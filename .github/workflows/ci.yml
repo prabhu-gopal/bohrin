@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: py${{ matrix.python-version }} · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install the project
+        run: uv sync --extra dev --python ${{ matrix.python-version }}
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run mypy
+
+      - name: Test
+        # The suite is fully synthetic: no network, no GPU, no dataset downloads.
+        run: uv run pytest -q
+
+  # The CLI is what users actually touch, and a working test suite has never once caught a
+  # broken entry point or a missing runtime dependency. This installs the built wheel into a
+  # clean environment and runs the binary, which is the only way to catch that.
+  smoke:
+    name: installed-wheel smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build the wheel
+        run: uv build
+
+      - name: Verify the wheel contains the package
+        run: |
+          ls -R dist/
+          python -c "
+          import zipfile, glob, sys
+          wheel = glob.glob('dist/*.whl')[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          assert any(n.startswith('bohrin/') for n in names), 'no bohrin/ inside the wheel'
+          print(f'{wheel}: {len(names)} files, package present')
+          "
+
+      - name: Install into a clean environment and run it
+        run: |
+          python -m venv /tmp/fresh
+          /tmp/fresh/bin/pip install --quiet dist/*.whl
+          /tmp/fresh/bin/bohrin --version
+          /tmp/fresh/bin/bohrin --help
+          /tmp/fresh/bin/bohrin list-detectors | head -5
+          /tmp/fresh/bin/bohrin explain stats.dead_dimension
+
+      - name: Errors are messages, not tracebacks
+        run: |
+          set +e
+          out=$(/tmp/fresh/bin/bohrin scan ./definitely-not-a-dataset 2>&1)
+          code=$?
+          set -e
+          echo "$out"
+          [ "$code" -eq 2 ] || { echo "expected exit 2 for a usage error, got $code"; exit 1; }
+          case "$out" in *Traceback*) echo "a traceback reached the user"; exit 1 ;; esac

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+*.so
+
+# Environments
+.venv/
+venv/
+.env
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Bohrin scan artifacts (never commit real reports)
+*_report.html
+*_report.json
+bohrin-report.*
+
+# Internal design docs: business strategy, roadmap, licensing/moat reasoning.
+# Kept locally for reference, deliberately never pushed to the public repo.
+/docs/

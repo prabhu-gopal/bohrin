@@ -1,0 +1,79 @@
+name: False positive
+description: Bohrin flagged something on your data that is actually fine.
+title: "[false positive] "
+labels: ["false-positive", "calibration"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This is the most valuable report you can send us.**
+
+        Bohrin's only real asset is that its findings are trustworthy. A detector that
+        cries wolf is worse than no detector, and we cannot find those on synthetic data —
+        we need yours. Every report here goes directly into threshold calibration.
+
+        You do **not** need to share your dataset. The detector id, the numbers bohrin
+        reported, and your explanation of why it is wrong is enough to act on.
+
+  - type: input
+    id: detector-id
+    attributes:
+      label: Detector ID
+      description: >
+        The bracketed id printed with the finding, e.g. `[stats.dead_dimension]`. Run
+        `bohrin explain <id>` to see what it thinks it is measuring.
+      placeholder: "stats.jitter_outlier"
+    validations:
+      required: true
+
+  - type: textarea
+    id: the-finding
+    attributes:
+      label: The finding, as bohrin printed it
+      description: Copy the whole block, including the measured value and the episode count.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: why-wrong
+    attributes:
+      label: Why is this wrong?
+      description: >
+        What does bohrin not know about your setup? This is the part we cannot guess.
+      placeholder: |
+        Dimension 6 is a binary gripper open/close, so its variance is supposed to be near
+        zero between grasps. It is not a dead dimension — it is doing its job.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dataset-context
+    attributes:
+      label: Dataset context
+      description: >
+        Robot/embodiment, control rate, action space (joint positions? EEF deltas?),
+        episode count, and the Hugging Face repo id if it is public.
+      placeholder: |
+        SO-101, 30 Hz, 6-DoF joint positions + binary gripper, 220 episodes, private.
+    validations:
+      required: true
+
+  - type: input
+    id: bohrin-version
+    attributes:
+      label: Bohrin version
+      description: "Output of `bohrin --version`"
+      placeholder: "bohrin 0.1.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: json
+    attributes:
+      label: Report JSON (optional, but very helpful)
+      description: >
+        `bohrin scan <path> --json report.json` gives us the exact measured values and
+        thresholds. Attach it or paste the relevant finding. It contains no raw data from
+        your dataset — only statistics.
+      render: json

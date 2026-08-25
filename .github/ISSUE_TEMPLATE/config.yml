@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/prabhu-gopal/bohrin/security/advisories/new
+    about: Please report security issues privately, never as a public issue. See SECURITY.md.
+  - name: Unsupported dataset format
+    url: https://github.com/prabhu-gopal/bohrin/issues/new?labels=format-request&title=%5Bformat%5D+
+    about: Want bohrin to read a format it does not support yet? Tell us which, and how common it is.

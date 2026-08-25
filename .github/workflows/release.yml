@@ -1,0 +1,99 @@
+name: Release
+
+# Tag-triggered publish. Never publish from a laptop: the tag is the only thing that can
+# ship a version, so what is on PyPI always corresponds to a commit anyone can check out.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      test_pypi:
+        description: "Publish to TestPyPI instead of PyPI"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build
+        run: uv build
+
+      - name: Show what is in the distributions
+        # If `bohrin/` is not inside the wheel, pyproject.toml is wrong and the upload
+        # would silently ship an empty package.
+        run: |
+          ls -R dist/
+          python -m zipfile -l dist/*.whl | head -20
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.test_pypi
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/bohrin
+    permissions:
+      # Required for Trusted Publishing: this is what lets uv mint a short-lived OIDC
+      # token instead of us storing a long-lived PyPI API token in GitHub Secrets.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Publish
+        run: uv publish --trusted-publishing always --publish-url https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: pypi
+      url: https://pypi.org/p/bohrin
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Publish
+        run: uv publish --trusted-publishing always
+
+  github-release:
+    name: Attach distributions to the GitHub release
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

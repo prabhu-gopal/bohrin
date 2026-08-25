@@ -1,0 +1,71 @@
+name: Bug report
+description: Bohrin crashed, failed to read a dataset, or did something clearly wrong.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The three version fields below are required because without
+        them almost every bug report is unactionable — we cannot tell a fixed bug from a
+        live one, or a format difference from a code difference.
+
+        **If bohrin flagged something that is actually fine**, that is a false positive, not
+        a bug — please use the *False positive* template instead. It goes into detector
+        calibration rather than the bug queue.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you run, what did you expect, and what did you get instead?
+      placeholder: |
+        I ran `bohrin scan ./my_data` and it exited with a traceback instead of a report.
+    validations:
+      required: true
+
+  - type: input
+    id: dataset
+    attributes:
+      label: Dataset
+      description: >
+        The Hugging Face repo id if it is public (e.g. `lerobot/pusht`) — that lets us
+        reproduce it exactly. If it is private, describe the format and layout instead.
+      placeholder: "lerobot/pusht — or: private LeRobot v2.1, 340 episodes, SO-101, 2 cameras"
+    validations:
+      required: true
+
+  - type: input
+    id: bohrin-version
+    attributes:
+      label: Bohrin version
+      description: "Output of `bohrin --version`"
+      placeholder: "bohrin 0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version and OS
+      description: "Output of `python --version`, plus your OS"
+      placeholder: "Python 3.11.9, Ubuntu 22.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Full output
+      description: >
+        The complete terminal output, including any traceback. This is automatically
+        formatted as code, so no backticks needed.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked that no existing issue already reports this.
+          required: true
