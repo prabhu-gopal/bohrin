@@ -66,7 +66,13 @@ def pairwise_distances(a: FloatArray, b: FloatArray) -> FloatArray:
     """
     aa = np.sum(a * a, axis=1)[:, None]
     bb = np.sum(b * b, axis=1)[None, :]
-    sq = np.maximum(aa + bb - 2.0 * (a @ b.T), 0.0)
+    # On some BLAS backends (observed with Apple Accelerate under Python 3.10) `a @ b.T` can
+    # raise a spurious RuntimeWarning for finite, well-formed inputs — an internal FPE flag
+    # from the GEMM microkernel, not a real division. The clamp to 0.0 immediately after
+    # already guards the one thing that could actually go wrong (a tiny negative from
+    # floating-point cancellation), so a warning here carries no information.
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        sq = np.maximum(aa + bb - 2.0 * (a @ b.T), 0.0)
     out: FloatArray = np.sqrt(sq)
     return out
 
@@ -158,8 +164,13 @@ def is_multimodal(
         # Diagonal covariance keeps the parameter count low, which matters at the small
         # neighbourhood sizes these are fitted on — a full covariance would be unstable and
         # could "discover" modes in ordinary noise.
-        one = GaussianMixture(n_components=1, covariance_type="diag", random_state=0).fit(samples)
-        two = GaussianMixture(n_components=2, covariance_type="diag", random_state=0).fit(samples)
+        #
+        # `samples` was already validated finite and non-degenerate above, so a RuntimeWarning
+        # from inside sklearn's internal matmuls here (observed on some BLAS backends, e.g.
+        # under Python 3.10) reflects an internal FPE flag, not a real problem with our input.
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            one = GaussianMixture(n_components=1, covariance_type="diag", random_state=0).fit(samples)
+            two = GaussianMixture(n_components=2, covariance_type="diag", random_state=0).fit(samples)
     except ValueError:
         return False
     if one.bic(samples) - two.bic(samples) <= bic_margin:

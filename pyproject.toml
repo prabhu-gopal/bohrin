@@ -40,6 +40,7 @@ dependencies = [
   "scipy>=1.11",   # KS statistic, distance primitives
   "scikit-learn>=1.4",  # kNN graph, ridge dynamics fit, KMeans/GMM (CPU-only, no weights)
   "huggingface-hub>=0.23",  # `bohrin scan owner/name` — the only network call in the tool
+  "typing_extensions>=4.6; python_version < '3.11'",  # typing.Self backport
 ]
 
 [project.optional-dependencies]

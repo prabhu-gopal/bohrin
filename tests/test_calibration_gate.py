@@ -21,6 +21,7 @@ import numpy as np
 import pytest
 
 import _synth
+from bohrin._arrays import FloatArray
 from bohrin.analysis.robust import mad_scores
 from bohrin.calibrate.collect import build_corpus, collect_scores
 from bohrin.calibrate.conformal import ConformalCalibrator, Selection
@@ -451,7 +452,7 @@ def test_no_detector_claims_calibration_it_did_not_use() -> None:
     )
 
 
-def _band_for(scores: np.ndarray, *, n_units: int, fpr: float) -> np.ndarray:
+def _band_for(scores: FloatArray, *, n_units: int, fpr: float) -> FloatArray:
     """A reference band drawn from ``scores``, sized to clear the resolution limit.
 
     Tiling a clean detector's own scores is a legitimate stand-in for a real reference band
@@ -463,7 +464,7 @@ def _band_for(scores: np.ndarray, *, n_units: int, fpr: float) -> np.ndarray:
     return np.tile(np.asarray(scores, dtype=np.float64), repeats)
 
 
-def _corpus_of(bands: dict[str, np.ndarray]) -> CalibrationCorpus:
+def _corpus_of(bands: dict[str, FloatArray]) -> CalibrationCorpus:
     """A wildcard-keyed corpus from ``detector_id → band``."""
     return CalibrationCorpus(
         version="1.0",

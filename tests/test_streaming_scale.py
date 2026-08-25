@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 from scipy.stats import ks_2samp
 
+from bohrin._arrays import FloatArray
 from bohrin.analysis.neighbors import ks_statistic
 from bohrin.analysis.shapes import dtw_distance, pairwise_distances
 from bohrin.profile.dataset_profile import DEFAULT_RESERVOIR_ROWS
@@ -42,7 +43,7 @@ def _rank_tolerance(p: float, n: int) -> float:
     return _SIGMA_ALLOWANCE * float(np.sqrt(p * (1.0 - p) / n))
 
 
-_StreamFn = Callable[[np.random.Generator, int], np.ndarray]
+_StreamFn = Callable[[np.random.Generator, int], FloatArray]
 
 _STREAMS: dict[str, _StreamFn] = {
     "normal": lambda rng, m: rng.normal(size=m),
@@ -79,10 +80,10 @@ def test_quantile_accuracy_is_reproducible_under_a_seed() -> None:
     """The reservoir's other advantage over a sketch: the same seed gives the same sample."""
     data = np.random.default_rng(1).normal(size=(200_000, 3))
 
-    def run() -> np.ndarray:
+    def run() -> FloatArray:
         reservoir = Reservoir(5_000, np.random.default_rng(99))
         reservoir.update(data)
-        return np.quantile(reservoir.values(), [0.01, 0.99], axis=0)
+        return np.asarray(np.quantile(reservoir.values(), [0.01, 0.99], axis=0), dtype=np.float64)
 
     assert np.array_equal(run(), run())
 
@@ -150,7 +151,7 @@ def test_reservoir_ignores_empty_batches() -> None:
 # ------------------------------------------------- the optimized primitives are equivalent
 
 
-def _reference_dtw(a: np.ndarray, b: np.ndarray, band: int = 10) -> float:
+def _reference_dtw(a: FloatArray, b: FloatArray, band: int = 10) -> float:
     """The original implementation: `np.linalg.norm` inside the DP loop."""
     n, m = a.shape[0], b.shape[0]
     if n == 0 or m == 0:

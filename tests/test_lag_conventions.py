@@ -216,7 +216,7 @@ def test_best_lag_refuses_a_boundary_peak() -> None:
     arbitrary, which would not exercise the boundary rule.
     """
     rng = np.random.default_rng(3)
-    smooth = np.convolve(rng.normal(size=240), np.ones(9) / 9, mode="valid")[:200]
+    smooth = np.convolve(rng.normal(size=240), np.ones(9) / 9, mode="valid")[:200].astype(np.float64)
     assert _best_lag(smooth, np.roll(smooth, 9), 4) is None  # true offset far outside ±4
 
 

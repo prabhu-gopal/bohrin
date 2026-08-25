@@ -44,7 +44,13 @@ def median_heuristic_gamma(pooled: FloatArray) -> float:
 
 
 def _sq_dists(a: FloatArray, b: FloatArray) -> FloatArray:
-    sq: FloatArray = np.sum(a**2, axis=1)[:, None] + np.sum(b**2, axis=1)[None, :] - 2.0 * (a @ b.T)
+    # On some BLAS backends (observed with Apple Accelerate under Python 3.10) `a @ b.T` can
+    # raise a spurious RuntimeWarning for finite, well-formed inputs — an internal FPE flag
+    # from the GEMM microkernel, not a real division. The clamp to 0.0 right after already
+    # guards the one thing that could actually go wrong (floating-point cancellation going
+    # slightly negative), so a warning here carries no information.
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        sq: FloatArray = np.sum(a**2, axis=1)[:, None] + np.sum(b**2, axis=1)[None, :] - 2.0 * (a @ b.T)
     return np.maximum(sq, 0.0)
 
 

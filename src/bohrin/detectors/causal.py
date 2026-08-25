@@ -169,9 +169,21 @@ def _linear_r2(features: FloatArray, targets: FloatArray) -> float:
         return 0.0
     x = np.hstack([features, np.ones((features.shape[0], 1), dtype=np.float64)])
     coef, _, _, _ = np.linalg.lstsq(x, targets, rcond=None)
-    pred = x @ coef
-    ss_res = float(np.sum((targets - pred) ** 2))
-    ss_tot = float(np.sum((targets - targets.mean(axis=0)) ** 2))
-    if ss_tot <= 1e-12:
+    if not np.all(np.isfinite(coef)):
+        # A degenerate fit (too few rows, collinear columns) can return non-finite
+        # coefficients; that varies by numpy/LAPACK version rather than being reliably
+        # raised, so it has to be checked rather than caught. No fit means no explanatory
+        # power, which R² = 0 says correctly.
         return 0.0
-    return 1.0 - ss_res / ss_tot
+    # `coef` is finite but an ill-conditioned fit can still make it astronomically large, and
+    # multiplying that back through `x` can overflow to inf even though every input was finite
+    # — the failure mode this whole function exists to survive, just one step later than the
+    # coefficients themselves. Compute under a local errstate (a non-finite result is handled
+    # explicitly below, so a warning here would be redundant, not informative) and let the
+    # final finiteness check be the single source of truth for "this fit is unusable."
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        pred = x @ coef
+        ss_res = float(np.sum((targets - pred) ** 2))
+        ss_tot = float(np.sum((targets - targets.mean(axis=0)) ** 2))
+        r2 = 1.0 - ss_res / ss_tot if ss_tot > 1e-12 else 0.0
+    return r2 if np.isfinite(r2) else 0.0

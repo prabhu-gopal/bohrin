@@ -303,7 +303,7 @@ def _idle_mask(action: FloatArray, proprio: FloatArray) -> BoolArray:
         no_motion = delta < _STATE_EPS
     else:
         no_motion = np.ones(action.shape[0], dtype=bool)
-    return no_command & no_motion
+    return np.asarray(no_command & no_motion, dtype=np.bool_)
 
 
 def _longest_true_run(mask: BoolArray) -> int:

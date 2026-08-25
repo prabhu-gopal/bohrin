@@ -59,7 +59,7 @@ class OperatorStyleDetector(Detector):
         # KMeans raises on NaN/inf. Episodes and metric rows are filtered together because
         # `labels[i]` is reported as `episodes[i]` — renumbering one alone would name the
         # wrong episode in the finding.
-        finite = np.isfinite(metrics).all(axis=1)
+        finite: BoolArray = np.asarray(np.isfinite(metrics).all(axis=1), dtype=np.bool_)
         if not bool(finite.all()):
             episodes = [ep for ep, ok in zip(episodes, finite.tolist(), strict=True) if ok]
             metrics = metrics[finite]
@@ -126,7 +126,7 @@ class TrajectoryAlignmentDetector(Detector):
                 matrix[i, j] = matrix[j, i] = dtw_distance(resampled[i], resampled[j])
         # Median over the others: mask the self-distance rather than including a spurious 0.
         off_diagonal = ~np.eye(n, dtype=bool)
-        return np.median(matrix[off_diagonal].reshape(n, n - 1), axis=1).astype(np.float64)
+        return np.asarray(np.median(matrix[off_diagonal].reshape(n, n - 1), axis=1), dtype=np.float64)
 
     def score_units(self, ctx: AnalysisContext) -> FloatArray | None:
         """Per-demo median DTW distance to the others — the quantity :meth:`run` gates on."""

@@ -23,8 +23,8 @@ def finite_row_mask(*arrays: FloatArray) -> BoolArray:
     mask: BoolArray | None = None
     for array in arrays:
         a = np.asarray(array, dtype=np.float64)
-        rows = np.isfinite(a) if a.ndim == 1 else np.isfinite(a).all(axis=1)
-        mask = rows if mask is None else (mask & rows)
+        rows = np.asarray(np.isfinite(a) if a.ndim == 1 else np.isfinite(a).all(axis=1), dtype=np.bool_)
+        mask = rows if mask is None else np.asarray(mask & rows, dtype=np.bool_)
     if mask is None:
         return np.empty(0, dtype=np.bool_)
     return mask

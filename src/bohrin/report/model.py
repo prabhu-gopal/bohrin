@@ -11,10 +11,10 @@ normalize *output* into ``Finding`` — one type, whatever the check.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from bohrin._compat import Self
 from bohrin.ir.schema import Family, Provenance, Severity
 from bohrin.version import REPORT_SCHEMA_VERSION, __version__
 

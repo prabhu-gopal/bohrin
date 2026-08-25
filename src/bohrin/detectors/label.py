@@ -22,6 +22,7 @@ import numpy as np
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from sklearn.neighbors import KNeighborsClassifier
 
+from bohrin._arrays import BoolArray
 from bohrin.analysis import embeddings
 from bohrin.analysis.confident_learning import confident_joint, label_error_mask, self_confidence
 from bohrin.detectors._common import blast_over, dataset_provenance, make_finding
@@ -116,7 +117,7 @@ class TrajectoryLabelMismatchDetector(Detector):
         # The kNN classifier raises on NaN/inf. Rows and their labels are filtered together
         # because a suspect is reported as `labelled[i]` — dropping rows alone would accuse the
         # wrong episode of being mislabeled.
-        finite = np.isfinite(matrix).all(axis=1)
+        finite: BoolArray = np.asarray(np.isfinite(matrix).all(axis=1), dtype=np.bool_)
         if not bool(finite.all()):
             matrix = matrix[finite]
             labelled = [item for item, ok in zip(labelled, finite.tolist(), strict=True) if ok]

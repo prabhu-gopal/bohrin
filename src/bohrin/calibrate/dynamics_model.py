@@ -126,9 +126,14 @@ def _fit_out_of_fold(features: FloatArray, targets: FloatArray, folds: int) -> t
     n = features.shape[0]
     k = max(2, min(folds, n // 2))
     predictions = np.zeros_like(targets)
-    for train_idx, test_idx in KFold(n_splits=k, shuffle=False).split(features):
-        model = Ridge(alpha=1e-6).fit(features[train_idx], targets[train_idx])
-        predictions[test_idx] = model.predict(features[test_idx])
+    # `features`/`targets` were already filtered to finite rows by the caller, so a
+    # RuntimeWarning from Ridge's internal `X.T @ X` here (observed on some BLAS backends,
+    # e.g. under Python 3.10, for a small or ill-conditioned fold) reflects an internal FPE
+    # flag rather than a real problem with our input.
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        for train_idx, test_idx in KFold(n_splits=k, shuffle=False).split(features):
+            model = Ridge(alpha=1e-6).fit(features[train_idx], targets[train_idx])
+            predictions[test_idx] = model.predict(features[test_idx])
     residual = np.linalg.norm(targets - predictions, axis=1).astype(np.float64)
     ss_res = float(np.sum((targets - predictions) ** 2))
     ss_tot = float(np.sum((targets - targets.mean(axis=0)) ** 2))

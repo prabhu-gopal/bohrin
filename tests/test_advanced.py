@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 import _synth
+from bohrin._arrays import FloatArray, IntArray
 from bohrin.analysis.confident_learning import (
     class_thresholds,
     confident_joint,
@@ -66,7 +67,7 @@ def test_scene_diversity_clean_and_injected() -> None:
 # ------------------------------------------------------------- confident learning
 
 
-def _toy_problem() -> tuple[np.ndarray, np.ndarray]:
+def _toy_problem() -> tuple[IntArray, FloatArray]:
     """Ten examples, two classes, confidently predicted; index 3 is labelled wrong."""
     labels = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1], dtype=np.int64)
     probs = np.tile(np.array([0.9, 0.1]), (10, 1))

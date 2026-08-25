@@ -21,6 +21,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+from bohrin._arrays import AnyArray
 from bohrin.encoders import get_encoder
 from bohrin.encoders.dino import DinoV2Encoder, _prepare
 from bohrin.ir.schema import PolicyFamily
@@ -42,7 +43,7 @@ class _StubModule:
     class _Tensor:
         """Carries a numpy array through ``from_numpy().float().permute()`` and the model."""
 
-        def __init__(self, array: np.ndarray) -> None:
+        def __init__(self, array: AnyArray) -> None:
             self.array = array
 
         def float(self) -> _StubModule._Tensor:
@@ -54,7 +55,7 @@ class _StubModule:
         def cpu(self) -> _StubModule._Tensor:
             return self
 
-        def numpy(self) -> np.ndarray:
+        def numpy(self) -> AnyArray:
             return self.array
 
     class _Hub:
@@ -82,7 +83,7 @@ class _StubModule:
     def __init__(self, embedding_dim: int = 384) -> None:
         self.hub = _StubModule._Hub(embedding_dim)
 
-    def from_numpy(self, array: np.ndarray) -> _StubModule._Tensor:
+    def from_numpy(self, array: AnyArray) -> _StubModule._Tensor:
         return _StubModule._Tensor(array)
 
     def inference_mode(self) -> _StubModule._InferenceMode:
