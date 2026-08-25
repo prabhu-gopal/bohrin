@@ -6,11 +6,12 @@ from collections.abc import Iterable, Iterator
 
 import pytest
 
-import _synth  # noqa: F401 - importing registers the memory adapter for the session
+import _synth
+import bohrin
 from bohrin._plugins import load_plugin_classes
 from bohrin.adapters.registry import discover as discover_adapters
 from bohrin.detectors.base import AnalysisContext, Detector
-from bohrin.detectors.registry import _REGISTERED, register
+from bohrin.detectors.registry import _REGISTERED, DEFAULT_EXCLUDED, register
 from bohrin.detectors.registry import discover as discover_detectors
 from bohrin.ir.schema import Family
 from bohrin.report.model import Finding
@@ -33,6 +34,31 @@ def test_lerobot_adapters_declared_as_entry_points() -> None:
 
 def test_memory_adapter_registered_programmatically() -> None:
     assert any(a.name == "memory" for a in discover_adapters())
+
+
+def test_default_excluded_detectors_are_real_and_only_the_two_flagged() -> None:
+    """A typo in DEFAULT_EXCLUDED would silently do nothing — pin it against the registry."""
+    known = {d.id for d in discover_detectors()}
+    assert {"smoothness.discontinuity_jump", "integrity.declared_mismatch"} == DEFAULT_EXCLUDED
+    assert known >= DEFAULT_EXCLUDED
+
+
+def test_a_default_scan_excludes_the_flagged_detector_all_includes_it() -> None:
+    """The actual product decision this exists for: measured on 20 real public LeRobot
+    datasets, discontinuity_jump reported HIGH on 70% of them — common enough that it was
+    winning the visible top-6 report slot with an untrustworthy finding. Excluded from a
+    default scan, reachable with --all; nothing about the detector itself changes."""
+    from bohrin.detectors.smoothness import DiscontinuityJumpDetector
+
+    episodes = _synth.clean_dataset(n_episodes=16)
+    episodes[4] = _synth.inject_jump(episodes[4])
+    uri = _synth.register_memory_dataset(episodes)
+
+    default_report = bohrin.scan(uri)
+    assert DiscontinuityJumpDetector.id not in default_report.detectors_run
+
+    full_report = bohrin.scan(uri, all_detectors=True)
+    assert DiscontinuityJumpDetector.id in full_report.detectors_run
 
 
 def test_only_and_disable_globs() -> None:

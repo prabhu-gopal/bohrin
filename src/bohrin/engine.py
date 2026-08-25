@@ -20,6 +20,7 @@ from bohrin.adapters.registry import select_adapter
 from bohrin.calibrate.corpus import CalibrationCorpus
 from bohrin.config import ScanConfig
 from bohrin.detectors.base import AnalysisContext
+from bohrin.detectors.registry import DEFAULT_EXCLUDED
 from bohrin.detectors.registry import discover as discover_detectors
 from bohrin.ir.schema import PolicyProfile
 from bohrin.profile.dataset_profile import ProfileBuilder
@@ -139,7 +140,10 @@ def run_scan(config: ScanConfig, *, progress: ProgressFn | None = None) -> Repor
     # ④ Analyze — run every applicable detector over the read-only context.
     findings: list[Finding] = []
     detectors_run: list[str] = []
-    selected = list(discover_detectors(only=config.only, disable=config.disable))
+    # An explicit --disable always wins: DEFAULT_EXCLUDED is what --all opts back INTO, not a
+    # floor under a user's own choice to turn something off.
+    disable = config.disable if config.all_detectors else (*config.disable, *DEFAULT_EXCLUDED)
+    selected = list(discover_detectors(only=config.only, disable=disable))
     for i, detector in enumerate(selected, start=1):
         emit("detect", i, len(selected))
         if not detector.applicable(profile, policy):

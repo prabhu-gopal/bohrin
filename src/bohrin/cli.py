@@ -146,6 +146,16 @@ def _build_parser() -> argparse.ArgumentParser:
     scan_p.add_argument("--no-vision", action="store_true", help="Skip image decoding.")
     scan_p.add_argument("--only", help="Run only matching detectors (comma-separated globs).")
     scan_p.add_argument("--disable", help="Skip matching detectors (comma-separated globs).")
+    scan_p.add_argument(
+        "--all",
+        dest="all_detectors",
+        action="store_true",
+        help=(
+            "Also run detectors excluded from the default scan pending recalibration "
+            "(see `bohrin explain smoothness.discontinuity_jump`). Nothing is deleted — "
+            "this only changes what runs without asking."
+        ),
+    )
     scan_p.add_argument("--seed", type=int, default=0, help="Deterministic sampling seed.")
     scan_p.add_argument(
         "--max-episode-memory",
@@ -228,6 +238,7 @@ def _cmd_scan(args: argparse.Namespace, console: Console, err: Console) -> int:
                 no_vision=args.no_vision,
                 only=_split_csv(args.only),
                 disable=_split_csv(args.disable),
+                all_detectors=args.all_detectors,
                 seed=args.seed,
                 fpr=args.fpr,
                 lang=args.lang,

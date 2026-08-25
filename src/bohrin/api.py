@@ -28,6 +28,7 @@ def scan(
     no_vision: bool = False,
     only: Sequence[str] = (),
     disable: Sequence[str] = (),
+    all_detectors: bool = False,
     seed: int = 0,
     fpr: float = DEFAULT_FPR,
     lang: str = "en",
@@ -44,6 +45,10 @@ def scan(
     ``path`` may be a local directory, a single-file dataset, or a Hugging Face Hub
     ``owner/name`` repo id — the one and only case in which bohrin touches the network.
     An existing local path always takes precedence over a same-named Hub repo.
+
+    A default scan skips detectors listed in
+    :data:`bohrin.detectors.registry.DEFAULT_EXCLUDED` pending recalibration; pass
+    ``all_detectors=True`` to run everything, mirroring ``--all``.
 
     ``policy`` raises :class:`~bohrin.policy.loader.UnreadablePolicyError` if the checkpoint
     cannot be read safely, and ``target`` raises
@@ -75,6 +80,7 @@ def scan(
         no_vision=no_vision,
         only=tuple(only),
         disable=tuple(disable),
+        all_detectors=all_detectors,
         seed=seed,
         fpr=fpr,
         lang=lang,

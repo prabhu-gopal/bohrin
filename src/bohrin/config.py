@@ -51,6 +51,10 @@ class ScanConfig:
     no_vision: bool = False
     only: tuple[str, ...] = ()
     disable: tuple[str, ...] = ()
+    #: Run every detector, including ``bohrin.detectors.registry.DEFAULT_EXCLUDED`` — the ones
+    #: held back from a default scan pending recalibration. ``False`` is the trustworthy
+    #: default; nothing in the excluded set is deleted, weaker, or hidden from ``--all``.
+    all_detectors: bool = False
     seed: int = 0
     fpr: float = DEFAULT_FPR
     lang: str = "en"

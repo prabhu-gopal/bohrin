@@ -423,7 +423,10 @@ def test_a_calibrated_scan_still_catches_a_planted_defect(clean_corpus: Path) ->
             for i, ep in enumerate(_synth.smooth_dataset(n_episodes=_HOLDOUT_EPISODES))
         ]
     )
-    report = scan(faulted, calibration=str(clean_corpus), fpr=_E2E_FPR)
+    # discontinuity_jump is excluded from a default scan (see bohrin.detectors.registry.
+    # DEFAULT_EXCLUDED); this test is exercising its calibrated gate specifically, not the
+    # default CLI experience, so it opts back in explicitly.
+    report = scan(faulted, calibration=str(clean_corpus), fpr=_E2E_FPR, all_detectors=True)
     cluster = report.cluster("smoothness.discontinuity_jump")
     assert cluster is not None, "a 5-unit teleport went unreported under the calibrated gate"
     assert cluster.severity is Severity.HIGH
