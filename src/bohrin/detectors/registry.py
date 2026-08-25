@@ -18,6 +18,26 @@ ENTRY_POINT_GROUP = "bohrin.detectors"
 # Programmatically registered detectors (via @register), keyed by detector id.
 _REGISTERED: dict[str, type[Detector]] = {}
 
+#: Detectors excluded from a default scan pending recalibration — not because they are
+#: wrong in principle, but because a sweep of 20 real public LeRobot datasets
+#: (``scripts/hub_smoke.py``) measured them reporting HIGH on 70% and 60% of curated,
+#: widely-used datasets respectively. A HIGH that common is far more likely a threshold
+#: problem than a real epidemic, and the report ranks by severity x blast radius — so on
+#: the datasets where either fired, it landed in the visible top-6 findings 13 of 16 times,
+#: winning the #1 or #2 slot in 6 of those. A first-time user's very first impression of the
+#: tool was disproportionately likely to be one of the two things already known to be
+#: probably wrong. See ``docs/11_HUB_SMOKE_RESULTS.md``.
+#:
+#: Nothing here is deleted or degraded: both detectors are fully implemented, benchmarked,
+#: and reachable with ``--all``. This set is revisited as each is re-calibrated against real
+#: data or a calibration corpus (``bohrin calibrate``) makes ``--fpr`` govern its gate instead.
+DEFAULT_EXCLUDED: frozenset[str] = frozenset(
+    {
+        "smoothness.discontinuity_jump",
+        "integrity.declared_mismatch",
+    }
+)
+
 
 def register(cls: type[Detector]) -> type[Detector]:
     """Class decorator: register a detector without an entry point (docs/05 §4).

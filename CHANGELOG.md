@@ -9,6 +9,18 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ## [Unreleased]
 
+### Changed
+
+- `smoothness.discontinuity_jump` and `integrity.declared_mismatch` (see "Known
+  limitations" under 0.1.0) no longer run in a default scan. Measured on the same
+  20-dataset sweep: when either fired, the report's own ranking (severity × blast radius)
+  put it in the visible top-6 findings 13 of 16 times, winning the #1 or #2 slot in 6 of
+  those — a first-time user's first impression was disproportionately likely to be one of
+  the two things already known to probably be wrong. Nothing is deleted, degraded, or
+  hidden: both are fully implemented and reachable with the new `--all` flag
+  (`bohrin.scan(..., all_detectors=True)` in the Python API), and this default list lives
+  at `bohrin.detectors.registry.DEFAULT_EXCLUDED`.
+
 ## [0.1.0] — unreleased
 
 First public release.

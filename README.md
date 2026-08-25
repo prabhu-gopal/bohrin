@@ -68,7 +68,8 @@ Python 3.10–3.13. Point it at a local directory or a Hugging Face Hub `owner/n
 
 ## What it checks
 
-Bohrin runs 48 detectors across 12 families. What makes a finding useful is not that
+Bohrin ships 48 detectors across 12 families — 46 run by default, 2 are held back
+pending recalibration (see below) and reachable with `--all`. What makes a finding useful is not that
 something is statistically unusual — it is the **mechanism**: why this specific defect
 degrades a trained policy. Every finding carries one, plus the measured value, the
 threshold it crossed, the affected episodes, and a concrete fix.
@@ -101,11 +102,12 @@ Being clear about this matters more than any feature claim:
 - **The findings are not calibrated against training outcomes yet.** They are grounded in
   documented failure mechanisms, not in a corpus of runs that measures how much each defect
   actually costs. Treat severity as a triage ordering, not a prediction.
-- **Two detectors are known to over-report.** On a 20-dataset sweep of curated public
-  LeRobot data, `smoothness.discontinuity_jump` and `integrity.declared_mismatch` reported
-  HIGH on 70% and 60% of datasets respectively. A HIGH that common is far more likely to be
-  a threshold problem than a real epidemic, so treat those two with suspicion until they
-  are re-calibrated, and please
+- **Two detectors are excluded from a default scan.** On a 20-dataset sweep of curated
+  public LeRobot data, `smoothness.discontinuity_jump` and `integrity.declared_mismatch`
+  reported HIGH on 70% and 60% of datasets respectively — common enough that they were
+  winning the visible top of the report with an untrustworthy finding, on data that has no
+  reason to be that broadly defective. Pass `--all` to run them anyway; nothing is deleted,
+  just held back pending recalibration. Please
   [report them as false positives](https://github.com/prabhu-gopal/bohrin/issues/new?template=false_positive.yml)
   if they fire on data you trust. The sweep is reproducible: `python scripts/hub_smoke.py`.
 
