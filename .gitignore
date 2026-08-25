@@ -33,3 +33,7 @@ bohrin-report.*
 # Internal design docs: business strategy, roadmap, licensing/moat reasoning.
 # Kept locally for reference, deliberately never pushed to the public repo.
 /docs/
+
+# The local working playbook (branch rules, CI checks, release process). Kept out of the
+# public repo by choice, not because it's sensitive — see the decision in chat history.
+/CLAUDE.md
