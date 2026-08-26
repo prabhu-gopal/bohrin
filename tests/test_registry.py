@@ -36,10 +36,19 @@ def test_memory_adapter_registered_programmatically() -> None:
     assert any(a.name == "memory" for a in discover_adapters())
 
 
-def test_default_excluded_detectors_are_real_and_only_the_two_flagged() -> None:
-    """A typo in DEFAULT_EXCLUDED would silently do nothing — pin it against the registry."""
+def test_default_excluded_detectors_are_real_and_exactly_the_flagged_set() -> None:
+    """A typo in DEFAULT_EXCLUDED would silently do nothing — pin it against the registry.
+
+    The set is pinned by name, not just by size, so growing it is a deliberate edit here
+    rather than something that happens quietly. Each member needs measured numbers in the
+    ``DEFAULT_EXCLUDED`` docstring before it is added.
+    """
     known = {d.id for d in discover_detectors()}
-    assert {"smoothness.discontinuity_jump", "integrity.declared_mismatch"} == DEFAULT_EXCLUDED
+    assert {
+        "smoothness.discontinuity_jump",
+        "integrity.declared_mismatch",
+        "dynamics.inverse_residual",
+    } == DEFAULT_EXCLUDED
     assert known >= DEFAULT_EXCLUDED
 
 

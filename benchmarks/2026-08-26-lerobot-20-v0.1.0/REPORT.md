@@ -1,4 +1,4 @@
-# A Precision Audit of Robot Data-Quality Detectors
+# A Precision Audit of Bohrin, a Static Analyzer for Robot Demonstration Data
 
 **46 static checks measured against 20 public LeRobot datasets: 4,342 episodes,
 545,964 frames, 22 seconds.**
@@ -34,8 +34,10 @@ On the tool itself:
 - **Cost.** 22.5 s for the full corpus on a laptop CPU, no GPU, no video decoded.
 - **Yield.** 190 findings: 23 HIGH, 121 MEDIUM, 46 LOW. Every dataset produced findings;
   17 of 20 produced at least one HIGH.
-- **Selectivity.** Of 46 detectors that run by default, 27 fired at least once, 19 never
-  fired, and 4 ever reached HIGH.
+- **Selectivity.** Of the 46 detectors that ran by default at the time of this run, 27 fired
+  at least once, 19 never fired, and 4 ever reached HIGH.
+- **This run changed bohrin.** `dynamics.inverse_residual` fired on 100% of the corpus and
+  was moved out of the default set as a result (Section 6.1), leaving 45.
 - **Six detectors are effectively always-on** (Section 5), and they, not the HIGH findings,
   are what makes a report long.
 - **The report is too long to act on** (Section 4). A median of 9.5 findings per dataset,
@@ -59,7 +61,7 @@ user. Measuring it requires real data and a count of complaints.
 ## 2. Corpus
 
 Twenty LeRobot datasets, chosen for breadth of embodiment and provenance rather than size.
-Fourteen are Open X-Embodiment datasets that reached LeRobot through an RLDS conversion
+Fourteen are Open X-Embodiment datasets that reached LeRobot through a conversion from RLDS, the Reinforcement Learning Datasets format
 [[1](#references)]; six were published natively for LeRobot. Four are simulated. Action
 dimensionality spans 2 to 40 and control rates span 5 Hz to 50 Hz.
 
@@ -164,12 +166,13 @@ The detector now fires on 20 of 20 datasets and returns HIGH on 10 of 20. An ear
 of this report proposed three explanations. One has since been tested.
 
 **Rejected: the ridge solve was ill-conditioned.** The detector fits an inverse-dynamics
-model *g*(*oₜ₋₁*, *oₜ*, *oₜ₊₁*) → *âₜ* and thresholds the residual. The design matrix stacks
-consecutive states, which are nearly identical in a smooth trajectory, so it is collinear by
-construction; the ridge penalty was 1e-6, effectively unregularized, and LAPACK reported
+model *g*(*oₜ₋₁*, *oₜ*, *oₜ₊₁*) → *âₜ* and thresholds the residual. Bohrin builds that fit from
+consecutive states, which in a smooth trajectory are nearly identical, so the columns it
+solves over are close to duplicates of one another. The ridge penalty meant to counteract
+that was 1e-6, small enough to do nothing, and the linear-algebra library underneath reported
 `Ill-conditioned matrix (rcond=7.05e-17)` on real datasets. The fit was standardized
 per fold and the penalty raised to 1.0, and the solve now abstains outright rather than
-returning a residual from a fit LAPACK flags as unreliable.
+returning a residual from a fit the solver itself flags as unreliable.
 
 The numerical problem was real and is fixed. **It was not the cause of the over-firing.**
 Fire rate went from 19/20 to 20/20 and the HIGH rate stayed at exactly 10/20. The hypothesis
@@ -197,6 +200,33 @@ native one runs faster, so control rate and provenance are perfectly confounded 
 corpus cannot separate them. Doing so requires data that breaks the confound: native
 recordings at 5 Hz, or converted data at higher rates. See Section 8.3.
 
+### 6.1 What this run decided
+
+Bohrin's rule for a detector it cannot yet trust is to measure it, record the number, and
+gate it, never to delete it. `dynamics.inverse_residual` now meets that bar, so it has moved
+to `DEFAULT_EXCLUDED` and no longer runs in a default scan. It stays fully implemented and
+reachable with `--all`.
+
+Compared against the two detectors excluded before it, on the same corpus:
+
+| Detector | Fires on | Reaches HIGH | In visible top-5 |
+| --- | ---: | ---: | ---: |
+| `dynamics.inverse_residual` | **100%** | 50% | **60%** |
+| `smoothness.discontinuity_jump` | 70% | 70% | 50% |
+| `integrity.declared_mismatch` | 60% | 60% | 5% |
+
+Its HIGH rate is the *lowest* of the three. The 100% fire rate is what decides it: a detector
+that fires on every curated public dataset cannot discriminate, whatever severity it
+attaches. Removing it from the default set takes the corpus from 23 HIGH findings to 13, and
+the datasets carrying at least one HIGH from 17 of 20 to 11 of 20, which is what makes a HIGH
+worth reading again.
+
+`dynamics.forward_residual` is the obvious next candidate and is deliberately left in. It
+fires on 90% and reaches the visible top-5 on 75%, the highest of any detector, but it never
+reports HIGH, so it does not break a `--fail-on HIGH` gate. Excluding two undiagnosed
+detectors at once would be over-correction, and this set is meant to be evidence-gated rather
+than a place for detectors we are merely unsure about.
+
 ## 7. Triage sampling does not change the conclusions
 
 The default scan caps at 300 episodes, which subsamples `ucsd_pick_and_place_dataset`
@@ -222,7 +252,7 @@ datasets rather than a general guarantee.
 Read this section before quoting any number above.
 
 **8.1 Fire rate is not precision.** Nothing here establishes that a single finding is
-correct. A 95% fire rate is equally consistent with "95% of public robot datasets have this
+correct. A 100% fire rate is equally consistent with "every public robot dataset has this
 defect" and with "the threshold is too tight." No ground-truth labels exist for this corpus
 and none were constructed. Every rate reported here is a rate of complaint. The next step
 is to hand-adjudicate a stratified sample against the underlying Parquet and publish a
@@ -265,7 +295,7 @@ nothing to read. A different configuration produces different numbers.
 
 **8.6 The conformal gate never activated, and public metadata may prevent fixing that.**
 Bohrin's `--fpr` becomes a false-discovery bound only when a calibration corpus covers the
-dataset's embodiment, using embodiment as a Mondrian category [[6](#references)]. No corpus
+dataset's embodiment, keeping a separate reference distribution per embodiment, which is what conformal prediction calls a Mondrian taxonomy [[6](#references)]. No corpus
 ships with the package, so every scan fell back to a robust-*z* heuristic and `--fpr` was
 inert.
 
@@ -278,24 +308,25 @@ for. This is a finding about ecosystem metadata as much as about the tool.
 **8.7 Numerical warnings are resolved, and one root cause is fixed.** An earlier run of this
 corpus leaked `LinAlgWarning: Ill-conditioned matrix` and numpy `divide by zero` / `overflow`
 / `invalid value` warnings from scikit-learn to stderr during ordinary scans. The
-ill-conditioning had a real cause and is fixed at source (Section 6). The remainder are IEEE
-flags raised inside BLAS during clustering, on input already validated as finite; they are
-suppressed at one documented boundary in the engine, with `BOHRIN_SHOW_NUMERIC_WARNINGS=1`
+ill-conditioning had a real cause and is fixed at source (Section 6). The rest are floating-point
+flags raised deep inside the numerical libraries during clustering, on input bohrin has
+already checked is finite; they are suppressed at one documented boundary in the engine, with `BOHRIN_SHOW_NUMERIC_WARNINGS=1`
 to restore them for debugging. This sweep produced zero warning lines on stderr. Genuine
 non-finite data is still reported, by `integrity.nan_inf`, on the raw episodes.
 
 **8.8 Dataset revisions are not pinned.** A Hub-side update will change these numbers.
 
-## 9. Two detectors were correctly held back
+## 9. The held-back set, and why it grew
 
-`DEFAULT_EXCLUDED` in `src/bohrin/detectors/registry.py` withholds two implemented, tested
-detectors from a default scan pending recalibration, reachable with `--all`:
-`smoothness.discontinuity_jump` and `integrity.declared_mismatch`. They were excluded after
-an earlier run of this harness measured them reporting HIGH on 70% and 60% of the corpus.
-Neither appears in any finding here, confirming the mechanism works.
+`DEFAULT_EXCLUDED` in `src/bohrin/detectors/registry.py` names detectors that are implemented
+and tested but withheld from a default scan pending recalibration, reachable with `--all`.
+Before this run it held `smoothness.discontinuity_jump` and `integrity.declared_mismatch`,
+excluded after an earlier sweep measured them reporting HIGH on 70% and 60% of the corpus.
+Neither appears in any default finding here, confirming the mechanism works. This run added
+`dynamics.inverse_residual` (Section 6.1).
 
-This is the project's alternative to deleting a noisy detector: measure it, record the
-number, and gate it.
+Deleting a noisy detector destroys the evidence needed to fix it and quietly narrows what
+bohrin can see. Measuring it, recording the number, and gating it keeps both.
 
 ## 10. Reproducing
 

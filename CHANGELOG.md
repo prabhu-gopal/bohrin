@@ -42,6 +42,18 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ### Changed
 
+- **`dynamics.inverse_residual` no longer runs in a default scan.** Measured on the
+  20-dataset benchmark: it fires on **100%** of the corpus (20/20) and reports HIGH on 50%
+  (10/20), and reaches the report's visible top-5 on 60% of datasets, more often than either
+  detector already excluded. Its HIGH rate is lower than theirs; the 100% fire rate is what
+  decides it, because a detector that fires on every curated public dataset cannot
+  discriminate whatever severity it attaches. Excluding it takes the corpus from 23 HIGH
+  findings to 13 and the datasets carrying at least one HIGH from 17 of 20 to 11 of 20.
+  Nothing is deleted: it stays fully implemented and reachable with `--all`. One explanation
+  was tested and rejected first (see Fixed, below); the two that survive are confounded in
+  that corpus, so recalibration waits on a corpus of natively-recorded community datasets.
+  `dynamics.forward_residual` is the next candidate and is deliberately **not** excluded
+  yet: it has the highest top-5 visibility of any detector (75%) but never reports HIGH.
 - **A default `bohrin scan` now details the top 5 findings instead of 6**, and names the
   flag that carries the rest (`--html` or `--json`, never `--all`, which adds the
   held-back over-reporting detectors). The benchmark measured a median of 9.5 findings per

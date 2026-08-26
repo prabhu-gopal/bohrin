@@ -13,42 +13,35 @@ $ bohrin scan lerobot/pusht
 bohrin  ·  lerobot/pusht
 lerobot_v3 · 206 episodes · unknown · 10 Hz · action_dim 2
 ╭──────────────────╮
-│ 3 MEDIUM   4 LOW │
+│ 3 MEDIUM   3 LOW │
 ╰──────────────────╯
-by family: smoothness 3  dynamics 2  stats 1  temporal 1
+by family: smoothness 3  dynamics 1  stats 1  temporal 1
 
 MEDIUM ▸ The dataset's distribution shifts partway through collection
-         → Check for a recalibration, tool change, or operator change 
-midway; consider treating the segments as separate datasets.
+         → Check for a recalibration, tool change, or operator change midway; consider
+treating the segments as separate datasets.
            206 eps  [stats.distribution_drift]
 
-LOW    ▸ State evolves inconsistently with the actions in 2.0% of 
-transitions (206 episodes)
-         → Inspect the flagged segments; drop episodes containing resets or 
-frame drops.
+LOW    ▸ State evolves inconsistently with the actions in 2.1% of transitions (206
+episodes)
+         → Inspect the flagged segments; drop episodes containing resets or frame drops.
            206 eps  [dynamics.forward_residual]
-
-LOW    ▸ Logged actions don't explain 2.0% of transitions, spread over 206 
-episode(s)
-         → Inspect the flagged episodes for recording misalignment or 
-dropped frames; re-sync the action and observation streams.
-           206 eps  [dynamics.inverse_residual]
 
 MEDIUM ▸ Same state, different next action in 74 episode(s)
          → Prefer action chunking (ACT) or Diffusion Policy over plain BC.
            74 eps  [temporal.non_markovian_pause]
 
 MEDIUM ▸ Shaky teleoperation in 9 episode(s) (up to 6.3× median jerk)
-         → Re-record or smooth the flagged episodes; consider a low-pass 
-filter on teleop input.
+         → Re-record or smooth the flagged episodes; consider a low-pass filter on
+teleop input.
            9 eps  [smoothness.jerk_outlier]
 
 LOW    ▸ 4 episode(s) wander: up to 18.6× the direct path
-         → Review the flagged episodes; re-record the ones where the 
-operator was searching.
+         → Review the flagged episodes; re-record the ones where the operator was
+searching.
            4 eps  [smoothness.path_efficiency]
 
-… 1 more finding(s).
+… 1 more finding(s) — --html or --json for all.
 Next: bohrin scan lerobot/pusht --html report.html --open
 ```
 
@@ -68,7 +61,7 @@ Python 3.10–3.13. Point it at a local directory or a Hugging Face Hub `owner/n
 
 ## What it checks
 
-Bohrin ships 48 detectors across 12 families — 46 run by default, 2 are held back
+Bohrin ships 48 detectors across 12 families — 45 run by default, 3 are held back
 pending recalibration (see below) and reachable with `--all`. What makes a finding useful is not that
 something is statistically unusual — it is the **mechanism**: why this specific defect
 degrades a trained policy. Every finding carries one, plus the measured value, the
@@ -102,14 +95,16 @@ Being clear about this matters more than any feature claim:
 - **The findings are not calibrated against training outcomes yet.** They are grounded in
   documented failure mechanisms, not in a corpus of runs that measures how much each defect
   actually costs. Treat severity as a triage ordering, not a prediction.
-- **Two detectors are excluded from a default scan.** On a 20-dataset sweep of curated
-  public LeRobot data, `smoothness.discontinuity_jump` and `integrity.declared_mismatch`
-  reported HIGH on 70% and 60% of datasets respectively — common enough that they were
-  winning the visible top of the report with an untrustworthy finding, on data that has no
-  reason to be that broadly defective. Pass `--all` to run them anyway; nothing is deleted,
-  just held back pending recalibration. Please
+- **Three detectors are excluded from a default scan.** Each was measured over-firing on a
+  20-dataset sweep of curated public LeRobot data, and gating beats deleting.
+  `smoothness.discontinuity_jump` and `integrity.declared_mismatch` reported HIGH on 70% and
+  60% of that corpus. `dynamics.inverse_residual` fired on **100%** of it and reported HIGH
+  on 50%; excluding it drops the corpus from 23 HIGH findings to 13, and the datasets
+  carrying at least one HIGH from 17 of 20 to 11 of 20. Pass `--all` to run them anyway;
+  nothing is deleted, just held back pending recalibration. Please
   [report them as false positives](https://github.com/prabhu-gopal/bohrin/issues/new?template=false_positive.yml)
-  if they fire on data you trust. The sweep is reproducible: `python scripts/hub_smoke.py`.
+  if they fire on data you trust. The evidence and the method are in
+  [`benchmarks/`](benchmarks/).
 
 ## Measured evidence
 

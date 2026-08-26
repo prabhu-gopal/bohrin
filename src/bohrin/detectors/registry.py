@@ -18,23 +18,47 @@ ENTRY_POINT_GROUP = "bohrin.detectors"
 # Programmatically registered detectors (via @register), keyed by detector id.
 _REGISTERED: dict[str, type[Detector]] = {}
 
-#: Detectors excluded from a default scan pending recalibration — not because they are
-#: wrong in principle, but because a sweep of 20 real public LeRobot datasets
-#: (``scripts/hub_smoke.py``) measured them reporting HIGH on 70% and 60% of curated,
-#: widely-used datasets respectively. A HIGH that common is far more likely a threshold
-#: problem than a real epidemic, and the report ranks by severity x blast radius — so on
-#: the datasets where either fired, it landed in the visible top-6 findings 13 of 16 times,
-#: winning the #1 or #2 slot in 6 of those. A first-time user's very first impression of the
-#: tool was disproportionately likely to be one of the two things already known to be
-#: probably wrong. See ``docs/11_HUB_SMOKE_RESULTS.md``.
+#: Detectors excluded from a default scan pending recalibration. None of them is wrong in
+#: principle; each was *measured* firing too often on curated, widely-used public data to
+#: carry information, and gating beats deleting. Nothing here is removed or degraded: every
+#: one is fully implemented, benchmarked, and reachable with ``--all``.
 #:
-#: Nothing here is deleted or degraded: both detectors are fully implemented, benchmarked,
-#: and reachable with ``--all``. This set is revisited as each is re-calibrated against real
-#: data or a calibration corpus (``bohrin calibrate``) makes ``--fpr`` govern its gate instead.
+#: ``smoothness.discontinuity_jump`` and ``integrity.declared_mismatch`` were excluded first,
+#: after a sweep of 20 real public LeRobot datasets measured them reporting HIGH on 70% and
+#: 60% of the corpus. Because the report ranks by severity x blast radius, on the datasets
+#: where either fired it landed in the visible top findings 13 of 16 times, taking the #1 or
+#: #2 slot in 6 of those: a first-time user's very first impression of bohrin was
+#: disproportionately likely to be one of the two things already known to be probably wrong.
+#:
+#: ``dynamics.inverse_residual`` joined them after the 2026-08-26 benchmark
+#: (``benchmarks/2026-08-26-lerobot-20-v0.1.0/``) measured it on the same 20 datasets:
+#:
+#: * fires on **100%** of them (20/20) and reports HIGH on 50% (10/20);
+#: * reaches the visible top-5 on 60% of them, more often than either detector above;
+#: * excluding it drops the corpus from 23 HIGH findings to 13, and the number of datasets
+#:   carrying at least one HIGH from 17/20 to 11/20.
+#:
+#: Its HIGH rate is *lower* than the two above; the 100% fire rate is what decides it. A
+#: detector that fires on every curated public dataset cannot discriminate, whatever severity
+#: it attaches. One explanation was tested and rejected: the ridge solve behind it was
+#: genuinely ill-conditioned, that is fixed, and the fire and HIGH rates did not move. The
+#: two surviving explanations, 5 Hz control rate and RLDS conversion provenance, are perfectly
+#: confounded in that corpus, so it cannot be diagnosed there. Recalibration needs a corpus of
+#: natively-recorded community datasets.
+#:
+#: Next candidate, deliberately **not** excluded yet: ``dynamics.forward_residual`` fires on
+#: 90% and reaches the top-5 on 75%, the highest visibility of any detector, but never reports
+#: HIGH, so it does not break a ``--fail-on HIGH`` gate. Excluding two undiagnosed detectors at
+#: once would be over-correction; this set is evidence-gated, not a place to put detectors we
+#: are merely unsure of.
+#:
+#: This set shrinks as each detector is recalibrated against real data, or as a calibration
+#: corpus (``bohrin calibrate``) makes ``--fpr`` govern its gate instead.
 DEFAULT_EXCLUDED: frozenset[str] = frozenset(
     {
         "smoothness.discontinuity_jump",
         "integrity.declared_mismatch",
+        "dynamics.inverse_residual",
     }
 )
 

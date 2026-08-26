@@ -30,11 +30,16 @@
 \setlength{\parskip}{0.35em}
 \setlength{\parindent}{0pt}
 
+% Detector ids are long unbreakable typewriter words (`dynamics.inverse_residual`), which
+% leaves justified paragraphs overfull. \emergencystretch lets TeX loosen a line only when
+% it would otherwise overflow, so ordinary paragraphs keep normal spacing.
+\emergencystretch=3em
 \newcommand{\dtr}[1]{\texttt{\small #1}}
 \newcommand{\warn}[1]{\textcolor{critical}{\textbf{#1}}}
 
-\title{\vspace{-2.2em}\textbf{A Precision Audit of Robot Data-Quality Detectors}\\[0.35em]
-\large 46 Static Checks Measured Against 20 Public LeRobot Datasets}
+\title{\vspace{-2.2em}\textbf{A Precision Audit of Bohrin, a Static Analyzer for
+Robot Demonstration Data}\\[0.35em]
+\large 46 Detectors Measured Against 20 Public LeRobot Datasets}
 \author{Prabhu Gopal}
 \date{26 August 2026 \quad$\cdot$\quad bohrin 0.1.0 \quad$\cdot$\quad commit \texttt{cf39d78}}
 
@@ -48,7 +53,7 @@ behavior-cloned policy before training begins. Their detectors are typically val
 fault injection: plant a known defect in a fixture, confirm the detector fires. That
 measures recall and cannot measure precision, because a detector that fires unconditionally
 passes every such test. We report the complementary measurement for \emph{bohrin}, an
-open-source dataset linter, across 20 public LeRobot datasets (4{,}342 episodes,
+open-source linter for robot demonstration datasets, across 20 public LeRobot datasets (4{,}342 episodes,
 545{,}964 frames, 2--40 action dimensions, 5--50\,Hz, simulated and real).
 Our most consequential result is not about the tool: \textbf{18 of 20 datasets declare}
 \mbox{\texttt{robot\_type:\,"unknown"}}, so any method conditioning on embodiment via Hub
@@ -82,8 +87,9 @@ requires real data and a count of complaints. This report is that measurement.
 \section{Corpus and Method}
 
 Twenty LeRobot datasets were selected for breadth of embodiment and provenance rather than
-size. Fourteen are Open X-Embodiment datasets \cite{oxe} that reached LeRobot through an
-RLDS conversion; six were published natively for LeRobot. Four are simulated. Action
+size. Fourteen are Open X-Embodiment datasets \cite{oxe} that reached LeRobot through a
+conversion from RLDS, the Reinforcement Learning Datasets format; six were published
+natively for LeRobot. Four are simulated. Action
 dimensionality spans 2 to 40 and control rates span 5\,Hz to 50\,Hz. Bohrin does not decode
 video, so the corpus occupies roughly 50\,MB.
 
@@ -171,8 +177,8 @@ per-episode fixed work dominates.}
 
 \subsection{Selectivity}
 
-Of the 46 detectors that run in a default scan (48 registered, 2 held back;
-Section~\ref{sec:excluded}), \textbf{27 fired at least once} and \textbf{19 never fired}.
+Of the 46 detectors that ran by default at the time of this run (48 registered, 2 held
+back; Section~\ref{sec:excluded} explains why that is now 45), \textbf{27 fired at least once} and \textbf{19 never fired}.
 Four ever reached \textsc{high} (Table~\ref{tab:high}, Figure~\ref{fig:rates}).
 
 \begin{figure}[tb]
@@ -247,12 +253,14 @@ Detector & Fires on & Reaches \textsc{high} \\
 The detector fires on 20 of 20 datasets and returns \textsc{high} on 10 of 20. An earlier
 draft proposed three explanations; one has since been tested.
 
-\textbf{Rejected: the ridge solve was ill-conditioned.} The design matrix stacks consecutive
-states, nearly identical in a smooth trajectory and thus collinear by construction, while the
-ridge penalty was $10^{-6}$, effectively unregularized. LAPACK reported
+\textbf{Rejected: the ridge solve was ill-conditioned.} Bohrin builds the fit from consecutive
+states, which in a smooth trajectory are nearly identical, so the columns it solves over are
+close to duplicates of one another. The ridge penalty meant to counteract that was
+$10^{-6}$, small enough to do nothing. The linear-algebra library underneath reported
 \dtr{Ill-conditioned matrix} ($\mathrm{rcond} = 7.05\times10^{-17}$) on real datasets. We
 standardized features per fold, raised the penalty to 1.0, and made the solve abstain rather
-than return a residual from a fit LAPACK flags as unreliable. The numerical fault was real
+than return a residual from a fit the solver itself flags as unreliable. The numerical fault
+was real
 and is fixed. \textbf{It was not the cause of the over-firing}: the fire rate moved from
 19/20 to 20/20 and the \textsc{high} rate stayed at exactly 10/20.
 
@@ -270,6 +278,44 @@ datasets against 1/6 (17\%) above 5\,Hz, and 9/14 (64\%) on OXE conversions agai
 runs at 5\,Hz and every native one runs faster, so control rate and provenance are perfectly
 confounded and this corpus cannot separate them. Doing so needs data that breaks the
 confound: native recordings at 5\,Hz, or converted data at higher rates.
+
+\subsection{What this run changed in bohrin}
+\label{sec:decided}
+
+Bohrin's rule for a detector it cannot yet trust is to measure it, record the number, and
+gate it, never to delete it. \dtr{dynamics.inverse\_residual} now meets that bar and has
+moved to bohrin's \texttt{DEFAULT\_EXCLUDED} set, so it no longer runs in a default scan. It
+remains fully implemented and reachable with \texttt{-{}-all}. Table~\ref{tab:excluded}
+compares it against the two detectors bohrin excluded before it, measured on this corpus.
+
+\begin{table}[tb]
+\centering
+\caption{The held-back set, measured on the same 20 datasets. Visibility is the share of
+datasets on which the detector reached the report's visible top five.}
+\label{tab:excluded}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Detector & Fires on & Reaches \textsc{high} & In top 5 \\
+\midrule
+\dtr{dynamics.inverse\_residual}      & \warn{100\%} & 50\% & \warn{60\%} \\
+\dtr{smoothness.discontinuity\_jump}  & 70\% & 70\% & 50\% \\
+\dtr{integrity.declared\_mismatch}    & 60\% & 60\% & 5\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Its \textsc{high} rate is the \emph{lowest} of the three. The 100\% fire rate decides it: a
+detector that fires on every curated public dataset cannot discriminate, whatever severity it
+attaches. Removing it from bohrin's default set takes this corpus from 23 \textsc{high}
+findings to 13, and the datasets carrying at least one \textsc{high} from 17 of 20 to 11 of
+20, which is what makes a \textsc{high} worth reading again.
+
+\dtr{dynamics.forward\_residual} is the obvious next candidate and is deliberately left in.
+It fires on 90\% and reaches the visible top five on 75\%, the highest of any detector in
+bohrin, but never reports \textsc{high}, so it does not break a \texttt{-{}-fail-on HIGH}
+gate. Excluding two undiagnosed detectors at once would be over-correction, and this set is
+meant to be evidence-gated rather than a place for detectors we are merely unsure about.
 
 \subsection{The nineteen silent detectors}
 
@@ -295,16 +341,19 @@ detectors reaching \textsc{high}. Two \textsc{medium} findings out of 190 differ
 datasets. Triage is a reasonable default on this corpus; that is a statement about these 20
 datasets, not a general guarantee.
 
-\section{Two Detectors Were Correctly Held Back}
+\section{The Held-Back Set, and Why It Grew}
 \label{sec:excluded}
 
 Bohrin's registry defines \texttt{DEFAULT\_EXCLUDED}: detectors that are implemented and
 tested but withheld from a default scan pending recalibration, reachable with
-\texttt{-{}-all}. It holds \dtr{smoothness.discontinuity\_jump} and
-\dtr{integrity.declared\_mismatch}, excluded after an earlier run of this harness measured
-them reporting \textsc{high} on 70\% and 60\% of the corpus. Neither appears in any finding
-here, confirming the mechanism works. This is the project's alternative to deleting a noisy
-detector: measure it, record the number, and gate it.
+\texttt{-{}-all}. Before this run it held \dtr{smoothness.discontinuity\_jump} and
+\dtr{integrity.declared\_mismatch}, excluded after an earlier sweep measured them reporting
+\textsc{high} on 70\% and 60\% of the corpus. Neither appears in any default finding here,
+confirming the mechanism works. This run added \dtr{dynamics.inverse\_residual}
+(Section~\ref{sec:decided}).
+
+Deleting a noisy detector destroys the evidence needed to fix it and quietly narrows what
+bohrin can see. Measuring it, recording the number, and gating it keeps both.
 
 \section{Limitations}
 \label{sec:limits}
@@ -348,7 +397,7 @@ The five \textsc{policy}$\leftrightarrow$\textsc{data} detectors were inert by c
 
 \textbf{The conformal gate never activated, and public metadata may prevent fixing that.}
 Bohrin's \texttt{-{}-fpr} becomes a false-discovery bound only when a calibration corpus
-covers the dataset's embodiment, using embodiment as a Mondrian category \cite{vovk}. No
+covers the dataset's embodiment, keeping a separate reference distribution per embodiment, which is what conformal prediction calls a Mondrian taxonomy \cite{vovk}. No
 corpus ships with the package, so every scan fell back to a robust-$z$ heuristic. Filling
 that gap meets an obstacle this run surfaced incidentally: \textbf{18 of the 20 datasets
 declare} \mbox{\texttt{robot\_type:\,"unknown"}}, with only the two ALOHA datasets naming an
@@ -356,15 +405,14 @@ embodiment. A Mondrian taxonomy keyed on a field that 90\% of this corpus leaves
 collapses to a single wildcard bucket and forfeits the group-conditional validity the design
 was chosen for.
 
-\begin{sloppypar}
 \textbf{Numerical warnings are resolved, and one root cause is fixed.} An earlier run leaked
 \dtr{LinAlgWarning} and numpy divide-by-zero, overflow and invalid-value warnings from
 scikit-learn to stderr during ordinary scans. The ill-conditioning had a real cause and is
-fixed at source (Section~\ref{sec:suspect}). The rest are IEEE flags raised inside BLAS
-during clustering, on input already validated as finite; they are suppressed at one
-documented boundary, with an environment variable to restore them for debugging. This sweep
+fixed at source (Section~\ref{sec:suspect}). The rest are floating-point flags raised deep inside the
+numerical libraries during clustering, on input bohrin has already checked is finite; they
+are suppressed at one documented boundary, with an environment variable to restore them for
+debugging. This sweep
 produced zero warning lines on stderr.
-\end{sloppypar}
 
 \textbf{Dataset revisions are not pinned.} A Hub-side update will change these numbers.
 
