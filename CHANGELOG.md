@@ -9,8 +9,56 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ## [Unreleased]
 
+### Added
+
+- **`benchmarks/` — published measured evidence on real public data.** The first run,
+  `benchmarks/2026-08-26-lerobot-20-v0.1.0/`, scans 20 curated public LeRobot datasets
+  (4,342 episodes, 545,964 frames, 2–40 action dims, 5–50 Hz, sim and real, 14 of them
+  Open X-Embodiment conversions): 20/20 parsed without error in 22.3 s on a laptop CPU,
+  producing 189 findings (23 HIGH, 121 MEDIUM, 45 LOW). Of the 46 default detectors, 27
+  fired at least once, 19 never fired, and only 4 ever reached HIGH. Ships the raw sweep
+  JSON for both the uncapped and the default triage pass, a report, the sweep and figure
+  scripts, and a LaTeX paper. The unit suite measures recall on synthetic fixtures; this
+  measures how often detectors complain about healthy real data, which the suite cannot.
+- **Measured: the default 300-episode triage cap does not change the conclusions** on this
+  corpus. Comparing a capped scan against one that reads every episode, all 23 HIGH
+  findings are identical, as are the counts of detectors that fired and detectors reaching
+  HIGH; 2 MEDIUM findings out of 189 differ, on the 3 datasets that the cap subsamples.
+
+### Fixed
+
+- **Scans no longer leak numerical warnings to stderr.** `LinAlgWarning: Ill-conditioned
+  matrix` and numpy `divide by zero` / `overflow` / `invalid value` warnings from
+  scikit-learn could appear during an ordinary `bohrin scan`. The ill-conditioning had a
+  real cause: the dynamics fits stack consecutive states, which are collinear by
+  construction, under a ridge penalty of 1e-6 that left that collinearity essentially
+  unregularized. Features are now standardized per fold and the penalty is 1.0, and the
+  solve **abstains** rather than returning a residual from a fit LAPACK flags as
+  unreliable. The remaining warnings are IEEE flags raised inside BLAS during clustering,
+  on input already validated as finite; they are suppressed at one documented boundary in
+  the engine, with `BOHRIN_SHOW_NUMERIC_WARNINGS=1` to restore them for debugging. Genuine
+  non-finite data is still reported by `integrity.nan_inf`. Measured across the 20-dataset
+  benchmark: 42 warning lines before, 0 after.
+
 ### Changed
 
+- **`dynamics.inverse_residual` no longer runs in a default scan.** Measured on the
+  20-dataset benchmark: it fires on **100%** of the corpus (20/20) and reports HIGH on 50%
+  (10/20), and reaches the report's visible top-5 on 60% of datasets, more often than either
+  detector already excluded. Its HIGH rate is lower than theirs; the 100% fire rate is what
+  decides it, because a detector that fires on every curated public dataset cannot
+  discriminate whatever severity it attaches. Excluding it takes the corpus from 23 HIGH
+  findings to 13 and the datasets carrying at least one HIGH from 17 of 20 to 11 of 20.
+  Nothing is deleted: it stays fully implemented and reachable with `--all`. One explanation
+  was tested and rejected first (see Fixed, below); the two that survive are confounded in
+  that corpus, so recalibration waits on a corpus of natively-recorded community datasets.
+  `dynamics.forward_residual` is the next candidate and is deliberately **not** excluded
+  yet: it has the highest top-5 visibility of any detector (75%) but never reports HIGH.
+- **A default `bohrin scan` now details the top 5 findings instead of 6**, and names the
+  flag that carries the rest (`--html` or `--json`, never `--all`, which adds the
+  held-back over-reporting detectors). The benchmark measured a median of 9.5 findings per
+  dataset with no dataset ever coming back clean; at that density the terminal is a triage
+  surface, not the full record. Nothing is dropped from any machine-readable output.
 - `smoothness.discontinuity_jump` and `integrity.declared_mismatch` (see "Known
   limitations" under 0.1.0) no longer run in a default scan. Measured on the same
   20-dataset sweep: when either fired, the report's own ranking (severity × blast radius)
@@ -20,6 +68,31 @@ any `--json` output. It changes only when the serialized report shape changes.
   hidden: both are fully implemented and reachable with the new `--all` flag
   (`bohrin.scan(..., all_detectors=True)` in the Python API), and this default list lives
   at `bohrin.detectors.registry.DEFAULT_EXCLUDED`.
+
+### Known limitations
+
+- **Six detectors are effectively always-on** and their thresholds are not yet trustworthy.
+  Measured across the 20-dataset benchmark: `dynamics.inverse_residual` 100%,
+  `dynamics.forward_residual` 90%, `smoothness.jerk_outlier` 85%, `smoothness.curvature`
+  75%, `smoothness.path_efficiency` 70%, `temporal.non_markovian_pause` 70%. A detector
+  firing on 85% of curated public data carries almost no information whatever severity it
+  attaches, and these six are the bulk of a report's length. Recalibration needs a corpus
+  that represents the intended user, which the current one does not (see below).
+- **`dynamics.inverse_residual`'s HIGH severity is not yet trustworthy** (HIGH on 50% of
+  the benchmark). One hypothesis was tested and rejected: fixing the ill-conditioned ridge
+  solve eliminated the numerical fault but left the fire rate and HIGH rate unchanged. The
+  two surviving explanations, control rate and format-conversion provenance, are perfectly
+  confounded in that corpus and cannot be separated there. See
+  `benchmarks/2026-08-26-lerobot-20-v0.1.0/REPORT.md` §6.
+- **The benchmark corpus is not the population bohrin is for.** 14 of its 20 datasets are
+  Open X-Embodiment conversions at 5 Hz, against an intended user recording natively at
+  30 Hz. The HIGH rate is 64% on the former and 17% on the latter, so a share of those
+  findings may reflect format conversion rather than data quality.
+- **`--fpr` is inert out of the box, and public metadata makes it hard to fix.** The
+  conformal gate needs a calibration corpus keyed by embodiment (Mondrian), and none ships
+  with the package. The sweep also found that 18 of 20 public LeRobot datasets declare
+  `robot_type: "unknown"`, so an embodiment-keyed taxonomy built from Hub metadata
+  collapses to the single wildcard bucket and forfeits group-conditional validity.
 
 ## [0.1.0] — unreleased
 

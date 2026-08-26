@@ -16,8 +16,13 @@ from bohrin.report.messages import catalog
 from bohrin.report.model import Report
 
 #: Clusters shown with their full why/fix in the terminal. Beyond this the TTY summarizes
-#: and points at the HTML report — a first run must stay skimmable (docs/05 §2).
-_DETAIL_LIMIT = 6
+#: and points at the fuller reports — a first run must stay skimmable (docs/05 §2).
+#:
+#: Five, not six, because the 20-dataset benchmark measured a median of 9.5 findings per
+#: dataset with every dataset producing at least one. At that density the terminal is the
+#: triage surface, not the full record: a reader who has to scroll has already stopped
+#: reading. Nothing is dropped — `--json`, `--sarif` and `--html` all carry every finding.
+_DETAIL_LIMIT = 5
 
 _SEV_STYLE: dict[Severity, str] = {
     Severity.HIGH: "bold red",
@@ -92,7 +97,11 @@ class TtyRenderer:
 
         remaining = len(report.clusters) - _DETAIL_LIMIT
         if remaining > 0:
-            console.print(Text(f"… {remaining} {cat.more_findings}.", style="dim"))
+            # Name the flag that actually shows the rest. Deliberately *not* `--all`: that
+            # flag adds the DEFAULT_EXCLUDED detectors, which are held back precisely
+            # because they over-report, so pointing a user there to see more findings would
+            # hand them the least trustworthy ones first.
+            console.print(Text(f"… {remaining} {cat.more_findings} — --html or --json for all.", style="dim"))
         if report.dataset.sampled:
             triage = (
                 f"Triage scan of {report.dataset.n_episodes}/{report.dataset.total_episodes} episodes — --full for all."

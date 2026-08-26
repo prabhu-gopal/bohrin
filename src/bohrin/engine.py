@@ -9,7 +9,10 @@ engine does not change.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import contextlib
+import os
+import warnings
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -125,6 +128,34 @@ def prepare_scan(config: ScanConfig, *, progress: ProgressFn | None = None) -> P
     )
 
 
+@contextlib.contextmanager
+def _quiet_numerics() -> Iterator[None]:
+    """Keep third-party numerical noise out of a user's terminal (docs/05 §2).
+
+    scikit-learn's clustering and neighbour routines raise IEEE floating-point flags from
+    inside BLAS — ``divide by zero``/``overflow``/``invalid value encountered in matmul`` —
+    on input this codebase has *already* validated as finite. They are an artifact of how
+    the kernel computes, not a statement about the dataset, and a stranger's first
+    ``bohrin scan`` printing numpy warnings destroys exactly the credibility the tool exists
+    to earn. Real data corruption is not hidden by this: NaN/Inf in the data is what
+    ``integrity.nan_inf`` reports, on the raw episodes, before any of this runs.
+
+    Numerical problems that *do* change a result are handled where they occur rather than
+    suppressed. ``bohrin.calibrate.dynamics_model`` promotes LAPACK's ill-conditioning
+    warning to an abstention, so the DYNAMICS detectors stay silent rather than threshold a
+    residual from an unreliable fit.
+
+    Set ``BOHRIN_SHOW_NUMERIC_WARNINGS=1`` to see them anyway when debugging a detector.
+    """
+    if os.environ.get("BOHRIN_SHOW_NUMERIC_WARNINGS"):
+        yield
+        return
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore", under="ignore"), warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning, module=r"sklearn\..*")
+        warnings.filterwarnings("ignore", category=RuntimeWarning, module=r"numpy\..*")
+        yield
+
+
 def run_scan(config: ScanConfig, *, progress: ProgressFn | None = None) -> Report:
     """Run the full Layer 1 pipeline for ``config`` and return the :class:`Report`.
 
@@ -149,7 +180,8 @@ def run_scan(config: ScanConfig, *, progress: ProgressFn | None = None) -> Repor
         if not detector.applicable(profile, policy):
             continue
         detectors_run.append(detector.id)
-        findings.extend(detector.run(ctx))
+        with _quiet_numerics():
+            findings.extend(detector.run(ctx))
 
     # ⑤ Synthesize — cluster and rank. No aggregate score: see Report's docstring.
     clusters = synthesize(findings, total_episodes=profile.n_episodes)

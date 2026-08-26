@@ -19,18 +19,38 @@ Grounded in inverse-dynamics action labeling (arXiv 2412.15109).
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.linalg import LinAlgWarning
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import KFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 from bohrin._arrays import FloatArray, IntArray
 from bohrin.analysis.robust import finite_row_mask
 from bohrin.ir.episode import Episode
 
 _MIN_TRANSITIONS = 64
+
+#: Ridge penalty for the dynamics fits, applied to **standardized** features.
+#:
+#: The design matrix stacks ``(state[t-1], state[t], state[t+1])``, and in a smooth trajectory
+#: those columns are nearly identical, so the matrix is collinear by construction. The previous
+#: value (1e-6) left that collinearity essentially unregularized: scikit-learn's own guidance is
+#: that an alpha near zero is numerically inadvisable, and in practice LAPACK reported
+#: ``Ill-conditioned matrix (rcond=7e-17)`` on real datasets, which leaked to stderr and — more
+#: importantly — meant the residual the DYNAMICS detectors threshold was computed from a fit
+#: that LAPACK itself flagged as unreliable.
+#:
+#: Standardizing first (see :func:`_fit_out_of_fold`) puts every column on a comparable scale,
+#: which is what makes a single alpha meaningful across datasets whose units differ by orders of
+#: magnitude. 1.0 is a mild penalty on standardized columns: enough to condition the solve,
+#: small enough that a genuinely inconsistent transition still leaves a large residual.
+_RIDGE_ALPHA = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,19 +141,41 @@ def _transitions(
     return previous, state, state_next, action, action_next, owners
 
 
-def _fit_out_of_fold(features: FloatArray, targets: FloatArray, folds: int) -> tuple[FloatArray, float]:
-    """K-fold out-of-fold predictions → per-row residual norms and overall R²."""
+def _fit_out_of_fold(features: FloatArray, targets: FloatArray, folds: int) -> tuple[FloatArray, float] | None:
+    """K-fold out-of-fold predictions → per-row residual norms and overall R², or ``None``.
+
+    Returns ``None`` when the solve is numerically unreliable, so the DYNAMICS detectors
+    **abstain** rather than threshold a residual computed from a fit LAPACK flagged as
+    ill-conditioned. Abstaining is the cheaper error: a confident finding derived from a
+    broken fit is worse than no finding, and this detector family's severity was already
+    under review for over-reporting.
+
+    Two changes make that rare rather than routine. Features are **standardized inside each
+    fold** (fit on train, applied to test, so no leakage), which matters because the raw
+    columns are joint angles, velocities, and gripper states whose units differ by orders of
+    magnitude. And the ridge penalty is :data:`_RIDGE_ALPHA` rather than a token 1e-6, which
+    is what actually conditions the collinear ``(state[t-1], state[t], state[t+1])`` block.
+
+    ``np.errstate`` suppresses FPE flags raised inside BLAS during ``X.T @ X``; those are an
+    internal artifact, not a statement about our input, and the caller already filtered
+    non-finite rows.
+    """
     n = features.shape[0]
     k = max(2, min(folds, n // 2))
     predictions = np.zeros_like(targets)
-    # `features`/`targets` were already filtered to finite rows by the caller, so a
-    # RuntimeWarning from Ridge's internal `X.T @ X` here (observed on some BLAS backends,
-    # e.g. under Python 3.10, for a small or ill-conditioned fold) reflects an internal FPE
-    # flag rather than a real problem with our input.
-    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-        for train_idx, test_idx in KFold(n_splits=k, shuffle=False).split(features):
-            model = Ridge(alpha=1e-6).fit(features[train_idx], targets[train_idx])
-            predictions[test_idx] = model.predict(features[test_idx])
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"), warnings.catch_warnings():
+        # Promote LAPACK's ill-conditioning warning to an exception so it becomes an
+        # abstention here instead of stderr noise in the user's terminal.
+        warnings.simplefilter("error", LinAlgWarning)
+        try:
+            for train_idx, test_idx in KFold(n_splits=k, shuffle=False).split(features):
+                model = make_pipeline(StandardScaler(), Ridge(alpha=_RIDGE_ALPHA))
+                model.fit(features[train_idx], targets[train_idx])
+                predictions[test_idx] = model.predict(features[test_idx])
+        except LinAlgWarning:
+            return None
+    if not np.isfinite(predictions).all():
+        return None
     residual = np.linalg.norm(targets - predictions, axis=1).astype(np.float64)
     ss_res = float(np.sum((targets - predictions) ** 2))
     ss_tot = float(np.sum((targets - targets.mean(axis=0)) ** 2))
@@ -152,7 +194,10 @@ def fit_inverse_dynamics(episodes: Sequence[Episode], *, folds: int = 4) -> Dyna
     if s_t.shape[0] < _MIN_TRANSITIONS:
         return None
     features = np.hstack([s_prev, s_t, s_next, s_t - s_prev, s_next - s_t])
-    residual, r2 = _fit_out_of_fold(features, a_t, folds)
+    fit = _fit_out_of_fold(features, a_t, folds)
+    if fit is None:  # numerically unreliable solve — abstain rather than report from it
+        return None
+    residual, r2 = fit
     scale = float(np.median(np.linalg.norm(a_t, axis=1)))
     return DynamicsFit(residuals=residual, owner=owner, r2=r2, target_scale=scale)
 
@@ -172,6 +217,9 @@ def fit_forward_dynamics(episodes: Sequence[Episode], *, folds: int = 4) -> Dyna
         return None
     features = np.hstack([s_prev, s_t, a_t, a_next])
     delta = s_next - s_t
-    residual, r2 = _fit_out_of_fold(features, delta, folds)
+    fit = _fit_out_of_fold(features, delta, folds)
+    if fit is None:  # numerically unreliable solve — abstain rather than report from it
+        return None
+    residual, r2 = fit
     scale = float(np.median(np.linalg.norm(delta, axis=1)))
     return DynamicsFit(residuals=residual, owner=owner, r2=r2, target_scale=scale)

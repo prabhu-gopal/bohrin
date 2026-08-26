@@ -1,0 +1,473 @@
+% ============================================================================
+%  A Precision Audit of Robot Data-Quality Detectors
+%  Compiles on Overleaf as-is (pdfLaTeX). No custom classes, no shell-escape,
+%  no external downloads. Locally: `tectonic bohrin-benchmark.tex`
+%  or `pdflatex bohrin-benchmark.tex` (run twice for cross-references).
+% ============================================================================
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+% Let long typewriter paths wrap at separators instead of running off the margin.
+\usepackage{url}
+\urlstyle{tt}
+\def\UrlBreaks{\do\/\do-\do.\do\_}
+
+\definecolor{accent}{HTML}{2A78D6}
+\definecolor{critical}{HTML}{D03B3B}
+\definecolor{ink}{HTML}{52514E}
+
+\captionsetup{font=small,labelfont=bf,width=.92\textwidth}
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0pt}
+
+% Detector ids are long unbreakable typewriter words (`dynamics.inverse_residual`), which
+% leaves justified paragraphs overfull. \emergencystretch lets TeX loosen a line only when
+% it would otherwise overflow, so ordinary paragraphs keep normal spacing.
+\emergencystretch=3em
+\newcommand{\dtr}[1]{\texttt{\small #1}}
+\newcommand{\warn}[1]{\textcolor{critical}{\textbf{#1}}}
+
+\title{\vspace{-2.2em}\textbf{A Precision Audit of Bohrin, a Static Analyzer for
+Robot Demonstration Data}\\[0.35em]
+\large 46 Detectors Measured Against 20 Public LeRobot Datasets}
+\author{Prabhu Gopal}
+\date{26 August 2026 \quad$\cdot$\quad bohrin 0.1.0 \quad$\cdot$\quad commit \texttt{cf39d78}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Static analyzers for robot demonstration data promise to catch defects that degrade a
+behavior-cloned policy before training begins. Their detectors are typically validated by
+fault injection: plant a known defect in a fixture, confirm the detector fires. That
+measures recall and cannot measure precision, because a detector that fires unconditionally
+passes every such test. We report the complementary measurement for \emph{bohrin}, an
+open-source linter for robot demonstration datasets, across 20 public LeRobot datasets (4{,}342 episodes,
+545{,}964 frames, 2--40 action dimensions, 5--50\,Hz, simulated and real).
+Our most consequential result is not about the tool: \textbf{18 of 20 datasets declare}
+\mbox{\texttt{robot\_type:\,"unknown"}}, so any method conditioning on embodiment via Hub
+metadata degenerates to one undifferentiated bucket on 90\% of this corpus. That includes
+bohrin's own conformal gate, whose Mondrian taxonomy is keyed on that field.
+On the tool: all 20 datasets parsed without error in 22.5\,s on a laptop CPU, yielding 190
+findings (23 \textsc{high}, 121 \textsc{medium}, 46 \textsc{low}). Twenty-seven detectors
+fired at least once and nineteen never fired, but six fire on 70\% or more of this curated
+corpus, and a median of 9.5 findings per dataset with no dataset ever clean is a usability
+defect we measure in our own output. We tested one hypothesis for the worst offender,
+\dtr{dynamics.inverse\_residual} (100\% fire rate, \textsc{high} on 50\%): an
+ill-conditioned ridge solve. Fixing it eliminated the numerical fault but left the fire and
+\textsc{high} rates unchanged, falsifying the hypothesis. The two surviving explanations,
+control rate and format-conversion provenance, are perfectly confounded in this corpus. We
+state plainly what this does not establish: without ground-truth labels a fire rate is a
+rate of complaint, not of correctness, and no policy was trained, so the premise that these
+defects degrade policies remains untested here.
+\end{abstract}
+
+\section{Motivation}
+
+A data-quality detector encodes a claim: that a specific pattern in the data predicts a
+specific training failure. Testing that claim by fault injection establishes recall and
+nothing else. A detector hard-coded to return \textsc{high} passes every such test.
+
+Precision determines whether such a tool is usable in practice. A \textsc{high} severity
+that fires on most curated public datasets carries no information, and it breaks a
+\texttt{-{}-fail-on HIGH} continuous-integration gate for every user. Measuring precision
+requires real data and a count of complaints. This report is that measurement.
+
+\section{Corpus and Method}
+
+Twenty LeRobot datasets were selected for breadth of embodiment and provenance rather than
+size. Fourteen are Open X-Embodiment datasets \cite{oxe} that reached LeRobot through a
+conversion from RLDS, the Reinforcement Learning Datasets format; six were published
+natively for LeRobot. Four are simulated. Action
+dimensionality spans 2 to 40 and control rates span 5\,Hz to 50\,Hz. Bohrin does not decode
+video, so the corpus occupies roughly 50\,MB.
+
+Embodiments were confirmed from published sources where possible: \dtr{asu\_table\_top} is
+a UR5 commanding joint velocities, \dtr{austin\_buds\_dataset} and
+\dtr{nyu\_franka\_play\_dataset} are Franka arms \cite{tfds},
+\dtr{cmu\_stretch} is a Hello Robot Stretch \cite{stretch}, \dtr{dlr\_edan\_shared\_control}
+is a wheelchair-mounted 8-DoF DLR arm \cite{edan}, and \dtr{utokyo\_saytap} is a Unitree Go1
+quadruped \cite{saytap}, the one locomotion dataset in an otherwise manipulation-heavy
+corpus. Platforms not verified against a primary source are not claimed.
+
+Each dataset was scanned twice. The \textbf{full} pass reads every episode and is the basis
+for every number reported here. The \textbf{default} pass is what a user gets from
+\texttt{bohrin scan}: a triage scan capped at 300 episodes, which subsamples 3 of the 20
+datasets. Section~\ref{sec:triage} compares them. Both passes used no policy checkpoint, no
+target family, no calibration corpus, and no vision.
+
+\begin{table}[tb]
+\centering
+\caption{Corpus summary. All twenty datasets resolved as \texttt{lerobot\_v3}. OXE denotes
+an Open X-Embodiment dataset reaching LeRobot via RLDS conversion. H/M/L are counts of
+\textsc{high}/\textsc{medium}/\textsc{low} findings from the full pass.}
+\label{tab:corpus}
+\footnotesize
+\begin{tabular}{llrrrrrrrl}
+\toprule
+Dataset & Source & Hz & act & state & Episodes & Frames & Scan (s) & H & M/L \\
+\midrule
+\dtr{ucsd\_pick\_and\_place}      & real, OXE &  5 &  4 &  7 & 1{,}355 & 67{,}750  & 4.2 & 2 & 7/3 \\
+\dtr{xarm\_lift\_medium}                & sim  & 15 &  4 &  4 &    800  & 20{,}000  & 1.6 & 1 & 6/2 \\
+\dtr{nyu\_franka\_play}           & real, OXE &  5 & 15 & 13 &    456  & 44{,}875  & 2.4 & 1 & 8/3 \\
+\dtr{utokyo\_pr2\_tabletop}       & real, OXE &  5 &  8 &  7 &    240  & 32{,}708  & 1.1 & 2 & 10/3 \\
+\dtr{pusht}                             & sim  & 10 &  2 &  2 &    206  & 25{,}650  & 0.7 & 0 & 3/4 \\
+\dtr{pusht\_keypoints}                  & sim  & 10 &  2 &  2 &    206  & 25{,}650  & 0.9 & 0 & 3/4 \\
+\dtr{ucsd\_kitchen}               & real, OXE &  5 &  8 & 21 &    150  & 3{,}970   & 0.6 & 1 & 7/2 \\
+\dtr{cmu\_stretch}                & real, OXE &  5 &  8 &  4 &    135  & 25{,}016  & 0.8 & 3 & 8/1 \\
+\dtr{asu\_table\_top}             & real, OXE &  5 &  7 &  7 &    110  & 26{,}113  & 0.8 & 1 & 6/1 \\
+\dtr{dlr\_sara\_grid\_clamp}      & real, OXE &  5 &  7 & 12 &    107  & 7{,}622   & 0.6 & 1 & 4/4 \\
+\dtr{dlr\_edan\_shared\_control}  & real, OXE &  5 &  7 &  7 &    104  & 8{,}928   & 0.6 & 1 & 9/2 \\
+\dtr{dlr\_sara\_pour}             & real, OXE &  5 &  7 &  6 &    100  & 12{,}971  & 0.7 & 1 & 8/4 \\
+\dtr{aloha\_mobile\_cabinet}            & real & 50 & 14 & 14 &     85  & 127{,}500 & 2.1 & 1 & 5/1 \\
+\dtr{utokyo\_pr2\_fridge}         & real, OXE &  5 &  8 &  7 &     80  & 11{,}522  & 0.6 & 1 & 7/2 \\
+\dtr{tokyo\_u\_lsmo}              & real, OXE &  5 &  7 & 13 &     50  & 11{,}925  & 0.7 & 1 & 4/2 \\
+\dtr{aloha\_sim\_insertion}             & sim  & 50 & 14 & 14 &     50  & 25{,}000  & 0.8 & 1 & 3/1 \\
+\dtr{austin\_buds}                & real, OXE &  5 &  7 & 24 &     50  & 34{,}112  & 1.1 & 2 & 6/2 \\
+\dtr{unitreeh1\_warehouse}              & real & 50 & 40 & 19 &     24  & 11{,}275  & 0.6 & 0 & 6/2 \\
+\dtr{utokyo\_saytap}              & real, OXE &  5 & 12 & 30 &     20  & 22{,}937  & 0.8 & 1 & 5/0 \\
+\dtr{nyu\_rot}                    & real, OXE &  5 &  7 &  7 &     14  & 440       & 0.4 & 2 & 6/2 \\
+\midrule
+\textbf{Total} & & & & & \textbf{4{,}342} & \textbf{545{,}964} & \textbf{22.3} & \textbf{23} & \textbf{121/46} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Results}
+
+\subsection{Coverage and cost}
+
+All 20 datasets parsed, profiled, and reported with no crash and no adapter failure. Total
+wall-clock time was 22.5\,s on a laptop CPU with no GPU, median 0.8\,s per dataset.
+Seventeen of twenty produced at least one \textsc{high}; none came back clean.
+
+Wall time correlates with episode count at $r = 0.87$ and with frame count at only
+$r = 0.68$ (Figure~\ref{fig:runtime}), so per-episode fixed work dominates rather than raw
+data volume: \dtr{aloha\_mobile\_cabinet} reads 127{,}500 frames in 2.1\,s while
+\dtr{ucsd\_pick\_and\_place} reads about half that in 4.2\,s with $16\times$ more episodes.
+Growth is sub-linear, with $97\times$ more episodes costing $10.5\times$ more time.
+
+\begin{figure}[tb]
+\centering
+\includegraphics[width=0.82\textwidth]{../figures/fig3_runtime.pdf}
+\caption{Scan wall-time against episode count (log $x$). Cost tracks episodes ($r = 0.87$)
+more than frames ($r = 0.68$): bohrin reads Parquet columns and never decodes video, so
+per-episode fixed work dominates.}
+\label{fig:runtime}
+\end{figure}
+
+\begin{figure}[tb]
+\centering
+\includegraphics[width=0.88\textwidth]{../figures/fig2_dataset_severity.pdf}
+\caption{Findings per dataset, split by severity. Every dataset produced findings; 17 of
+20 produced at least one \textsc{high}.}
+\label{fig:severity}
+\end{figure}
+
+\subsection{Selectivity}
+
+Of the 46 detectors that ran by default at the time of this run (48 registered, 2 held
+back; Section~\ref{sec:excluded} explains why that is now 45), \textbf{27 fired at least once} and \textbf{19 never fired}.
+Four ever reached \textsc{high} (Table~\ref{tab:high}, Figure~\ref{fig:rates}).
+
+\begin{figure}[tb]
+\centering
+\includegraphics[width=0.90\textwidth]{../figures/fig1_detector_fire_rates.pdf}
+\caption{Per-detector fire rate across the corpus, with the \textsc{high} share in red.
+Twenty-seven detectors appear; the other nineteen produced no finding on any dataset.}
+\label{fig:rates}
+\end{figure}
+
+\begin{table}[tb]
+\centering
+\caption{The four detectors that ever reported \textsc{high}.}
+\label{tab:high}
+\small
+\begin{tabular}{lrrl}
+\toprule
+Detector & Fires & \textsc{high} & Reading \\
+\midrule
+\dtr{dynamics.inverse\_residual}           & 95\% & \warn{50\%} & Suspect (\S\ref{sec:suspect}) \\
+\dtr{stats.dead\_dimension}                & 35\% & 35\% & Plausible \\
+\dtr{label.trajectory\_label\_mismatch}    & 20\% & 20\% & Plausible \\
+\dtr{multimodality.contradictory\_actions} & 10\% & 10\% & Plausible \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Finding volume is a usability defect}
+
+190 findings across 20 datasets is a median of \textbf{9.5 per dataset}. No dataset came
+back clean and 17 of 20 produced at least one \textsc{high};
+\dtr{utokyo\_pr2\_tabletop} returns 15 findings and \dtr{nyu\_rot} returns 10 on 440 frames.
+A report that flags every dataset and returns ten complaints is not a triage tool: the two
+findings that mattered are lost among the eight that did not. We measure this in our own
+output and treat it as a defect in the product rather than a property of the data. The
+terminal now shows the top five clusters by severity $\times$ blast radius and names the
+flag carrying the rest; machine-readable outputs stay complete. That is presentation. The
+substantive fix is Section~\ref{sec:alwayson}, and it is not done.
+
+\subsection{Six detectors are effectively always-on}
+\label{sec:alwayson}
+
+Ranking by severity, as Table~\ref{tab:high} does, hides the real problem. Ranked by fire
+rate, six detectors fire on 70\% or more of a curated, published corpus
+(Table~\ref{tab:alwayson}). \textbf{A detector that fires on 85\% of curated public data
+carries almost no information, whatever severity it attaches.} These six escaped scrutiny in
+an earlier draft by being \textsc{medium}, but they are the bulk of the 121 \textsc{medium}
+findings and therefore the bulk of the volume problem above.
+
+\begin{table}[tb]
+\centering
+\caption{Detectors firing on 70\% or more of the corpus.}
+\label{tab:alwayson}
+\small
+\begin{tabular}{lrr}
+\toprule
+Detector & Fires on & Reaches \textsc{high} \\
+\midrule
+\dtr{dynamics.inverse\_residual}   & \warn{100\%} & 50\% \\
+\dtr{dynamics.forward\_residual}   & 90\% & 0\% \\
+\dtr{smoothness.jerk\_outlier}     & 85\% & 0\% \\
+\dtr{smoothness.curvature}         & 75\% & 0\% \\
+\dtr{smoothness.path\_efficiency}  & 70\% & 0\% \\
+\dtr{temporal.non\_markovian\_pause} & 70\% & 0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{\dtr{dynamics.inverse\_residual}: one hypothesis tested and rejected}
+\label{sec:suspect}
+
+The detector fires on 20 of 20 datasets and returns \textsc{high} on 10 of 20. An earlier
+draft proposed three explanations; one has since been tested.
+
+\textbf{Rejected: the ridge solve was ill-conditioned.} Bohrin builds the fit from consecutive
+states, which in a smooth trajectory are nearly identical, so the columns it solves over are
+close to duplicates of one another. The ridge penalty meant to counteract that was
+$10^{-6}$, small enough to do nothing. The linear-algebra library underneath reported
+\dtr{Ill-conditioned matrix} ($\mathrm{rcond} = 7.05\times10^{-17}$) on real datasets. We
+standardized features per fold, raised the penalty to 1.0, and made the solve abstain rather
+than return a residual from a fit the solver itself flags as unreliable. The numerical fault
+was real
+and is fixed. \textbf{It was not the cause of the over-firing}: the fire rate moved from
+19/20 to 20/20 and the \textsc{high} rate stayed at exactly 10/20.
+
+\textbf{Still open: the threshold ignores control rate.} Fourteen of twenty datasets run at
+5\,Hz. At 200\,ms per step, consecutive states are only weakly related by the action between
+them, so an inverse-dynamics residual is legitimately large without misalignment.
+
+\textbf{Still open: the finding is real.} Action/observation misalignment is a known hazard
+of format conversion, and 14 of 20 datasets reached LeRobot through an RLDS conversion of an
+already-converted Open X-Embodiment dataset.
+
+Both surviving hypotheses predict the observed split: 9/14 (64\%) \textsc{high} on 5\,Hz
+datasets against 1/6 (17\%) above 5\,Hz, and 9/14 (64\%) on OXE conversions against 1/6
+(17\%) on native datasets. \textbf{These are the same partition.} Every OXE dataset here
+runs at 5\,Hz and every native one runs faster, so control rate and provenance are perfectly
+confounded and this corpus cannot separate them. Doing so needs data that breaks the
+confound: native recordings at 5\,Hz, or converted data at higher rates.
+
+\subsection{What this run changed in bohrin}
+\label{sec:decided}
+
+Bohrin's rule for a detector it cannot yet trust is to measure it, record the number, and
+gate it, never to delete it. \dtr{dynamics.inverse\_residual} now meets that bar and has
+moved to bohrin's \texttt{DEFAULT\_EXCLUDED} set, so it no longer runs in a default scan. It
+remains fully implemented and reachable with \texttt{-{}-all}. Table~\ref{tab:excluded}
+compares it against the two detectors bohrin excluded before it, measured on this corpus.
+
+\begin{table}[tb]
+\centering
+\caption{The held-back set, measured on the same 20 datasets. Visibility is the share of
+datasets on which the detector reached the report's visible top five.}
+\label{tab:excluded}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Detector & Fires on & Reaches \textsc{high} & In top 5 \\
+\midrule
+\dtr{dynamics.inverse\_residual}      & \warn{100\%} & 50\% & \warn{60\%} \\
+\dtr{smoothness.discontinuity\_jump}  & 70\% & 70\% & 50\% \\
+\dtr{integrity.declared\_mismatch}    & 60\% & 60\% & 5\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Its \textsc{high} rate is the \emph{lowest} of the three. The 100\% fire rate decides it: a
+detector that fires on every curated public dataset cannot discriminate, whatever severity it
+attaches. Removing it from bohrin's default set takes this corpus from 23 \textsc{high}
+findings to 13, and the datasets carrying at least one \textsc{high} from 17 of 20 to 11 of
+20, which is what makes a \textsc{high} worth reading again.
+
+\dtr{dynamics.forward\_residual} is the obvious next candidate and is deliberately left in.
+It fires on 90\% and reaches the visible top five on 75\%, the highest of any detector in
+bohrin, but never reports \textsc{high}, so it does not break a \texttt{-{}-fail-on HIGH}
+gate. Excluding two undiagnosed detectors at once would be over-correction, and this set is
+meant to be evidence-gated rather than a place for detectors we are merely unsure about.
+
+\subsection{The nineteen silent detectors}
+
+Nineteen of the 46 default detectors produced no finding across 4{,}342 episodes. This is
+not evidence they are broken: several target defects this corpus should not have
+(\dtr{integrity.nan\_inf}), the vision family had decoding disabled, and the entire
+\textsc{policy}$\leftrightarrow$\textsc{data} family stays silent without a checkpoint. It
+does mean those detectors carry no real-data evidence in this run, and their default
+severities rest on synthetic fixtures alone. It would be incorrect to describe this run as
+having validated 46 detectors.
+
+\subsection{Triage sampling does not change the conclusions}
+\label{sec:triage}
+
+The default scan caps at 300 episodes, subsampling \dtr{ucsd\_pick\_and\_place} (300 of
+1{,}355), \dtr{xarm\_lift\_medium} (300 of 800), and \dtr{nyu\_franka\_play} (300 of 456).
+It reads 61\% of episodes and 85\% of frames in 21.5\,s against 22.5\,s.
+
+Every \textsc{high} finding is identical between the two passes, as are the counts of
+datasets scanned, datasets with at least one \textsc{high}, detectors that fired, and
+detectors reaching \textsc{high}. Two \textsc{medium} findings out of 190 differ
+(119 versus 121), and four detectors shift by one dataset each, all on the three subsampled
+datasets. Triage is a reasonable default on this corpus; that is a statement about these 20
+datasets, not a general guarantee.
+
+\section{The Held-Back Set, and Why It Grew}
+\label{sec:excluded}
+
+Bohrin's registry defines \texttt{DEFAULT\_EXCLUDED}: detectors that are implemented and
+tested but withheld from a default scan pending recalibration, reachable with
+\texttt{-{}-all}. Before this run it held \dtr{smoothness.discontinuity\_jump} and
+\dtr{integrity.declared\_mismatch}, excluded after an earlier sweep measured them reporting
+\textsc{high} on 70\% and 60\% of the corpus. Neither appears in any default finding here,
+confirming the mechanism works. This run added \dtr{dynamics.inverse\_residual}
+(Section~\ref{sec:decided}).
+
+Deleting a noisy detector destroys the evidence needed to fix it and quietly narrows what
+bohrin can see. Measuring it, recording the number, and gating it keeps both.
+
+\section{Limitations}
+\label{sec:limits}
+
+These bound every number above.
+
+\textbf{Fire rate is not precision.} Nothing here establishes that a single finding is
+correct. A 95\% fire rate is equally consistent with ``95\% of public robot datasets have
+this defect'' and with ``the threshold is too tight.'' No ground-truth labels exist for this
+corpus and none were constructed. Every rate reported here is a rate of complaint. The next
+step is to hand-adjudicate a stratified sample and publish a precision estimate with an
+explicit $N$.
+
+\textbf{No link to downstream policy performance.} This is the most important gap. The
+premise behind every detector is that the defect it finds degrades a trained policy. This
+report does not test that premise: no policy was trained, no defect was ablated, no success
+rate was measured. The mechanisms are drawn from the literature, not from an experiment run
+here. A defensible causal claim requires training policies on data with and without a given
+defect and measuring the difference in rollout success. Until then, severity is a triage
+ordering rather than a prediction of harm.
+
+\textbf{This corpus is not the population the tool is for.} Fourteen of twenty datasets are
+Open X-Embodiment conversions recorded at 5\,Hz. The intended user teleoperates an SO-101 or
+similar and records natively at 30\,Hz. Those are different populations, and
+Section~\ref{sec:suspect} shows the difference is load-bearing: the \textsc{high} rate is
+64\% on the 5\,Hz conversions and 17\% on everything else, so a substantial share of these
+findings may be measuring \emph{this dataset survived two format conversions} rather than
+\emph{this teleoperation session was poor}. This run therefore does not tell us how the tool
+behaves for its intended user, and because rate and provenance are confounded here, this
+corpus cannot diagnose its own most suspicious detector. Both are fixed by the same thing: a
+second corpus drawn from community-published LeRobot datasets, natively recorded and far
+more numerous. The bias also runs the other way and is worth keeping: these datasets are
+curated and widely used, so a high fire rate on them is \emph{more} suspicious, not less.
+
+\textbf{Single machine, single run.} One laptop CPU with no GPU, one pass per configuration,
+warm cache. Timings are indicative rather than benchmarked: no repeats, no confidence
+intervals.
+
+\textbf{Default configuration only.} No checkpoint, target, calibration corpus, or vision.
+The five \textsc{policy}$\leftrightarrow$\textsc{data} detectors were inert by construction.
+
+\textbf{The conformal gate never activated, and public metadata may prevent fixing that.}
+Bohrin's \texttt{-{}-fpr} becomes a false-discovery bound only when a calibration corpus
+covers the dataset's embodiment, keeping a separate reference distribution per embodiment, which is what conformal prediction calls a Mondrian taxonomy \cite{vovk}. No
+corpus ships with the package, so every scan fell back to a robust-$z$ heuristic. Filling
+that gap meets an obstacle this run surfaced incidentally: \textbf{18 of the 20 datasets
+declare} \mbox{\texttt{robot\_type:\,"unknown"}}, with only the two ALOHA datasets naming an
+embodiment. A Mondrian taxonomy keyed on a field that 90\% of this corpus leaves blank
+collapses to a single wildcard bucket and forfeits the group-conditional validity the design
+was chosen for.
+
+\textbf{Numerical warnings are resolved, and one root cause is fixed.} An earlier run leaked
+\dtr{LinAlgWarning} and numpy divide-by-zero, overflow and invalid-value warnings from
+scikit-learn to stderr during ordinary scans. The ill-conditioning had a real cause and is
+fixed at source (Section~\ref{sec:suspect}). The rest are floating-point flags raised deep inside the
+numerical libraries during clustering, on input bohrin has already checked is finite; they
+are suppressed at one documented boundary, with an environment variable to restore them for
+debugging. This sweep
+produced zero warning lines on stderr.
+
+\textbf{Dataset revisions are not pinned.} A Hub-side update will change these numbers.
+
+\section{Next Steps}
+
+In priority order.
+
+\begin{enumerate}\itemsep2pt
+\item \textbf{Build a second corpus from community LeRobot datasets.} Natively recorded,
+higher control rate, numerous. It breaks the confound in Section~\ref{sec:suspect}, measures
+the tool on its intended population, and is the prerequisite for recalibrating anything.
+\item \textbf{Recalibrate the six always-on detectors} (Section~\ref{sec:alwayson}) against
+that corpus. A detector firing on 85\% of healthy data needs a threshold that reflects it, or
+it joins \texttt{DEFAULT\_EXCLUDED} with the number recorded.
+\item \textbf{Resolve \dtr{dynamics.inverse\_residual}} by making the residual threshold
+control-rate aware and testing against native data at matched rates.
+\item Publish a precision estimate with an explicit $N$ from hand-adjudicated findings.
+\item Run a policy-outcome experiment on at least one detector.
+\item Resolve the embodiment-metadata gap before shipping a default calibration corpus.
+\end{enumerate}
+
+\section*{Reproducibility}
+
+\begin{verbatim}
+git clone https://github.com/prabhu-gopal/bohrin && cd bohrin
+git checkout cf39d78
+python -m venv .venv && .venv/bin/pip install -e '.[dev]'
+cd benchmarks/2026-08-26-lerobot-20-v0.1.0
+../../.venv/bin/python scripts/run_sweep.py --out results/
+\end{verbatim}
+
+Raw results, figure-generation code, and this document's source are committed under
+\path{benchmarks/2026-08-26-lerobot-20-v0.1.0/}. Every figure derives from
+\dtr{results/sweep\_full.json} alone; the committed JSON is authoritative if a figure and
+the text disagree.
+
+\begin{thebibliography}{9}
+\raggedright
+\bibitem{oxe} Open X-Embodiment Collaboration. \emph{Open X-Embodiment: Robotic Learning
+Datasets and RT-X Models.} arXiv:2310.08864, 2023.
+\bibitem{tfds} TensorFlow Datasets catalog, Open X-Embodiment entries.
+\url{https://www.tensorflow.org/datasets/catalog/overview}
+\bibitem{stretch} S. Bahl et al. \emph{Affordances from Human Videos as a Versatile
+Representation for Robotics.} CVPR, 2023.
+\bibitem{edan} J. Vogel et al. \emph{EDAN: An EMG-controlled Daily Assistant to Help People
+with Physical Disabilities.} DLR Institute of Robotics and Mechatronics.
+\bibitem{saytap} Y. Tang et al. \emph{SayTap: Language to Quadrupedal Locomotion.} 2023.
+\bibitem{vovk} V. Vovk, A. Gammerman, G. Shafer. \emph{Algorithmic Learning in a Random
+World.} Springer, 2005.
+\end{thebibliography}
+
+\vspace{0.4em}
+\noindent\textcolor{ink}{\footnotesize Environment: Python 3.10.21, numpy 2.2.6,
+polars 1.44.0, scikit-learn 1.7.2, huggingface-hub 1.28.0, pydantic 2.13.4, rich 15.0.0.
+Figures: matplotlib 3.11.1, generated in a separate environment; matplotlib is a reporting
+tool and deliberately not a bohrin dependency.}
+
+\end{document}
