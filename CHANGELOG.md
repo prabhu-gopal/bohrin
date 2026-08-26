@@ -9,6 +9,19 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-27
+
+Published measured evidence on real public data, and acted on what it showed. Every
+detector-facing change below is driven by that measurement rather than by taste.
+
+**Upgrading from 0.1.0.** A default scan now returns fewer findings, and that is the point.
+`dynamics.inverse_residual` no longer runs by default because it fired on 100% of a
+20-dataset public corpus; across that corpus the change takes 23 HIGH findings down to 13.
+If you gate CI on `--fail-on HIGH`, expect fewer failures, not more. Nothing is deleted:
+`--all` runs every detector, and `--json`, `--sarif` and `--html` are unchanged and
+complete. Scans should also be quiet now — the numpy and scikit-learn warnings some users
+saw on stderr are fixed at source.
+
 ### Added
 
 - **`benchmarks/` — published measured evidence on real public data.** The first run,
@@ -94,7 +107,7 @@ any `--json` output. It changes only when the serialized report shape changes.
   `robot_type: "unknown"`, so an embodiment-keyed taxonomy built from Hub metadata
   collapses to the single wildcard bucket and forfeits group-conditional validity.
 
-## [0.1.0] — unreleased
+## [0.1.0] — 2026-08-25
 
 First public release.
 
@@ -146,7 +159,8 @@ First public release.
 - Python 3.10 through 3.13 are supported and tested.
 - No telemetry. Your data never leaves your machine.
 - `schema_version` is `1.0` — the first published report contract. Nothing consumed an
-  earlier shape, since no version of bohrin was ever released.
+  earlier shape, since this was the first released version of bohrin.
 
-[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/prabhu-gopal/bohrin/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/prabhu-gopal/bohrin/releases/tag/v0.1.0

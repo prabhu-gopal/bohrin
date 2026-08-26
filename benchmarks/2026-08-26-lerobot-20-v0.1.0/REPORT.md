@@ -6,11 +6,19 @@
 | | |
 | --- | --- |
 | Run date | 2026-08-26 |
-| Bohrin version | 0.1.0 |
-| Repository commit | `cf39d78` |
+| Bohrin version | 0.2.0 |
+| Repository commit | `c8265c0` (see note below) |
 | Corpus | 20 LeRobot datasets from the Hugging Face Hub |
 | Raw results | [`results/sweep_full.json`](results/sweep_full.json), [`results/sweep_default.json`](results/sweep_default.json) |
 | Reproduce | `python scripts/run_sweep.py --out results/` |
+
+> **On the commit.** Every measurement here was taken at `c8265c0`, when 46 detectors ran by
+> default. Section 6.1 records the decision this run produced: `dynamics.inverse_residual`
+> moved to `DEFAULT_EXCLUDED` in the very next commit, so a default scan on bohrin 0.2.0
+> runs 45 and returns 13 HIGH findings across this corpus rather than 23. Reproducing the
+> tables below therefore needs `c8265c0`, not the release tag. That is the point of the
+> report, not a defect in it: the numbers are the evidence, and the exclusion is what the
+> evidence bought.
 
 ---
 
@@ -332,7 +340,7 @@ bohrin can see. Measuring it, recording the number, and gating it keeps both.
 
 ```bash
 git clone https://github.com/prabhu-gopal/bohrin && cd bohrin
-git checkout cf39d78
+git checkout c8265c0
 python -m venv .venv && .venv/bin/pip install -e '.[dev]'
 cd benchmarks/2026-08-26-lerobot-20-v0.1.0
 ../../.venv/bin/python scripts/run_sweep.py --out results/

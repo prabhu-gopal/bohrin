@@ -8,7 +8,7 @@ SemVer independently of the package version.
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # The versioned Report schema (docs/06_ROADMAP.md P0 DoD, docs/09 §3). "1.0" is the first
 # *published* contract: it ships with 0.1.0, and nothing outside this repo ever consumed an
