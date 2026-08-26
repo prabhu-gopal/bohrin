@@ -9,6 +9,17 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ## [Unreleased]
 
+### Added
+
+- **`benchmarks/` — published measured evidence on real public data.** The first run,
+  `benchmarks/2026-08-26-hub-sweep-v0.1.0/`, scans 20 curated public LeRobot datasets
+  (2,631 episodes, 545,964 frames, 2–40 action dims, 5–50 Hz, sim and real): 20/20 parsed
+  without error in 20.8 s total on a laptop CPU, producing 187 findings (23 HIGH, 119
+  MEDIUM, 45 LOW). Of the 46 default detectors, 27 fired at least once, 19 never fired,
+  and only 4 ever reached HIGH. Ships the raw `sweep.json`, a report, the figure-generation
+  script, and a LaTeX paper. The unit suite measures recall on synthetic fixtures; this
+  measures how often detectors complain about healthy real data, which the suite cannot.
+
 ### Changed
 
 - `smoothness.discontinuity_jump` and `integrity.declared_mismatch` (see "Known
@@ -20,6 +31,20 @@ any `--json` output. It changes only when the serialized report shape changes.
   hidden: both are fully implemented and reachable with the new `--all` flag
   (`bohrin.scan(..., all_detectors=True)` in the Python API), and this default list lives
   at `bohrin.detectors.registry.DEFAULT_EXCLUDED`.
+
+### Known limitations
+
+- **`dynamics.inverse_residual`'s HIGH severity is not yet trustworthy.** On the 20-dataset
+  sweep it fires on 95% of datasets and reports HIGH on 50%. A HIGH that fires on half of
+  a curated, published corpus is more likely to be a threshold defect than an epidemic. No
+  ground-truth adjudication has been done, so this is not yet grounds for excluding it —
+  it is grounds for not trusting the severity. See
+  `benchmarks/2026-08-26-hub-sweep-v0.1.0/REPORT.md` §4.2.
+- **`--fpr` is inert out of the box, and public metadata makes it hard to fix.** The
+  conformal gate needs a calibration corpus keyed by embodiment (Mondrian), and none ships
+  with the package. The sweep also found that 18 of 20 public LeRobot datasets declare
+  `robot_type: "unknown"`, so an embodiment-keyed taxonomy built from Hub metadata
+  collapses to the single wildcard bucket and forfeits group-conditional validity.
 
 ## [0.1.0] — unreleased
 

@@ -111,6 +111,19 @@ Being clear about this matters more than any feature claim:
   [report them as false positives](https://github.com/prabhu-gopal/bohrin/issues/new?template=false_positive.yml)
   if they fire on data you trust. The sweep is reproducible: `python scripts/hub_smoke.py`.
 
+## Measured evidence
+
+The unit suite plants known defects in synthetic fixtures and checks they are found — that
+measures recall, and it cannot measure precision on healthy data. [`benchmarks/`](benchmarks/)
+holds the runs that measure the other half, on real published datasets.
+
+The latest, [**Bohrin on 20 public LeRobot datasets**](benchmarks/2026-08-26-hub-sweep-v0.1.0/REPORT.md)
+(2,631 episodes, 545,964 frames): all 20 parsed without error in 20.8 s total on a laptop
+CPU, producing 187 findings. Of the 46 default detectors, 27 fired at least once, 19 never
+fired, and only 4 ever reached HIGH. It also flags one of bohrin's own detectors,
+`dynamics.inverse_residual`, as reporting HIGH too often to be trusted yet — and is explicit
+that a fire rate is a rate of complaint, not a rate of correctness.
+
 ## Supported formats
 
 | Format | Status |
