@@ -3,7 +3,7 @@
   "dataset": "lerobot/nyu_rot_dataset",
   "ok": true,
   "full": true,
-  "seconds": 0.39,
+  "seconds": 0.47,
   "format": "lerobot_v3",
   "episodes_scanned": 14,
   "episodes_total": 14,
@@ -43,7 +43,7 @@
     "detectors": [
      "dynamics.inverse_residual"
     ],
-    "title": "Logged actions don't explain 9.2% of transitions, spread over 8 episode(s)"
+    "title": "Logged actions don't explain 8.7% of transitions, spread over 8 episode(s)"
    },
    {
     "severity": "MEDIUM",
@@ -93,7 +93,7 @@
   "dataset": "lerobot/ucsd_kitchen_dataset",
   "ok": true,
   "full": true,
-  "seconds": 0.62,
+  "seconds": 0.57,
   "format": "lerobot_v3",
   "episodes_scanned": 150,
   "episodes_total": 150,
@@ -119,7 +119,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 29.3% of transitions (150 episodes)"
+    "title": "State evolves inconsistently with the actions in 29.2% of transitions (150 episodes)"
    },
    {
     "severity": "MEDIUM",
@@ -183,7 +183,7 @@
   "dataset": "lerobot/cmu_stretch",
   "ok": true,
   "full": true,
-  "seconds": 0.81,
+  "seconds": 0.83,
   "format": "lerobot_v3",
   "episodes_scanned": 135,
   "episodes_total": 135,
@@ -223,7 +223,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 77.2% of transitions (135 episodes)"
+    "title": "State evolves inconsistently with the actions in 83.3% of transitions (135 episodes)"
    },
    {
     "severity": "MEDIUM",
@@ -287,7 +287,7 @@
   "dataset": "lerobot/pusht",
   "ok": true,
   "full": true,
-  "seconds": 0.73,
+  "seconds": 0.75,
   "format": "lerobot_v3",
   "episodes_scanned": 206,
   "episodes_total": 206,
@@ -313,7 +313,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 2.0% of transitions (206 episodes)"
+    "title": "State evolves inconsistently with the actions in 2.1% of transitions (206 episodes)"
    },
    {
     "severity": "LOW",
@@ -356,7 +356,7 @@
   "dataset": "lerobot/dlr_edan_shared_control",
   "ok": true,
   "full": true,
-  "seconds": 0.59,
+  "seconds": 0.6,
   "format": "lerobot_v3",
   "episodes_scanned": 104,
   "episodes_total": 104,
@@ -389,7 +389,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 93.8% of transitions (104 episodes)"
+    "title": "State evolves inconsistently with the actions in 93.7% of transitions (104 episodes)"
    },
    {
     "severity": "MEDIUM",
@@ -460,7 +460,7 @@
   "dataset": "lerobot/dlr_sara_grid_clamp",
   "ok": true,
   "full": true,
-  "seconds": 0.59,
+  "seconds": 0.6,
   "format": "lerobot_v3",
   "episodes_scanned": 107,
   "episodes_total": 107,
@@ -486,7 +486,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 66.8% of transitions (107 episodes)"
+    "title": "State evolves inconsistently with the actions in 66.7% of transitions (107 episodes)"
    },
    {
     "severity": "MEDIUM",
@@ -569,7 +569,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 19.0% of transitions (80 episodes)"
+    "title": "State evolves inconsistently with the actions in 19.1% of transitions (80 episodes)"
    },
    {
     "severity": "MEDIUM",
@@ -633,7 +633,7 @@
   "dataset": "lerobot/dlr_sara_pour",
   "ok": true,
   "full": true,
-  "seconds": 0.71,
+  "seconds": 0.63,
   "format": "lerobot_v3",
   "episodes_scanned": 100,
   "episodes_total": 100,
@@ -666,7 +666,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 98.1% of transitions (100 episodes)"
+    "title": "State evolves inconsistently with the actions in 98.0% of transitions (100 episodes)"
    },
    {
     "severity": "MEDIUM",
@@ -744,7 +744,7 @@
   "dataset": "lerobot/xarm_lift_medium",
   "ok": true,
   "full": true,
-  "seconds": 1.65,
+  "seconds": 1.68,
   "format": "lerobot_v3",
   "episodes_scanned": 800,
   "episodes_total": 800,
@@ -827,7 +827,7 @@
   "dataset": "lerobot/tokyo_u_lsmo",
   "ok": true,
   "full": true,
-  "seconds": 0.69,
+  "seconds": 0.62,
   "format": "lerobot_v3",
   "episodes_scanned": 50,
   "episodes_total": 50,
@@ -839,7 +839,7 @@
   "proprio_dim": 13,
   "high": 1,
   "medium": 4,
-  "low": 2,
+  "low": 3,
   "findings": [
    {
     "severity": "HIGH",
@@ -875,6 +875,13 @@
      "consistency.operator_style"
     ],
     "title": "Demonstrations split into two distinct styles (3 vs 47)"
+   },
+   {
+    "severity": "LOW",
+    "detectors": [
+     "dynamics.inverse_residual"
+    ],
+    "title": "Logged actions don't explain 0.03% of transitions, spread over 3 episode(s)"
    },
    {
     "severity": "LOW",
@@ -1021,7 +1028,7 @@
   "dataset": "lerobot/pusht_keypoints",
   "ok": true,
   "full": true,
-  "seconds": 0.93,
+  "seconds": 0.92,
   "format": "lerobot_v3",
   "episodes_scanned": 206,
   "episodes_total": 206,
@@ -1047,7 +1054,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 2.0% of transitions (206 episodes)"
+    "title": "State evolves inconsistently with the actions in 2.1% of transitions (206 episodes)"
    },
    {
     "severity": "LOW",
@@ -1090,7 +1097,7 @@
   "dataset": "lerobot/asu_table_top",
   "ok": true,
   "full": true,
-  "seconds": 0.81,
+  "seconds": 0.84,
   "format": "lerobot_v3",
   "episodes_scanned": 110,
   "episodes_total": 110,
@@ -1121,13 +1128,6 @@
    {
     "severity": "MEDIUM",
     "detectors": [
-     "dynamics.forward_residual"
-    ],
-    "title": "State evolves inconsistently with the actions in 2.7% of transitions (107 episodes)"
-   },
-   {
-    "severity": "MEDIUM",
-    "detectors": [
      "stats.unit_scale_inconsistency"
     ],
     "title": "action channels mix scales by 80\u00d7"
@@ -1137,7 +1137,14 @@
     "detectors": [
      "dynamics.inverse_residual"
     ],
-    "title": "Logged actions don't explain 4.9% of transitions, spread over 27 episode(s)"
+    "title": "Logged actions don't explain 5.0% of transitions, spread over 27 episode(s)"
+   },
+   {
+    "severity": "MEDIUM",
+    "detectors": [
+     "dynamics.forward_residual"
+    ],
+    "title": "State evolves inconsistently with the actions in 1.2% of transitions (49 episodes)"
    },
    {
     "severity": "MEDIUM",
@@ -1166,7 +1173,7 @@
   "dataset": "lerobot/aloha_sim_insertion_human",
   "ok": true,
   "full": true,
-  "seconds": 0.85,
+  "seconds": 0.88,
   "format": "lerobot_v3",
   "episodes_scanned": 50,
   "episodes_total": 50,
@@ -1199,7 +1206,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 6.2% of transitions (50 episodes)"
+    "title": "State evolves inconsistently with the actions in 9.1% of transitions (50 episodes)"
    },
    {
     "severity": "LOW",
@@ -1221,7 +1228,7 @@
   "dataset": "lerobot/unitreeh1_warehouse",
   "ok": true,
   "full": true,
-  "seconds": 0.58,
+  "seconds": 0.59,
   "format": "lerobot_v3",
   "episodes_scanned": 24,
   "episodes_total": 24,
@@ -1240,7 +1247,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 8.7% of transitions (24 episodes)"
+    "title": "State evolves inconsistently with the actions in 9.9% of transitions (24 episodes)"
    },
    {
     "severity": "MEDIUM",
@@ -1297,7 +1304,7 @@
   "dataset": "lerobot/austin_buds_dataset",
   "ok": true,
   "full": true,
-  "seconds": 1.05,
+  "seconds": 1.02,
   "format": "lerobot_v3",
   "episodes_scanned": 50,
   "episodes_total": 50,
@@ -1323,7 +1330,7 @@
     "detectors": [
      "dynamics.inverse_residual"
     ],
-    "title": "Logged actions don't explain 5.1% of transitions, spread over 50 episode(s)"
+    "title": "Logged actions don't explain 5.4% of transitions, spread over 50 episode(s)"
    },
    {
     "severity": "MEDIUM",
@@ -1337,7 +1344,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 51.8% of transitions (50 episodes)"
+    "title": "State evolves inconsistently with the actions in 51.5% of transitions (50 episodes)"
    },
    {
     "severity": "MEDIUM",
@@ -1387,7 +1394,7 @@
   "dataset": "lerobot/ucsd_pick_and_place_dataset",
   "ok": true,
   "full": true,
-  "seconds": 4.23,
+  "seconds": 4.13,
   "format": "lerobot_v3",
   "episodes_scanned": 1355,
   "episodes_total": 1355,
@@ -1491,7 +1498,7 @@
   "dataset": "lerobot/utokyo_saytap",
   "ok": true,
   "full": true,
-  "seconds": 0.82,
+  "seconds": 0.83,
   "format": "lerobot_v3",
   "episodes_scanned": 20,
   "episodes_total": 20,
@@ -1553,7 +1560,7 @@
   "dataset": "lerobot/nyu_franka_play_dataset",
   "ok": true,
   "full": true,
-  "seconds": 2.4,
+  "seconds": 2.53,
   "format": "lerobot_v3",
   "episodes_scanned": 456,
   "episodes_total": 456,
@@ -1621,7 +1628,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 0.56% of transitions (145 episodes)"
+    "title": "State evolves inconsistently with the actions in 0.84% of transitions (161 episodes)"
    },
    {
     "severity": "MEDIUM",
@@ -1657,7 +1664,7 @@
   "dataset": "lerobot/aloha_mobile_cabinet",
   "ok": true,
   "full": true,
-  "seconds": 2.12,
+  "seconds": 2.22,
   "format": "lerobot_v3",
   "episodes_scanned": 85,
   "episodes_total": 85,
@@ -1683,7 +1690,7 @@
     "detectors": [
      "dynamics.forward_residual"
     ],
-    "title": "State evolves inconsistently with the actions in 1.2% of transitions (85 episodes)"
+    "title": "State evolves inconsistently with the actions in 1.1% of transitions (85 episodes)"
    },
    {
     "severity": "MEDIUM",

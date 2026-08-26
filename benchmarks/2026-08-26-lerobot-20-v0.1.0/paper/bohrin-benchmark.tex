@@ -48,22 +48,24 @@ behavior-cloned policy before training begins. Their detectors are typically val
 fault injection: plant a known defect in a fixture, confirm the detector fires. That
 measures recall and cannot measure precision, because a detector that fires unconditionally
 passes every such test. We report the complementary measurement for \emph{bohrin}, an
-open-source dataset linter: how often its 46 default detectors complain about data that
-other people collected, curated, published, and trained on. Scanning 20 public LeRobot
-datasets (4{,}342 episodes, 545{,}964 frames, 2--40 action dimensions, 5--50\,Hz, simulated
-and real), all 20 parsed without error in 22.3\,s on a laptop CPU, yielding 189 findings
-(23 \textsc{high}, 121 \textsc{medium}, 45 \textsc{low}). Twenty-seven detectors fired at
-least once, nineteen never fired, and four ever reached \textsc{high}. One detector,
-\dtr{dynamics.inverse\_residual}, reports \textsc{high} on 50\% of the corpus; we give
-three competing explanations, two of which are defects in the tool, and identify an
-ill-conditioned ridge solve as the first hypothesis to test. We also find that the default
-300-episode triage cap changes no \textsc{high} finding and two \textsc{medium} findings
-out of 189. We state plainly what this measurement does not establish: without ground-truth
-labels a fire rate is a rate of complaint, not a rate of correctness, and no policy was
-trained, so the premise that these defects degrade policies remains untested here. A
-secondary finding concerns the ecosystem rather than the tool: 18 of 20 datasets declare
-\texttt{robot\_type: "unknown"}, undermining any embodiment-keyed calibration built on
-public metadata.
+open-source dataset linter, across 20 public LeRobot datasets (4{,}342 episodes,
+545{,}964 frames, 2--40 action dimensions, 5--50\,Hz, simulated and real).
+Our most consequential result is not about the tool: \textbf{18 of 20 datasets declare}
+\mbox{\texttt{robot\_type:\,"unknown"}}, so any method conditioning on embodiment via Hub
+metadata degenerates to one undifferentiated bucket on 90\% of this corpus. That includes
+bohrin's own conformal gate, whose Mondrian taxonomy is keyed on that field.
+On the tool: all 20 datasets parsed without error in 22.5\,s on a laptop CPU, yielding 190
+findings (23 \textsc{high}, 121 \textsc{medium}, 46 \textsc{low}). Twenty-seven detectors
+fired at least once and nineteen never fired, but six fire on 70\% or more of this curated
+corpus, and a median of 9.5 findings per dataset with no dataset ever clean is a usability
+defect we measure in our own output. We tested one hypothesis for the worst offender,
+\dtr{dynamics.inverse\_residual} (100\% fire rate, \textsc{high} on 50\%): an
+ill-conditioned ridge solve. Fixing it eliminated the numerical fault but left the fire and
+\textsc{high} rates unchanged, falsifying the hypothesis. The two surviving explanations,
+control rate and format-conversion provenance, are perfectly confounded in this corpus. We
+state plainly what this does not establish: without ground-truth labels a fire rate is a
+rate of complaint, not of correctness, and no policy was trained, so the premise that these
+defects degrade policies remains untested here.
 \end{abstract}
 
 \section{Motivation}
@@ -131,7 +133,7 @@ Dataset & Source & Hz & act & state & Episodes & Frames & Scan (s) & H & M/L \\
 \dtr{utokyo\_saytap}              & real, OXE &  5 & 12 & 30 &     20  & 22{,}937  & 0.8 & 1 & 5/0 \\
 \dtr{nyu\_rot}                    & real, OXE &  5 &  7 &  7 &     14  & 440       & 0.4 & 2 & 6/2 \\
 \midrule
-\textbf{Total} & & & & & \textbf{4{,}342} & \textbf{545{,}964} & \textbf{22.3} & \textbf{23} & \textbf{121/45} \\
+\textbf{Total} & & & & & \textbf{4{,}342} & \textbf{545{,}964} & \textbf{22.3} & \textbf{23} & \textbf{121/46} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -141,7 +143,7 @@ Dataset & Source & Hz & act & state & Episodes & Frames & Scan (s) & H & M/L \\
 \subsection{Coverage and cost}
 
 All 20 datasets parsed, profiled, and reported with no crash and no adapter failure. Total
-wall-clock time was 22.3\,s on a laptop CPU with no GPU, median 0.8\,s per dataset.
+wall-clock time was 22.5\,s on a laptop CPU with no GPU, median 0.8\,s per dataset.
 Seventeen of twenty produced at least one \textsc{high}; none came back clean.
 
 Wall time correlates with episode count at $r = 0.87$ and with frame count at only
@@ -198,34 +200,76 @@ Detector & Fires & \textsc{high} & Reading \\
 \end{tabular}
 \end{table}
 
-\subsection{\dtr{dynamics.inverse\_residual} fails its own audit}
+\subsection{Finding volume is a usability defect}
+
+190 findings across 20 datasets is a median of \textbf{9.5 per dataset}. No dataset came
+back clean and 17 of 20 produced at least one \textsc{high};
+\dtr{utokyo\_pr2\_tabletop} returns 15 findings and \dtr{nyu\_rot} returns 10 on 440 frames.
+A report that flags every dataset and returns ten complaints is not a triage tool: the two
+findings that mattered are lost among the eight that did not. We measure this in our own
+output and treat it as a defect in the product rather than a property of the data. The
+terminal now shows the top five clusters by severity $\times$ blast radius and names the
+flag carrying the rest; machine-readable outputs stay complete. That is presentation. The
+substantive fix is Section~\ref{sec:alwayson}, and it is not done.
+
+\subsection{Six detectors are effectively always-on}
+\label{sec:alwayson}
+
+Ranking by severity, as Table~\ref{tab:high} does, hides the real problem. Ranked by fire
+rate, six detectors fire on 70\% or more of a curated, published corpus
+(Table~\ref{tab:alwayson}). \textbf{A detector that fires on 85\% of curated public data
+carries almost no information, whatever severity it attaches.} These six escaped scrutiny in
+an earlier draft by being \textsc{medium}, but they are the bulk of the 121 \textsc{medium}
+findings and therefore the bulk of the volume problem above.
+
+\begin{table}[tb]
+\centering
+\caption{Detectors firing on 70\% or more of the corpus.}
+\label{tab:alwayson}
+\small
+\begin{tabular}{lrr}
+\toprule
+Detector & Fires on & Reaches \textsc{high} \\
+\midrule
+\dtr{dynamics.inverse\_residual}   & \warn{100\%} & 50\% \\
+\dtr{dynamics.forward\_residual}   & 90\% & 0\% \\
+\dtr{smoothness.jerk\_outlier}     & 85\% & 0\% \\
+\dtr{smoothness.curvature}         & 75\% & 0\% \\
+\dtr{smoothness.path\_efficiency}  & 70\% & 0\% \\
+\dtr{temporal.non\_markovian\_pause} & 70\% & 0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{\dtr{dynamics.inverse\_residual}: one hypothesis tested and rejected}
 \label{sec:suspect}
 
-The detector fires on 19 of 20 datasets and returns \textsc{high} on 10 of 20. A
-\textsc{high} on half of a curated, published, widely used corpus is more likely a threshold
-defect than a real epidemic. Three explanations are consistent with the number, and this
-run cannot fully separate them.
+The detector fires on 20 of 20 datasets and returns \textsc{high} on 10 of 20. An earlier
+draft proposed three explanations; one has since been tested.
 
-\textbf{The ridge solve is ill-conditioned.} These scans emitted
-\dtr{LinAlgWarning: Ill-conditioned matrix}
-($\mathrm{rcond} = 7.05\times10^{-17}$) from \dtr{sklearn.linear\_model.\_ridge}, alongside divide-by-zero, overflow, and invalid-value
-warnings from \dtr{sklearn.utils.extmath}. The detector fits an inverse-dynamics model
-$g(o_t, o_{t+1}) \rightarrow \hat{a}_t$ and thresholds its residual; if the design matrix is
-near-singular the fit is unreliable and so is the residual. This is a concrete, checkable
-hypothesis and the first thing to test.
+\textbf{Rejected: the ridge solve was ill-conditioned.} The design matrix stacks consecutive
+states, nearly identical in a smooth trajectory and thus collinear by construction, while the
+ridge penalty was $10^{-6}$, effectively unregularized. LAPACK reported
+\dtr{Ill-conditioned matrix} ($\mathrm{rcond} = 7.05\times10^{-17}$) on real datasets. We
+standardized features per fold, raised the penalty to 1.0, and made the solve abstain rather
+than return a residual from a fit LAPACK flags as unreliable. The numerical fault was real
+and is fixed. \textbf{It was not the cause of the over-firing}: the fire rate moved from
+19/20 to 20/20 and the \textsc{high} rate stayed at exactly 10/20.
 
-\textbf{The threshold ignores control rate.} Fourteen of twenty datasets run at 5\,Hz. At
-200\,ms per step, consecutive states are only weakly related by the action between them, so
-an inverse-dynamics residual is legitimately large without any misalignment. A threshold
-calibrated on higher-rate data would over-fire here systematically.
+\textbf{Still open: the threshold ignores control rate.} Fourteen of twenty datasets run at
+5\,Hz. At 200\,ms per step, consecutive states are only weakly related by the action between
+them, so an inverse-dynamics residual is legitimately large without misalignment.
 
-\textbf{The finding is real.} Action/observation misalignment is a known hazard of format
-conversion, and 14 of the 20 datasets reached LeRobot through an RLDS conversion of an
-already-converted OXE dataset. Two conversion hops is a plausible place to lose
-synchronization.
+\textbf{Still open: the finding is real.} Action/observation misalignment is a known hazard
+of format conversion, and 14 of 20 datasets reached LeRobot through an RLDS conversion of an
+already-converted Open X-Embodiment dataset.
 
-The first two explanations are defects in the tool; the third is a defect in the data.
-Separating them requires the adjudication described in Section~\ref{sec:limits}.
+Both surviving hypotheses predict the observed split: 9/14 (64\%) \textsc{high} on 5\,Hz
+datasets against 1/6 (17\%) above 5\,Hz, and 9/14 (64\%) on OXE conversions against 1/6
+(17\%) on native datasets. \textbf{These are the same partition.} Every OXE dataset here
+runs at 5\,Hz and every native one runs faster, so control rate and provenance are perfectly
+confounded and this corpus cannot separate them. Doing so needs data that breaks the
+confound: native recordings at 5\,Hz, or converted data at higher rates.
 
 \subsection{The nineteen silent detectors}
 
@@ -242,11 +286,11 @@ having validated 46 detectors.
 
 The default scan caps at 300 episodes, subsampling \dtr{ucsd\_pick\_and\_place} (300 of
 1{,}355), \dtr{xarm\_lift\_medium} (300 of 800), and \dtr{nyu\_franka\_play} (300 of 456).
-It reads 61\% of episodes and 85\% of frames in 21.5\,s against 22.3\,s.
+It reads 61\% of episodes and 85\% of frames in 21.5\,s against 22.5\,s.
 
 Every \textsc{high} finding is identical between the two passes, as are the counts of
 datasets scanned, datasets with at least one \textsc{high}, detectors that fired, and
-detectors reaching \textsc{high}. Two \textsc{medium} findings out of 189 differ
+detectors reaching \textsc{high}. Two \textsc{medium} findings out of 190 differ
 (119 versus 121), and four detectors shift by one dataset each, all on the three subsampled
 datasets. Triage is a reasonable default on this corpus; that is a statement about these 20
 datasets, not a general guarantee.
@@ -282,11 +326,18 @@ here. A defensible causal claim requires training policies on data with and with
 defect and measuring the difference in rollout success. Until then, severity is a triage
 ordering rather than a prediction of harm.
 
-\textbf{Selection bias, in both directions.} The datasets were chosen by the project's own
-maintainer. They are curated and widely used, which biases toward clean data and makes a
-high fire rate more suspicious, the intended direction. They are also predominantly 5\,Hz
-OXE conversions, so conversion artifacts are over-represented and native high-rate
-teleoperation is under-represented.
+\textbf{This corpus is not the population the tool is for.} Fourteen of twenty datasets are
+Open X-Embodiment conversions recorded at 5\,Hz. The intended user teleoperates an SO-101 or
+similar and records natively at 30\,Hz. Those are different populations, and
+Section~\ref{sec:suspect} shows the difference is load-bearing: the \textsc{high} rate is
+64\% on the 5\,Hz conversions and 17\% on everything else, so a substantial share of these
+findings may be measuring \emph{this dataset survived two format conversions} rather than
+\emph{this teleoperation session was poor}. This run therefore does not tell us how the tool
+behaves for its intended user, and because rate and provenance are confounded here, this
+corpus cannot diagnose its own most suspicious detector. Both are fixed by the same thing: a
+second corpus drawn from community-published LeRobot datasets, natively recorded and far
+more numerous. The bias also runs the other way and is worth keeping: these datasets are
+curated and widely used, so a high fire rate on them is \emph{more} suspicious, not less.
 
 \textbf{Single machine, single run.} One laptop CPU with no GPU, one pass per configuration,
 warm cache. Timings are indicative rather than benchmarked: no repeats, no confidence
@@ -305,21 +356,33 @@ embodiment. A Mondrian taxonomy keyed on a field that 90\% of this corpus leaves
 collapses to a single wildcard bucket and forfeits the group-conditional validity the design
 was chosen for.
 
-\textbf{Numerical warnings were observed and not resolved.} An ill-conditioned ridge solve
-reaching the dynamics fit is a correctness concern, not cosmetic noise.
+\begin{sloppypar}
+\textbf{Numerical warnings are resolved, and one root cause is fixed.} An earlier run leaked
+\dtr{LinAlgWarning} and numpy divide-by-zero, overflow and invalid-value warnings from
+scikit-learn to stderr during ordinary scans. The ill-conditioning had a real cause and is
+fixed at source (Section~\ref{sec:suspect}). The rest are IEEE flags raised inside BLAS
+during clustering, on input already validated as finite; they are suppressed at one
+documented boundary, with an environment variable to restore them for debugging. This sweep
+produced zero warning lines on stderr.
+\end{sloppypar}
 
 \textbf{Dataset revisions are not pinned.} A Hub-side update will change these numbers.
 
 \section{Next Steps}
 
+In priority order.
+
 \begin{enumerate}\itemsep2pt
-\item Test the ill-conditioning hypothesis: log the condition number of the design matrix
-per dataset and check whether it predicts the \textsc{high} findings. If it does, the fix is
-regularization or abstention, not a new threshold.
-\item Make the residual threshold control-rate aware, or verify that it already is.
+\item \textbf{Build a second corpus from community LeRobot datasets.} Natively recorded,
+higher control rate, numerous. It breaks the confound in Section~\ref{sec:suspect}, measures
+the tool on its intended population, and is the prerequisite for recalibrating anything.
+\item \textbf{Recalibrate the six always-on detectors} (Section~\ref{sec:alwayson}) against
+that corpus. A detector firing on 85\% of healthy data needs a threshold that reflects it, or
+it joins \texttt{DEFAULT\_EXCLUDED} with the number recorded.
+\item \textbf{Resolve \dtr{dynamics.inverse\_residual}} by making the residual threshold
+control-rate aware and testing against native data at matched rates.
 \item Publish a precision estimate with an explicit $N$ from hand-adjudicated findings.
-\item Run a policy-outcome experiment on at least one detector, converting a mechanism
-argument into a measurement.
+\item Run a policy-outcome experiment on at least one detector.
 \item Resolve the embodiment-metadata gap before shipping a default calibration corpus.
 \end{enumerate}
 

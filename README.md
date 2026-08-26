@@ -118,16 +118,18 @@ measures recall, and it cannot measure precision on healthy data. [`benchmarks/`
 holds the runs that measure the other half, on real published datasets.
 
 The latest, [**A precision audit of robot data-quality detectors**](benchmarks/2026-08-26-lerobot-20-v0.1.0/REPORT.md)
-(20 datasets, 4,342 episodes, 545,964 frames): all 20 parsed without error in 22.3 s on a
-laptop CPU, producing 189 findings. Of the 46 default detectors, 27 fired at least once, 19
-never fired, and only 4 ever reached HIGH.
+(20 datasets, 4,342 episodes, 545,964 frames): all 20 parsed without error in 22.5 s on a
+laptop CPU, producing 190 findings.
 
-It also fails one of bohrin's own detectors. `dynamics.inverse_residual` reports HIGH on
-half the corpus, which is more likely a threshold defect than a real epidemic, and the
-report names an ill-conditioned ridge solve as the first hypothesis to test. It is equally
-explicit about what it does not show: a fire rate is a rate of complaint, not a rate of
-correctness, and no policy was trained, so the premise that these defects degrade policies
-is not tested there.
+Its most consequential result is not about bohrin. **18 of the 20 datasets declare
+`robot_type: "unknown"`**, so any method conditioning on embodiment via Hub metadata
+collapses to a single bucket on 90% of the corpus — including bohrin's own conformal gate.
+
+It is also unflattering about the tool: six detectors fire on 70% or more of curated public
+data, a median of 9.5 findings per dataset is too many to act on, and one hypothesis for the
+worst offender was tested and rejected rather than quietly dropped. It is explicit about what
+it does not show: a fire rate is a rate of complaint, not a rate of correctness, and no
+policy was trained, so the premise that these defects degrade policies is untested there.
 
 ## Supported formats
 
