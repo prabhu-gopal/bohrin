@@ -41,7 +41,7 @@
 Robot Demonstration Data}\\[0.35em]
 \large 46 Detectors Measured Against 20 Public LeRobot Datasets}
 \author{Prabhu Gopal}
-\date{26 August 2026 \quad$\cdot$\quad bohrin 0.1.0 \quad$\cdot$\quad commit \texttt{cf39d78}}
+\date{26 August 2026 \quad$\cdot$\quad bohrin 0.2.0 \quad$\cdot$\quad measured at commit \texttt{c8265c0}}
 
 \begin{document}
 \maketitle
@@ -438,11 +438,18 @@ control-rate aware and testing against native data at matched rates.
 
 \begin{verbatim}
 git clone https://github.com/prabhu-gopal/bohrin && cd bohrin
-git checkout cf39d78
+git checkout c8265c0
 python -m venv .venv && .venv/bin/pip install -e '.[dev]'
 cd benchmarks/2026-08-26-lerobot-20-v0.1.0
 ../../.venv/bin/python scripts/run_sweep.py --out results/
 \end{verbatim}
+
+Every measurement here was taken at \texttt{c8265c0}, when 46 detectors ran by default.
+Section~\ref{sec:decided} records the decision this run produced:
+\dtr{dynamics.inverse\_residual} moved to \texttt{DEFAULT\_EXCLUDED} in the next commit, so
+a default scan on bohrin 0.2.0 runs 45 detectors and returns 13 \textsc{high} findings across
+this corpus rather than 23. Reproducing the tables above therefore needs \texttt{c8265c0}
+rather than the release tag.
 
 Raw results, figure-generation code, and this document's source are committed under
 \path{benchmarks/2026-08-26-lerobot-20-v0.1.0/}. Every figure derives from
