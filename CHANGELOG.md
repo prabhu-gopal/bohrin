@@ -12,13 +12,18 @@ any `--json` output. It changes only when the serialized report shape changes.
 ### Added
 
 - **`benchmarks/` — published measured evidence on real public data.** The first run,
-  `benchmarks/2026-08-26-hub-sweep-v0.1.0/`, scans 20 curated public LeRobot datasets
-  (2,631 episodes, 545,964 frames, 2–40 action dims, 5–50 Hz, sim and real): 20/20 parsed
-  without error in 20.8 s total on a laptop CPU, producing 187 findings (23 HIGH, 119
-  MEDIUM, 45 LOW). Of the 46 default detectors, 27 fired at least once, 19 never fired,
-  and only 4 ever reached HIGH. Ships the raw `sweep.json`, a report, the figure-generation
-  script, and a LaTeX paper. The unit suite measures recall on synthetic fixtures; this
+  `benchmarks/2026-08-26-lerobot-20-v0.1.0/`, scans 20 curated public LeRobot datasets
+  (4,342 episodes, 545,964 frames, 2–40 action dims, 5–50 Hz, sim and real, 14 of them
+  Open X-Embodiment conversions): 20/20 parsed without error in 22.3 s on a laptop CPU,
+  producing 189 findings (23 HIGH, 121 MEDIUM, 45 LOW). Of the 46 default detectors, 27
+  fired at least once, 19 never fired, and only 4 ever reached HIGH. Ships the raw sweep
+  JSON for both the uncapped and the default triage pass, a report, the sweep and figure
+  scripts, and a LaTeX paper. The unit suite measures recall on synthetic fixtures; this
   measures how often detectors complain about healthy real data, which the suite cannot.
+- **Measured: the default 300-episode triage cap does not change the conclusions** on this
+  corpus. Comparing a capped scan against one that reads every episode, all 23 HIGH
+  findings are identical, as are the counts of detectors that fired and detectors reaching
+  HIGH; 2 MEDIUM findings out of 189 differ, on the 3 datasets that the cap subsamples.
 
 ### Changed
 
@@ -38,8 +43,10 @@ any `--json` output. It changes only when the serialized report shape changes.
   sweep it fires on 95% of datasets and reports HIGH on 50%. A HIGH that fires on half of
   a curated, published corpus is more likely to be a threshold defect than an epidemic. No
   ground-truth adjudication has been done, so this is not yet grounds for excluding it —
-  it is grounds for not trusting the severity. See
-  `benchmarks/2026-08-26-hub-sweep-v0.1.0/REPORT.md` §4.2.
+  it is grounds for not trusting the severity. The same run recorded an
+  `Ill-conditioned matrix (rcond=7.05e-17)` warning from the ridge solve behind this
+  detector, which is the first hypothesis to test. See
+  `benchmarks/2026-08-26-lerobot-20-v0.1.0/REPORT.md` §5.
 - **`--fpr` is inert out of the box, and public metadata makes it hard to fix.** The
   conformal gate needs a calibration corpus keyed by embodiment (Mondrian), and none ships
   with the package. The sweep also found that 18 of 20 public LeRobot datasets declare

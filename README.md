@@ -117,12 +117,17 @@ The unit suite plants known defects in synthetic fixtures and checks they are fo
 measures recall, and it cannot measure precision on healthy data. [`benchmarks/`](benchmarks/)
 holds the runs that measure the other half, on real published datasets.
 
-The latest, [**Bohrin on 20 public LeRobot datasets**](benchmarks/2026-08-26-hub-sweep-v0.1.0/REPORT.md)
-(2,631 episodes, 545,964 frames): all 20 parsed without error in 20.8 s total on a laptop
-CPU, producing 187 findings. Of the 46 default detectors, 27 fired at least once, 19 never
-fired, and only 4 ever reached HIGH. It also flags one of bohrin's own detectors,
-`dynamics.inverse_residual`, as reporting HIGH too often to be trusted yet — and is explicit
-that a fire rate is a rate of complaint, not a rate of correctness.
+The latest, [**A precision audit of robot data-quality detectors**](benchmarks/2026-08-26-lerobot-20-v0.1.0/REPORT.md)
+(20 datasets, 4,342 episodes, 545,964 frames): all 20 parsed without error in 22.3 s on a
+laptop CPU, producing 189 findings. Of the 46 default detectors, 27 fired at least once, 19
+never fired, and only 4 ever reached HIGH.
+
+It also fails one of bohrin's own detectors. `dynamics.inverse_residual` reports HIGH on
+half the corpus, which is more likely a threshold defect than a real epidemic, and the
+report names an ill-conditioned ridge solve as the first hypothesis to test. It is equally
+explicit about what it does not show: a fire rate is a rate of complaint, not a rate of
+correctness, and no policy was trained, so the premise that these defects degrade policies
+is not tested there.
 
 ## Supported formats
 

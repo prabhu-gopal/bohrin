@@ -31,7 +31,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator, PercentFormatter, ScalarFormatter
 
 ROOT = Path(__file__).resolve().parent.parent
-RESULTS = ROOT / "results" / "sweep.json"
+RESULTS = ROOT / "results" / "sweep_full.json"
+RESULTS_TRIAGE = ROOT / "results" / "sweep_default.json"
 FIGURES = ROOT / "figures"
 
 # --- Design tokens -------------------------------------------------------------------
@@ -77,6 +78,7 @@ plt.rcParams.update(
 
 
 def load() -> list[dict]:
+    """The uncapped (``--full``) sweep: every episode of every dataset was read."""
     return json.loads(RESULTS.read_text())
 
 
@@ -188,11 +190,11 @@ def fig_dataset_severity(rows: list[dict]) -> None:
         left = [l0 + v + 0.22 for l0, v in zip(left, vals, strict=True)]  # surface gap between segments
 
     for i, r in enumerate(ok):
-        ax.text(left[i] + 0.5, i, f"{r['episodes']} eps", va="center", ha="left", fontsize=7, color=MUTED)
+        ax.text(left[i] + 0.5, i, f"{r['episodes_total']} eps", va="center", ha="left", fontsize=7, color=MUTED)
 
     ax.set_yticks(list(y))
     ax.set_yticklabels(names, fontsize=7.5, color=INK_2)
-    ax.set_xlabel("findings reported by a default scan")
+    ax.set_xlabel("findings reported per dataset")
     ax.set_xlim(0, max(left) + 4)
     ax.xaxis.set_major_locator(FixedLocator(list(range(0, int(max(left)) + 3, 5))))
     ax.set_title("Findings per dataset, by severity", loc="left", color=INK, pad=14)
@@ -203,37 +205,44 @@ def fig_dataset_severity(rows: list[dict]) -> None:
 
 # --- Figure 3 ------------------------------------------------------------------------
 def fig_runtime(rows: list[dict]) -> None:
-    """Scan wall-time against dataset size. Single series → no legend; the title names it."""
+    """Scan wall-time against episode count.
+
+    Plotted against *episodes*, not frames, because that is what the measurement supports:
+    across this corpus wall-time correlates with episode count at r = 0.87 and with frame
+    count at only r = 0.68. Per-episode fixed work dominates — ``aloha_mobile_cabinet``
+    reads 127,500 frames in 2.1 s while ``ucsd_pick_and_place`` reads half that in 4.2 s,
+    because it has 16x more episodes.
+    """
     ok = [r for r in rows if r.get("ok")]
-    xs = [r["episodes"] for r in ok]
+    xs = [r["episodes_total"] for r in ok]
     ys = [r["seconds"] for r in ok]
 
     fig, ax = plt.subplots(figsize=(6.4, 4.0))
     ax.scatter(xs, ys, s=54, color=SERIES_BLUE, edgecolor=SURFACE, linewidth=1.6, zorder=3)
     # Label only the extremes — never a number on every point.
     slowest = max(ok, key=lambda r: r["seconds"])
-    biggest = max(ok, key=lambda r: r["episodes"])
-    smallest = min(ok, key=lambda r: r["episodes"])
-    for r in (slowest, biggest, smallest):
-        # Anchor right-hand labels to the right of the text box so they stay on canvas.
-        right = r["episodes"] > 120
+    biggest = max(ok, key=lambda r: r["episodes_total"])
+    smallest = min(ok, key=lambda r: r["episodes_total"])
+    # Label only the extremes, each nudged clear of its neighbours: the right-hand points
+    # would otherwise run off the canvas and the smallest would land on top of the next point.
+    for r, (dx, dy, ha) in ((slowest, (-9, 6, "right")), (biggest, (-9, 6, "right")), (smallest, (9, -13, "left"))):
         ax.annotate(
             short(r["dataset"]),
-            (r["episodes"], r["seconds"]),
+            (r["episodes_total"], r["seconds"]),
             textcoords="offset points",
-            xytext=(-9 if right else 9, 6),
-            ha="right" if right else "left",
+            xytext=(dx, dy),
+            ha=ha,
             fontsize=7,
             color=INK_2,
         )
     ax.set_xscale("log")
-    ax.xaxis.set_major_locator(FixedLocator([10, 20, 50, 100, 200, 300]))
+    ax.xaxis.set_major_locator(FixedLocator([10, 25, 50, 100, 250, 500, 1400]))
     ax.xaxis.set_minor_locator(FixedLocator([]))
     ax.xaxis.set_major_formatter(ScalarFormatter())
     ax.set_xlabel("episodes in the dataset (log scale)")
     ax.set_ylabel("wall-clock seconds")
     ax.set_ylim(0, max(ys) * 1.28)
-    ax.set_title("Scan cost is set by column reads, not episode count", loc="left", color=INK, pad=14)
+    ax.set_title("Scan cost tracks episode count, sub-linearly", loc="left", color=INK, pad=14)
     _strip(ax)
     ax.yaxis.grid(True, color=GRID, linewidth=0.7, zorder=0)
     save(fig, "fig3_runtime")
