@@ -64,3 +64,21 @@ def test_max_episodes_contract() -> None:
     assert ScanConfig(path="x").max_episodes() == DEFAULT_TRIAGE_EPISODES
     assert ScanConfig(path="x", full=True).max_episodes() is None
     assert ScanConfig(path="x", sample_episodes=10).max_episodes() == 10
+
+
+def test_tty_points_at_the_flags_that_unlock_the_policy_checks() -> None:
+    """A default scan skips the POLICY<->DATA family and used to say nothing about it.
+
+    Those five checks need a model to compare against, so they are correctly silent without
+    one — but silence made `--target` and `--policy` undiscoverable: the only way to learn
+    the checks existed was to read `--help`. The hint appears exactly when none of them ran.
+    """
+    episodes = _synth.clean_dataset(n_episodes=8)
+    uri = _synth.register_memory_dataset(episodes)
+
+    text = TtyRenderer().render(bohrin.scan(uri))
+    assert "--target" in text and "--policy" in text
+
+    targeted = bohrin.scan(uri, target="act")
+    if any(d.startswith("policy_data.") for d in targeted.detectors_run):
+        assert "--target" not in TtyRenderer().render(targeted)

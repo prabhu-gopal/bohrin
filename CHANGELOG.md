@@ -9,6 +9,16 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ## [Unreleased]
 
+### Added
+
+- **A default scan now says that the policy↔data checks were skipped**, and names the flags
+  that unlock them (`--target bc|act|diffusion|openvla|pi0|octo`, or `--policy <checkpoint>`).
+  Those five checks need a model to compare against, so staying silent without one is
+  correct — but saying nothing made the flags undiscoverable: the only way to learn the
+  checks existed was to read `--help`. The line appears exactly when none of them ran,
+  including on a clean dataset, which is the most misleading moment to stay quiet about
+  checks that never ran.
+
 ## [0.2.0] — 2026-08-27
 
 Published measured evidence on real public data, and acted on what it showed. Every

@@ -24,6 +24,11 @@ from bohrin.report.model import Report
 #: reading. Nothing is dropped — `--json`, `--sarif` and `--html` all carry every finding.
 _DETAIL_LIMIT = 5
 
+#: Id prefix of the POLICY<->DATA family, whose members need a model to compare against.
+#: Matched against ``Report.detectors_run`` rather than the registry: the report layer is
+#: deliberately detector-agnostic, and importing the registry here is a circular import.
+_POLICY_PREFIX = "policy_data."
+
 _SEV_STYLE: dict[Severity, str] = {
     Severity.HIGH: "bold red",
     Severity.MEDIUM: "yellow",
@@ -71,6 +76,9 @@ class TtyRenderer:
         # about what we found; a score would be a claim about what it costs you.
         if not report.clusters:
             console.print(Text(cat.no_findings, style="green"))
+            # "Clean" is the most misleading moment to stay silent about skipped checks.
+            if not any(d.startswith(_POLICY_PREFIX) for d in report.detectors_run):
+                console.print(Text(cat.policy_checks_skipped, style="dim"))
             return
         console.print(Panel.fit(Text(tally, style="bold")))
 
@@ -102,6 +110,12 @@ class TtyRenderer:
             # because they over-report, so pointing a user there to see more findings would
             # hand them the least trustworthy ones first.
             console.print(Text(f"… {remaining} {cat.more_findings} — --html or --json for all.", style="dim"))
+        # A default scan silently skips the POLICY<->DATA family, because those checks need a
+        # model to compare against. Nothing in the output said so, which meant the flags that
+        # unlock them were undiscoverable: a user had to read `--help` to learn that five
+        # checks existed and were not running. Say it once, only when none of them ran.
+        if not any(d.startswith(_POLICY_PREFIX) for d in report.detectors_run):
+            console.print(Text(cat.policy_checks_skipped, style="dim"))
         if report.dataset.sampled:
             triage = (
                 f"Triage scan of {report.dataset.n_episodes}/{report.dataset.total_episodes} episodes — --full for all."
