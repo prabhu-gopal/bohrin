@@ -95,3 +95,18 @@ def test_a_non_lerobot_directory_names_the_missing_file(tmp_path: Path) -> None:
     assert "meta/info.json" in message  # says exactly what was looked for
     assert "train.hdf5" in message  # and what was found instead
     assert "--format" in message  # and the way forward
+
+
+def test_split_revision_parses_the_hub_pin_syntax() -> None:
+    """`owner/name@revision` pins a Hub dataset so a benchmark cites a fixed snapshot.
+
+    A Hub dataset can be re-uploaded under the same id, so an unpinned fire rate in a
+    published benchmark is a claim about a moving target. `@` is the Hub's own separator.
+    """
+    from bohrin.hub import split_revision
+
+    assert split_revision("lerobot/pusht") == ("lerobot/pusht", None)
+    assert split_revision("lerobot/pusht@abc123") == ("lerobot/pusht", "abc123")
+    # A local path must survive untouched, and a trailing `@` is not a revision.
+    assert split_revision("/tmp/data") == ("/tmp/data", None)
+    assert split_revision("owner/name@") == ("owner/name@", None)

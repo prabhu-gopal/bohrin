@@ -59,6 +59,17 @@ def looks_like_repo_id(target: str) -> bool:
     return bool(_REPO_ID.match(target))
 
 
+def split_revision(target: str) -> tuple[str, str | None]:
+    """``"owner/name@abc123"`` -> ``("owner/name", "abc123")``; no ``@`` -> revision ``None``.
+
+    Pinning matters for anything whose numbers are meant to be reproducible: a Hub dataset
+    can be re-uploaded under the same id, and a benchmark that cites a fire rate against an
+    unpinned dataset is citing a moving target. ``@`` is the separator the Hub itself uses.
+    """
+    repo_id, sep, revision = target.partition("@")
+    return (repo_id, revision) if sep and revision else (target, None)
+
+
 def resolve(
     repo_id: str,
     *,

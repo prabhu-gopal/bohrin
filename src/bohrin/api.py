@@ -11,7 +11,7 @@ from pathlib import Path
 
 from bohrin.config import DEFAULT_FPR, ScanConfig, load_yaml
 from bohrin.engine import ProgressFn, run_scan
-from bohrin.hub import looks_like_repo_id
+from bohrin.hub import looks_like_repo_id, split_revision
 from bohrin.hub import resolve as resolve_repo_id
 from bohrin.profile.episode_reservoir import DEFAULT_MEMORY_BUDGET_MB
 from bohrin.report.model import Report
@@ -63,9 +63,12 @@ def scan(
     #: informative than a two-tick stage of ours; we suppress it in exactly the cases where
     #: we already suppress our own progress (``--ci``, or a non-TTY).
     source: str | None = None
-    if looks_like_repo_id(path_str):
+    # ``owner/name@revision`` pins the dataset, so a benchmark can cite numbers against a
+    # Hub snapshot that cannot move under it.
+    repo_id, revision = split_revision(path_str)
+    if looks_like_repo_id(repo_id):
         source = path_str
-        path = resolve_repo_id(path_str, quiet=progress is None)
+        path = resolve_repo_id(repo_id, revision=revision, quiet=progress is None)
         path_str = str(path)
     schema_map = load_yaml(path) if Path(path).exists() else {}
     resolved_format = format or schema_map.get("format")
