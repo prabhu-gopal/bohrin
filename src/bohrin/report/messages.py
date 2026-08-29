@@ -38,6 +38,7 @@ class Catalog:
     provenance: str
     next_hint: str
     more_findings: str
+    policy_checks_skipped: str
     nothing_blocking: str
     things_to_fix: str
     footer_local: str
@@ -65,6 +66,10 @@ _EN = Catalog(
     provenance="Provenance",
     next_hint="Next",
     more_findings="more finding(s)",
+    policy_checks_skipped=(
+        "Policy↔data checks were skipped — name your model with --target "
+        "(bc|act|diffusion|openvla|pi0|octo) or point at a checkpoint with --policy."
+    ),
     nothing_blocking="Nothing blocking. The findings below are quality improvements, not reasons to hold off training.",
     things_to_fix="The things to fix before you train",
     footer_local="Findings computed locally; nothing left this machine.",
@@ -84,6 +89,10 @@ _ES = Catalog(
     provenance="Procedencia",
     next_hint="Siguiente",
     more_findings="hallazgo(s) más",
+    policy_checks_skipped=(
+        "Se omitieron las comprobaciones política↔datos — indica tu modelo con --target "
+        "(bc|act|diffusion|openvla|pi0|octo) o apunta a un checkpoint con --policy."
+    ),
     nothing_blocking=(
         "Nada que bloquee. Los hallazgos siguientes son mejoras de calidad, no motivos para posponer el entrenamiento."
     ),
