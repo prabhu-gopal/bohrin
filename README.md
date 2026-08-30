@@ -59,6 +59,13 @@ bohrin scan lerobot/pusht
 
 Python 3.10–3.13. Point it at a local directory or a Hugging Face Hub `owner/name`.
 
+Add `@revision` to pin a Hub dataset to one commit, so a result stays reproducible even if
+the dataset is re-uploaded under the same id:
+
+```bash
+bohrin scan lerobot/pusht@7628202a2180972f291ba1bc6723834921e72c19
+```
+
 ## What it checks
 
 Bohrin ships 48 detectors across 12 families — 45 run by default, 3 are held back

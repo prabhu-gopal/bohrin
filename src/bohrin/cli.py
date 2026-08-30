@@ -137,7 +137,10 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=_SCAN_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    scan_p.add_argument("path", help="Local dataset path, or a Hugging Face Hub repo id (owner/name).")
+    scan_p.add_argument(
+        "path",
+        help="Local dataset path, or a Hub repo id (owner/name, or owner/name@revision to pin a commit).",
+    )
     scan_p.add_argument("--format", help="Override format autodetection.")
     scan_p.add_argument("--policy", help="Checkpoint enabling policy↔data checks.")
     scan_p.add_argument("--target", help="Target family (bc|act|diffusion|openvla|pi0|octo).")
