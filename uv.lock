@@ -316,6 +316,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "ruff" },
     { name = "types-pyyaml" },
+    { name = "verifiers" },
 ]
 verifiers = [
     { name = "verifiers" },
@@ -332,6 +333,7 @@ requires-dist = [
     { name = "rich", specifier = ">=13.7" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "verifiers", marker = "extra == 'dev'", specifier = ">=0.3.1" },
     { name = "verifiers", marker = "extra == 'verifiers'", specifier = ">=0.3.1" },
 ]
 provides-extras = ["dev", "verifiers"]
