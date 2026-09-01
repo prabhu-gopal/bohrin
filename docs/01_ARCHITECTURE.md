@@ -215,16 +215,15 @@ That makes `asyncio.TaskGroup` and `asyncio.timeout()` available. We use
 So the choice stands on its own merits rather than on a version constraint.
 
 ```python
-sem = asyncio.Semaphore(cfg.concurrency)          # default 8
+sem = asyncio.Semaphore(cfg.concurrency)  # default 8
+
 
 async def _one(task: Task, cand: Candidate) -> Verdict:
     async with sem:
-        return await asyncio.wait_for(
-            source.score(task, cand), timeout=cfg.per_task_timeout
-        )
+        return await asyncio.wait_for(source.score(task, cand), timeout=cfg.per_task_timeout)
 
-verdicts = await asyncio.gather(*(_one(t, c) for t, c in work),
-                                return_exceptions=True)
+
+verdicts = await asyncio.gather(*(_one(t, c) for t, c in work), return_exceptions=True)
 ```
 
 `return_exceptions=True` is deliberate: one task that times out must not
