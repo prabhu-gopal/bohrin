@@ -22,7 +22,7 @@ Report it privately, either way:
 Please include, as far as you can:
 
 - What the vulnerability lets an attacker do.
-- The steps or input that trigger it — a dataset that reproduces it is ideal.
+- The steps or input that trigger it — an environment that reproduces it is ideal.
 - The `bohrin --version` and Python version you observed it on.
 
 ## Response times
@@ -52,4 +52,4 @@ security bug worth reporting:
   data is ever uploaded.
 - **Bohrin never unpickles a checkpoint.** `--policy` reads safetensors, ONNX, and JSON
   config only. If you find an input that causes arbitrary code execution — through a
-  checkpoint, a dataset file, or a `bohrin.yaml` — that is a vulnerability.
+  checkpoint, an environment file, or a `bohrin.yaml` — that is a vulnerability.

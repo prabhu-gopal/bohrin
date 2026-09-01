@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -78,13 +78,13 @@ jobs:
           /tmp/fresh/bin/pip install --quiet dist/*.whl
           /tmp/fresh/bin/bohrin --version
           /tmp/fresh/bin/bohrin --help
-          /tmp/fresh/bin/bohrin list-detectors | head -5
-          /tmp/fresh/bin/bohrin explain stats.dead_dimension
+          /tmp/fresh/bin/bohrin list-probes
+          /tmp/fresh/bin/bohrin explain weak_oracle
 
       - name: Errors are messages, not tracebacks
         run: |
           set +e
-          out=$(/tmp/fresh/bin/bohrin scan ./definitely-not-a-dataset 2>&1)
+          out=$(/tmp/fresh/bin/bohrin audit ./definitely-not-a-taskset 2>&1)
           code=$?
           set -e
           echo "$out"

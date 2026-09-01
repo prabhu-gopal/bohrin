@@ -1,124 +1,92 @@
-"""The terminal renderer — Stage ⑥ default output (docs/02 §6, docs/05 §2).
+"""Terminal rendering.
 
-Turns a finished :class:`Report` into a ranked, skimmable summary: the Quality Score, the
-severity tally, the ranked clusters, and the mechanism+fix for the top finding. Pure sink —
-it never mutates the report. Localizes its chrome via a :class:`Catalog` (docs/05 §7).
+The report leads with the candidate that passed, not with charts. A nine-line submission
+scoring full marks on the reader's own task is the argument; everything else is context.
 """
 
 from __future__ import annotations
 
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
+from rich.markup import escape
 
-from bohrin.ir.schema import Severity
-from bohrin.report.messages import catalog
+from bohrin.ir.evidence import Exploit, Flake
+from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.report.model import Report
 
-#: Clusters shown with their full why/fix in the terminal. Beyond this the TTY summarizes
-#: and points at the fuller reports — a first run must stay skimmable (docs/05 §2).
-#:
-#: Five, not six, because the 20-dataset benchmark measured a median of 9.5 findings per
-#: dataset with every dataset producing at least one. At that density the terminal is the
-#: triage surface, not the full record: a reader who has to scroll has already stopped
-#: reading. Nothing is dropped — `--json`, `--sarif` and `--html` all carry every finding.
-_DETAIL_LIMIT = 5
-
-#: Id prefix of the POLICY<->DATA family, whose members need a model to compare against.
-#: Matched against ``Report.detectors_run`` rather than the registry: the report layer is
-#: deliberately detector-agnostic, and importing the registry here is a circular import.
-_POLICY_PREFIX = "policy_data."
-
-_SEV_STYLE: dict[Severity, str] = {
-    Severity.HIGH: "bold red",
-    Severity.MEDIUM: "yellow",
-    Severity.LOW: "cyan",
-    Severity.INFO: "dim",
-}
+_BAR_WIDTH = 15
+#: Findings shown in full. The rest are named in a tail line pointing at --json, because a
+#: terminal is a triage surface and the machine-readable output is the full record.
+_DETAIL_LIMIT = 6
 
 
-class TtyRenderer:
-    """Renders a report to the terminal (and to a string for tests). A :class:`Renderer`."""
+def _bar(fraction: float) -> str:
+    filled = max(0, min(_BAR_WIDTH, round(fraction * _BAR_WIDTH)))
+    return "█" * filled + "░" * (_BAR_WIDTH - filled)
 
-    def render(self, report: Report, *, lang: str | None = None) -> str:
-        """Render to a plain string (used by tests and non-TTY sinks)."""
-        console = Console(record=True, width=100, force_terminal=False)
-        self.emit(report, console, lang=lang)
-        return console.export_text()
 
-    def print(self, report: Report, console: Console | None = None, *, lang: str | None = None) -> None:
-        """Render to a live terminal."""
-        self.emit(report, console or Console(), lang=lang)
+def _headline(result: ProbeResult) -> str:
+    if result.status is ProbeStatus.NOT_APPLICABLE:
+        return f"not applicable — {result.reason}"
+    if result.status is ProbeStatus.ERROR:
+        return f"error — {result.reason}"
+    # Count distinct tasks, not findings: several findings can share a task, and reporting
+    # "40 tasks" for a 4-task environment is worse than reporting nothing.
+    n = len({f.task_id for f in result.findings})
+    if result.probe_id == "determinism":
+        return f"{n} task(s) score inconsistently" if n else "no variance observed"
+    return f"{n} task(s) accept known-wrong solutions" if n else "no accepted wrong solutions"
 
-    def emit(self, report: Report, console: Console, *, lang: str | None = None) -> None:
-        cat = catalog(lang)
-        d = report.dataset
-        console.print(Text.assemble(("bohrin", "bold green"), ("  ·  ", "dim"), (d.uri, "bold")))
-        episodes_bit = (
-            f"{d.n_episodes} of {d.total_episodes} episodes (triage)" if d.sampled else f"{d.n_episodes} episodes"
+
+def render(report: Report, console: Console) -> None:
+    """Print the audit."""
+    console.print()
+    console.print(f"[bold]Bohrin[/bold]  ·  {escape(report.target)}")
+    console.print(f"[dim]{report.adapter} · {report.tasks_total} tasks · {len(report.results)} probes[/dim]")
+    console.print()
+
+    for result in report.results:
+        fraction = result.sub_score if result.sub_score is not None else 0.0
+        colour = "yellow" if result.status is ProbeStatus.OK else "dim"
+        console.print(
+            f"  [{colour}]{result.probe_id:<14}[/{colour}] {_bar(fraction)}  {escape(_headline(result))}",
+            highlight=False,
         )
-        meta = f"{d.format} · {episodes_bit}"
-        if d.embodiment:
-            meta += f" · {d.embodiment}"
-        if d.control_hz:
-            meta += f" · {d.control_hz:.0f} Hz"
-        if d.action_dim is not None:
-            meta += f" · action_dim {d.action_dim}"
-        console.print(Text(meta, style="dim"))
 
-        counts = report.counts
-        tally = "   ".join(
-            Text.assemble((f"{counts[s]} {cat.severity[s]}", _SEV_STYLE[s])).plain
-            for s in (Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO)
-            if counts[s]
-        )
-        # The headline is the severity tally, not an aggregate score. Counts are a fact
-        # about what we found; a score would be a claim about what it costs you.
-        if not report.clusters:
-            console.print(Text(cat.no_findings, style="green"))
-            # "Clean" is the most misleading moment to stay silent about skipped checks.
-            if not any(d.startswith(_POLICY_PREFIX) for d in report.detectors_run):
-                console.print(Text(cat.policy_checks_skipped, style="dim"))
-            return
-        console.print(Panel.fit(Text(tally, style="bold")))
+    console.print()
+    # The gap and its coverage are rendered by GapScore.__str__ so the two cannot drift
+    # apart, and so no caller can accidentally print a bare number.
+    console.print(f"  [bold]{escape(str(report.gap))}[/bold]")
+    console.print()
 
-        families = report.family_counts()
-        if families:
-            console.print(
-                Text(f"{cat.by_family}: " + "  ".join(f"{cat.family[f]} {n}" for f, n in families.items()), style="dim")
-            )
-        console.print()
-
-        # docs/05 §2: every cluster carries its own "why + fix", not just the top one —
-        # a user must not have to open the HTML report to learn what to do about #3.
-        for c in report.clusters[:_DETAIL_LIMIT]:
-            console.print(
-                Text.assemble(
-                    (f"{cat.severity[c.severity]:<7}", _SEV_STYLE[c.severity]),
-                    ("▸ ", "dim"),
-                    (c.title, "bold"),
-                )
-            )
-            console.print(Text(f"         → {c.fix.text}", style="none"))
-            console.print(Text(f"           {c.blast_radius.n_episodes} eps  [{c.id}]", style="dim"))
+    shown = 0
+    for result in report.results:
+        for finding in result.findings:
+            if shown >= _DETAIL_LIMIT:
+                break
+            shown += 1
+            if isinstance(finding, Exploit):
+                console.print(f"  [red]EXPLOIT[/red] ▸ {escape(finding.summary)}", highlight=False)
+                console.print(f"           [dim]{escape(finding.candidate.provenance.detail)}[/dim]", highlight=False)
+                payload = finding.candidate.payload.strip() or "(empty)"
+                first = payload.splitlines()[0][:96] if payload.splitlines() else payload
+                console.print(f"           submitted: [cyan]{escape(first)}[/cyan]", highlight=False)
+            elif isinstance(finding, Flake):
+                console.print(f"  [yellow]FLAKE[/yellow]   ▸ {escape(finding.summary)}", highlight=False)
+            console.print(f"           [dim]{escape(finding.repro)}[/dim]", highlight=False)
             console.print()
 
-        remaining = len(report.clusters) - _DETAIL_LIMIT
-        if remaining > 0:
-            # Name the flag that actually shows the rest. Deliberately *not* `--all`: that
-            # flag adds the DEFAULT_EXCLUDED detectors, which are held back precisely
-            # because they over-report, so pointing a user there to see more findings would
-            # hand them the least trustworthy ones first.
-            console.print(Text(f"… {remaining} {cat.more_findings} — --html or --json for all.", style="dim"))
-        # A default scan silently skips the POLICY<->DATA family, because those checks need a
-        # model to compare against. Nothing in the output said so, which meant the flags that
-        # unlock them were undiscoverable: a user had to read `--help` to learn that five
-        # checks existed and were not running. Say it once, only when none of them ran.
-        if not any(d.startswith(_POLICY_PREFIX) for d in report.detectors_run):
-            console.print(Text(cat.policy_checks_skipped, style="dim"))
-        if report.dataset.sampled:
-            triage = (
-                f"Triage scan of {report.dataset.n_episodes}/{report.dataset.total_episodes} episodes — --full for all."
-            )
-            console.print(Text(triage, style="dim"))
-        console.print(Text(f"{cat.next_hint}: bohrin scan {report.dataset.uri} --html report.html --open", style="dim"))
+    remaining = report.findings - shown
+    if remaining > 0:
+        console.print(f"  [dim]{remaining} more finding(s) — see --json for the full record[/dim]")
+        console.print()
+
+    if report.unverified:
+        console.print(
+            f"  [dim]note {report.unverified} accepted candidate(s) could not be shown to be wrong; "
+            f"reported as leads, excluded from the gap[/dim]",
+            highlight=False,
+        )
+        console.print()
+
+
+__all__ = ["render"]

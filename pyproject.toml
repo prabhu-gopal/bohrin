@@ -1,150 +1,96 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
 name = "bohrin"
 dynamic = ["version"]
-description = "The health check-up for robot-learning datasets. Find the hidden defects before you train."
+description = "Audits the verifier, not the model. Finds RL tasks whose grader accepts provably wrong solutions."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Bohrin" }]
 keywords = [
-  "robotics", "imitation-learning", "dataset", "data-quality",
-  "lerobot", "robot-learning", "data-validation",
+  "reinforcement-learning", "rl-environments", "reward-hacking",
+  "verifier", "rlvr", "evaluation", "mutation-testing", "benchmarks",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: Apache Software License",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Testing",
   "Typing :: Typed",
 ]
 
-# --- Core: CPU-only, no ML weights, no network (see docs/02_ARCHITECTURE.md §8). ---
-# P0 imports only this lean set. The Arrow tabular stack (polars/duckdb/pyarrow) and
-# the format libs (h5py/zarr/scipy/sklearn) land in P1 when code actually uses them —
-# we do not ship a dependency before a line imports it.
+# Dependency policy, carried over deliberately: nothing is declared that is not imported by
+# a line of code. `grep -rn "^import X\|^from X" src/bohrin/` must be non-empty for every
+# entry below.
 dependencies = [
-  "numpy>=1.26",
-  "pydantic>=2.6",
-  "rich>=13.7",
-  "pyyaml>=6.0",
-  "polars>=1.0",   # Arrow-backed tabular layer: reads LeRobot Parquet out-of-core (docs/09 §1)
-  "scikit-learn>=1.4",  # kNN graph, ridge dynamics fit, KMeans/GMM (CPU-only, no weights)
-  "huggingface-hub>=0.23",  # `bohrin scan owner/name` — the only network call in the tool
-  "typing_extensions>=4.6; python_version < '3.11'",  # typing.Self backport
+  "rich>=13.7",              # terminal report rendering
+  "libcst>=1.4",             # mutation operators — see docs/01_ARCHITECTURE.md
+  "pyyaml>=6.0",             # bohrin.yaml
 ]
 
 [project.optional-dependencies]
-# Heavy/optional extras — a proprio-only LeRobot user never pulls any of these.
-rlds = ["tensorflow>=2.15", "tensorflow-datasets>=4.9"]
-hdf5 = ["h5py>=3.10"]
-zarr = ["zarr>=2.17"]
-video = ["av>=12.0"]
-vision = ["torch>=2.2", "torchvision>=0.17"]
-ann = ["faiss-cpu>=1.8"]
-onnx = ["onnxruntime>=1.17"]
-llm = ["httpx>=0.27"]
+# The adapter for Prime Intellect's verifiers spec. Optional so that `pip install bohrin`
+# stays small and the tool can report a clear "install this extra" message rather than an
+# import error — see MissingExtraError in adapters/base.py.
+# NOTE: "v1" is the API *namespace* (`import verifiers.v1`), not the package version —
+# the package itself is on 0.3.x. It also requires Python >=3.11, which is one of the two
+# reasons this project's floor is 3.11; see CHANGELOG.
+verifiers = ["verifiers>=0.3.1"]
+
 dev = [
   "ruff>=0.6",
   "mypy>=1.11",
   "pytest>=8.2",
+  "pytest-asyncio>=0.24",
   "pytest-cov>=5.0",
   "types-PyYAML>=6.0",
-  "h5py>=3.10",
-  "zarr>=2.17",
-  "av>=12.0",
-  "scipy>=1.11",  # reference implementation the KS-statistic tests check against; never imported by bohrin itself
 ]
 
 [project.urls]
 Homepage = "https://bohrin.com"
-Documentation = "https://bohrin.com/docs"
+Documentation = "https://github.com/prabhu-gopal/bohrin/tree/main/docs"
 Source = "https://github.com/prabhu-gopal/bohrin"
+Issues = "https://github.com/prabhu-gopal/bohrin/issues"
+Changelog = "https://github.com/prabhu-gopal/bohrin/blob/main/CHANGELOG.md"
 
 [project.scripts]
 bohrin = "bohrin.cli:_run"
 
-# --- The extensibility seams (docs/02_ARCHITECTURE.md §10). Built-ins register through
-# the SAME entry-point groups a third-party plugin uses — no privileged path. ---
-[project.entry-points."bohrin.adapters"]
-lerobot_v21 = "bohrin.adapters.lerobot:LeRobotV21Adapter"
-lerobot_v3 = "bohrin.adapters.lerobot:LeRobotV3Adapter"
-robomimic_hdf5 = "bohrin.adapters.hdf5:RobomimicHdf5Adapter"
-raw_hdf5 = "bohrin.adapters.hdf5:RawHdf5Adapter"
-zarr_replaybuffer = "bohrin.adapters.zarr_replay:ZarrReplayBufferAdapter"
-numpy_dir = "bohrin.adapters.numpy_dir:NumpyDirAdapter"
-rlds = "bohrin.adapters.rlds:RldsAdapter"
+# ---------------------------------------------------------------------------------------
+# Plugin seams. These group names are PUBLIC API: renaming one breaks every third-party
+# plugin and every proprietary probe package at once. See docs/01_ARCHITECTURE.md.
+#
+# First-party and third-party entries use the identical mechanism — there is no privileged
+# path, and nothing in this repository checks a licence.
+# ---------------------------------------------------------------------------------------
 
-[project.entry-points."bohrin.detectors"]
-# P3 additions - the remaining catalogued checks
-"integrity.split_leakage" = "bohrin.detectors.integrity:SplitLeakageDetector"
-"stats.constant_or_degenerate_channel" = "bohrin.detectors.scale:ConstantOrDegenerateChannelDetector"
-"stats.unit_scale_inconsistency" = "bohrin.detectors.scale:UnitScaleInconsistencyDetector"
-"smoothness.path_efficiency" = "bohrin.detectors.kinematics:PathEfficiencyDetector"
-"smoothness.curvature" = "bohrin.detectors.kinematics:CurvatureDetector"
-"temporal.gripper_chatter" = "bohrin.detectors.kinematics:GripperChatterDetector"
-"temporal.non_markovian_pause" = "bohrin.detectors.kinematics:NonMarkovianPauseDetector"
-"vision.compression_artifacts" = "bohrin.detectors.vision:CompressionArtifactsDetector"
-# POLICY<->DATA (Family J) - inert unless --policy is supplied
-"policy_data.dim_mismatch" = "bohrin.detectors.policy_data:DimMismatchDetector"
-"policy_data.missing_proprio" = "bohrin.detectors.policy_data:MissingProprioDetector"
-"policy_data.normalization_mismatch" = "bohrin.detectors.policy_data:NormalizationMismatchDetector"
-"policy_data.action_space_mismatch" = "bohrin.detectors.policy_data:ActionSpaceMismatchDetector"
-"policy_data.ood_estimate" = "bohrin.detectors.policy_data:OodEstimateDetector"
-# INTEGRITY (Family A)
-"integrity.nan_inf" = "bohrin.detectors.integrity:NanInfDetector"
-"integrity.shape_dtype" = "bohrin.detectors.integrity:ShapeDtypeDetector"
-"integrity.timestamp_regularity" = "bohrin.detectors.integrity:TimestampRegularityDetector"
-"integrity.duplicate_frames" = "bohrin.detectors.integrity:DuplicateFramesDetector"
-"integrity.truncated_episodes" = "bohrin.detectors.integrity:TruncatedEpisodesDetector"
-"integrity.declared_mismatch" = "bohrin.detectors.integrity:DeclaredMismatchDetector"
-# STATS (Family B)
-"stats.dead_dimension" = "bohrin.detectors.stats:DeadDimensionDetector"
-"stats.saturation_clipping" = "bohrin.detectors.stats:SaturationClippingDetector"
-"stats.normalization_outliers" = "bohrin.detectors.stats:NormalizationOutliersDetector"
-"stats.distribution_drift" = "bohrin.detectors.stats:DistributionDriftDetector"
-# COVERAGE (Family E) — the highest-value family
-"coverage.mode_collapse" = "bohrin.detectors.coverage:ModeCollapseDetector"
-"coverage.initial_condition_diversity" = "bohrin.detectors.coverage:InitialConditionDiversityDetector"
-"coverage.redundancy" = "bohrin.detectors.coverage:RedundancyDetector"
-"coverage.scene_diversity" = "bohrin.detectors.coverage:SceneDiversityDetector"
-"coverage.task_imbalance" = "bohrin.detectors.coverage:TaskImbalanceDetector"
-# CONSISTENCY (Family F)
-"consistency.operator_style" = "bohrin.detectors.consistency:OperatorStyleDetector"
-"consistency.trajectory_alignment" = "bohrin.detectors.consistency:TrajectoryAlignmentDetector"
-"consistency.duration_variance" = "bohrin.detectors.consistency:DurationVarianceDetector"
-# MULTIMODALITY (Family G)
-"multimodality.contradictory_actions" = "bohrin.detectors.multimodality:ContradictoryActionsDetector"
-"multimodality.label_conflict" = "bohrin.detectors.multimodality:LabelConflictDetector"
-# VISION (Family H)
-"vision.frozen_frames" = "bohrin.detectors.vision:FrozenFramesDetector"
-"vision.blur_exposure" = "bohrin.detectors.vision:BlurExposureDetector"
-"vision.camera_dropout" = "bohrin.detectors.vision:CameraDropoutDetector"
-"vision.viewpoint_drift" = "bohrin.detectors.vision:ViewpointDriftDetector"
-"vision.depth_pointcloud_quality" = "bohrin.detectors.vision:DepthQualityDetector"
-# LABEL (Family I)
-"label.missing_or_empty" = "bohrin.detectors.label:MissingLabelDetector"
-"label.trajectory_label_mismatch" = "bohrin.detectors.label:TrajectoryLabelMismatchDetector"
-# DYNAMICS (Family K)
-"dynamics.inverse_residual" = "bohrin.detectors.dynamics:InverseResidualDetector"
-"dynamics.forward_residual" = "bohrin.detectors.dynamics:ForwardResidualDetector"
-# SMOOTHNESS (Family C)
-"smoothness.jerk_outlier" = "bohrin.detectors.smoothness:JerkOutlierDetector"
-"smoothness.discontinuity_jump" = "bohrin.detectors.smoothness:DiscontinuityJumpDetector"
-# TEMPORAL (Family D)
-"temporal.idle_frames" = "bohrin.detectors.temporal:IdleFramesDetector"
-"temporal.action_observation_lag" = "bohrin.detectors.temporal:ActionObservationLagDetector"
-# CAUSAL (Family L)
-"causal.copycat_shortcut" = "bohrin.detectors.causal:CopycatShortcutDetector"
-"causal.proprio_shortcut" = "bohrin.detectors.causal:ProprioShortcutDetector"
+[project.entry-points."bohrin.adapters"]
+verifiers_v1 = "bohrin.adapters.verifiers_v1:VerifiersV1Adapter"
+
+[project.entry-points."bohrin.probes"]
+weak_oracle = "bohrin.probes.weak_oracle:WeakOracleProbe"
+determinism = "bohrin.probes.determinism:DeterminismProbe"
+
+# Only operators that can establish a wrongness ground are registered. `off_by_one` and
+# `swap_operator` are deliberately absent until the differential comparator lands: without
+# it they can produce leads but not findings, and a registered operator that cannot
+# establish a ground is a false-accusation risk.
+[project.entry-points."bohrin.mutators"]
+empty_body       = "bohrin.mutate.operators:EmptyBody"
+identity_return  = "bohrin.mutate.operators:IdentityReturn"
+refusal          = "bohrin.mutate.operators:Refusal"
+constant_return  = "bohrin.mutate.operators:ConstantReturn"
+drop_side_effect = "bohrin.mutate.operators:DropSideEffect"
+negate_condition = "bohrin.mutate.operators:NegateCondition"
 
 [tool.hatch.version]
 path = "src/bohrin/version.py"
@@ -152,12 +98,17 @@ path = "src/bohrin/version.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/bohrin"]
 
-# ----------------------------------------------------------------------------------
-# DoD gates: `ruff`, `mypy --strict`, `pytest` — all configured here, single source.
-# ----------------------------------------------------------------------------------
+[tool.hatch.build.targets.sdist]
+include = ["src/", "tests/", "docs/", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE"]
+
+# ---------------------------------------------------------------------------------------
+# Tooling. Carried over unchanged from the previous codebase: this configuration was
+# already proven across the nine-job CI matrix and there is no reason to re-derive it.
+# ---------------------------------------------------------------------------------------
+
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
@@ -170,6 +121,7 @@ select = [
   "SIM",              # simplify
   "RUF",              # ruff-specific
   "TID",              # tidy-imports
+  "ASYNC",            # async correctness — this codebase is async throughout
 ]
 ignore = [
   "N818",             # exception names need not end in "Error"
@@ -179,38 +131,32 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# The 3.10 fallback deliberately uses the `str, Enum` mixin; UP042 would "fix" it into the
-# very class it is standing in for. See src/bohrin/_compat.py.
-"src/bohrin/_compat.py" = ["UP042"]
+# libcst's visitor protocol dictates the method names (`leave_FunctionDef`, `leave_If`).
+# Renaming them to satisfy N802 would silently stop the transformer from firing.
+"src/bohrin/mutate/operators.py" = ["N802"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["bohrin"]
 
 [tool.mypy]
 strict = true
-plugins = ["pydantic.mypy"]
 files = ["src", "tests"]
 mypy_path = "tests"
 warn_unreachable = true
 warn_redundant_casts = true
 
-# scikit-learn and scipy ship no type information (no py.typed, no stubs on PyPI we depend
-# on). Our own wrappers in bohrin/analysis are fully typed, so the untyped surface is
-# confined to these import sites.
+# `verifiers` is an optional extra and ships no type information. Our adapter wraps it and
+# is itself fully typed, so the untyped surface is confined to that one import site.
 [[tool.mypy.overrides]]
-module = ["huggingface_hub.*", "tqdm.*", "sklearn.*", "h5py.*", "zarr.*", "tensorflow_datasets.*", "tensorflow.*", "onnxruntime.*", "av", "av.*", "scipy.*", "torch.*", "faiss.*"]
+module = ["verifiers.*"]
 ignore_missing_imports = true
-
-[tool.pydantic-mypy]
-init_forbid_extra = true
-init_typed = true
-warn_required_dynamic_aliases = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra --strict-markers"
 testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["error"]
 
 [tool.coverage.run]
-source = ["bohrin"]
 branch = true
+source = ["src/bohrin"]

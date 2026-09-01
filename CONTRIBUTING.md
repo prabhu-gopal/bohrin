@@ -1,16 +1,16 @@
 # Contributing to Bohrin
 
 Thanks for considering it. Bohrin's whole value is that its findings are trustworthy, so
-the bar here is precision, not breadth: a detector that is right 95% of the time is worth
+the bar here is precision, not breadth: a probe that is right 95% of the time is worth
 more than five that are right 70% of the time.
 
 ## The most valuable contribution
 
 **A false positive report.** If bohrin flagged something on your data that is actually
-fine, that is the single most useful thing you can send us — it is how detector thresholds
+fine, that is the single most useful thing you can send us — it is how probe thresholds
 get calibrated. Use the
 [false positive template](https://github.com/prabhu-gopal/bohrin/issues/new?template=false_positive.yml).
-You do not need to share the dataset; the finding, the detector id, and why it is wrong is
+You do not need to share the environment; the finding, the probe id, and why it is wrong is
 plenty.
 
 ## Setup
@@ -41,12 +41,12 @@ mypy                  # strict type checking, src and tests
 pytest                # the full suite; no network, no GPU
 ```
 
-The test suite runs entirely on synthetic fixtures, so it needs no dataset and no network.
+The test suite runs entirely on synthetic fixtures, so it needs no environment and no network.
 It should finish in well under a minute.
 
-## Adding a detector
+## Adding a probe
 
-Every detector must justify itself on four points, and a PR that skips any of them will be
+Every probe must justify itself on four points, and a PR that skips any of them will be
 asked for it:
 
 1. **Mechanism.** One sentence on *why* this defect degrades a trained policy. Not "this is
@@ -54,11 +54,11 @@ asked for it:
 2. **Evidence.** A public issue, a paper, or a reproducible training run showing the defect
    is real and matters. Plausibility is not evidence.
 3. **A fault-injection scenario.** Add it to the benchmark. A registry-enumerating test
-   fails the build if any detector lacks one, so this is not optional.
+   fails the build if any probe lacks one, so this is not optional.
 4. **Measured error rates.** The benchmark reports recall and precision. If precision is
-   poor, the detector is not ready — raise the threshold or lower the severity.
+   poor, the probe is not ready — raise the threshold or lower the severity.
 
-Detectors register through the `bohrin.detectors` entry point, the same mechanism external
+Detectors register through the `bohrin.probes` entry point, the same mechanism external
 plugins use. There is no privileged path for built-ins.
 
 ## Pull requests

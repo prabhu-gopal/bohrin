@@ -1,91 +1,54 @@
-"""CLI smoke tests (docs/05 §3)."""
+"""The CLI surface: exit codes, streams, and errors that are messages not tracebacks."""
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-import _synth
+import pytest
+
 from bohrin.cli import main
 
 
-def _clean_path() -> str:
-    return _synth.register_memory_dataset(_synth.clean_dataset())
+def test_version_and_help_exit_zero(capsys: pytest.CaptureFixture[str]) -> None:
+    for argv in (["--version"], ["--help"]):
+        with pytest.raises(SystemExit) as exc:
+            main(argv)
+        assert exc.value.code == 0
 
 
-def _defective_path() -> str:
-    return _synth.register_memory_dataset(_synth.inject_dead_dimension(_synth.clean_dataset()))
+def test_list_probes_names_both_open_probes(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["list-probes"]) == 0
+    out = capsys.readouterr().out
+    assert "weak_oracle" in out
+    assert "determinism" in out
 
 
-def test_scan_command_exits_zero() -> None:
-    assert main(["scan", _clean_path()]) == 0
+def test_explain_prints_the_probe_rationale(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["explain", "weak_oracle"]) == 0
+    assert "verifier" in capsys.readouterr().out.lower()
 
 
-def test_scan_writes_json(tmp_path: Path) -> None:
-    out = tmp_path / "report.json"
-    assert main(["scan", _clean_path(), "--json", str(out)]) == 0
-    data = json.loads(out.read_text())
-    assert data["schema_version"] == "1.0"
-    assert data["dataset"]["format"] == "memory"
+def test_explain_unknown_probe_lists_what_exists(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["explain", "no_such_probe"]) == 1
+    err = capsys.readouterr().err
+    assert "unknown probe" in err.lower()
+    assert "weak_oracle" in err, "telling the user what is wrong without what to try is not help"
 
 
-def test_scan_writes_self_contained_html(tmp_path: Path) -> None:
-    out = tmp_path / "report.html"
-    assert main(["scan", _defective_path(), "--html", str(out)]) == 0
-    html = out.read_text()
-    assert html.startswith("<!doctype html>")
-    assert "nothing left this machine" in html
-    assert "http://" not in html and "https://" not in html  # self-contained, no external requests
+def test_a_missing_path_is_a_message_not_a_traceback(capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["audit", "./definitely-not-a-taskset"])
+    captured = capsys.readouterr()
+
+    assert code == 2
+    assert captured.out == "", "a failed audit produces no findings on stdout"
+    assert "error" in captured.err
+    assert "Traceback" not in captured.err
+    assert "adapter" in captured.err.lower(), "the error should name what is installed"
 
 
-def test_ci_gate_trips_on_high() -> None:
-    assert main(["scan", _defective_path(), "--ci"]) == 1  # dead dim is HIGH
-    assert main(["scan", _clean_path(), "--ci"]) == 0  # clean → passes
+def test_unknown_format_names_the_verifiers_extra(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (tmp_path / "some_file.txt").write_text("not a taskset", encoding="utf-8")
 
-
-def test_list_and_explain() -> None:
-    assert main(["list-detectors"]) == 0
-    assert main(["explain", "stats.dead_dimension"]) == 0
-    assert main(["explain", "no.such.detector"]) == 1
-
-
-def test_version() -> None:
-    assert main(["version"]) == 0
-
-
-# ------------------------------------------------------------------ the calibrate command
-
-
-def test_calibrate_writes_a_corpus(tmp_path: Path) -> None:
-    out = tmp_path / "corpus.json"
-    paths = [_synth.register_memory_dataset(_synth.smooth_dataset(n_episodes=16)) for _ in range(3)]
-    assert main(["calibrate", *paths, "-o", str(out)]) == 0
-    blob = json.loads(out.read_text())
-    assert blob["version"] == "1.0"
-    assert "synth_arm" in blob["embodiments"]  # keyed by embodiment (the Mondrian category)
-    assert "*" in blob["embodiments"]  # …and the cross-embodiment fallback
-
-
-def test_calibrate_refuses_defective_input_and_exits_nonzero(tmp_path: Path) -> None:
-    """Collecting from data that reports HIGH would teach the gate that the defect is normal."""
-    out = tmp_path / "corpus.json"
-    assert main(["calibrate", _defective_path(), "-o", str(out)]) == 2
-    assert not out.exists()
-
-
-def test_calibrate_force_collects_anyway(tmp_path: Path) -> None:
-    out = tmp_path / "corpus.json"
-    assert main(["calibrate", _defective_path(), "-o", str(out), "--force"]) == 0
-    assert out.exists()
-
-
-def test_scan_accepts_a_calibration_corpus(tmp_path: Path) -> None:
-    out = tmp_path / "corpus.json"
-    paths = [_synth.register_memory_dataset(_synth.smooth_dataset(n_episodes=16)) for _ in range(3)]
-    assert main(["calibrate", *paths, "-o", str(out)]) == 0
-    assert main(["scan", _clean_path(), "--calibration", str(out)]) == 0
-
-
-def test_scan_with_a_missing_corpus_still_succeeds() -> None:
-    """A bad --calibration path must degrade to self-calibration, not abort the scan."""
-    assert main(["scan", _clean_path(), "--calibration", "/no/such/corpus.json"]) == 0
+    assert main(["audit", str(tmp_path)]) == 2
+    err = " ".join(capsys.readouterr().err.split())  # rich soft-wraps at the console width
+    assert "bohrin[verifiers]" in err, "the extra must survive rendering — rich eats bare brackets"

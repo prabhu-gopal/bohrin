@@ -1,89 +1,71 @@
-"""The adapter contract — Stage ① (docs/02 §1).
+"""The adapter contract.
 
-An adapter is the *only* code that touches a format-specific container. It turns any
-on-disk dataset into a stream of Canonical IR episodes. Adding a format is one class and
-one entry point; detectors, synthesis, and the report never change.
+An adapter is the only code that touches a format-specific environment. It turns any
+taskset into :class:`~bohrin.ir.task.Task` objects and exposes one way to score a
+candidate. Adding a format is one class and one entry point; probes never change.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-import numpy as np
-
-from bohrin.ir.episode import Episode
-from bohrin.ir.schema import DatasetSchema, SchemaHints
+from bohrin.ir.task import Candidate, Task, Verdict
 
 if TYPE_CHECKING:
-    from bohrin._arrays import IntArray
     from bohrin.config import ScanConfig
 
 
-@dataclass(frozen=True, slots=True)
-class Sampler:
-    """Deterministic episode subsampling for triage runs (docs/02 §7).
+class MissingExtraError(ImportError):
+    """An optional extra is not installed, and the message names the pip command.
 
-    ``plan(total)`` returns the sorted episode indices to keep. With a fixed ``seed`` the
-    selection is reproducible, so two scans of the same data agree (docs/02 §9).
+    Distinct from a bare ``ImportError`` so the CLI can print it as a fixable input rather
+    than a traceback, without also swallowing a genuinely broken install. It subclasses
+    ``ImportError`` so ``except ImportError`` callers keep working.
     """
 
-    max_episodes: int | None = None
-    seed: int = 0
 
-    def plan(self, total: int) -> IntArray:
-        """Sorted indices of the episodes to keep from ``total`` available."""
-        if total <= 0:
-            return np.empty(0, dtype=np.int64)
-        keep = total if self.max_episodes is None else min(self.max_episodes, total)
-        if keep >= total:
-            return np.arange(total, dtype=np.int64)
-        rng = np.random.default_rng(self.seed)
-        chosen = rng.choice(total, size=keep, replace=False)
-        chosen.sort()
-        return chosen.astype(np.int64)
-
-    def keeps(self, index: int, total: int) -> bool:
-        """Whether episode ``index`` survives the plan (for streaming adapters)."""
-        return bool(index in set(self.plan(total).tolist()))
+class UnknownFormatError(Exception):
+    """No adapter recognised the path."""
 
 
 @runtime_checkable
-class DatasetHandle(Protocol):
-    """An opened dataset: its schema, declared hints, and a streaming episode iterator."""
+class TaskSource(Protocol):
+    """A loaded taskset: enumerate tasks, and score candidates against their verifier."""
 
-    def schema(self) -> DatasetSchema:
-        """The frozen, dataset-wide type description (docs/03 §2)."""
+    def tasks(self) -> Iterator[Task]:
+        """Yield every task in the taskset."""
         ...
 
-    def profile_hints(self) -> SchemaHints:
-        """Declared dtypes/shapes/stats from the source, if any (docs/03 §5)."""
-        ...
+    async def score(self, task: Task, candidate: Candidate) -> Verdict:
+        """Submit ``candidate`` to ``task``'s verifier and return what it said.
 
-    def episode_count(self) -> int | None:
-        """Episode count if known cheaply, else ``None``."""
-        ...
-
-    def iter_episodes(self, *, sample: Sampler) -> Iterator[Episode]:
-        """Stream episodes (honoring ``sample``). STREAMING — never loads all at once."""
+        This is the only method that executes the environment's own code, which keeps the
+        isolation boundary in one place.
+        """
         ...
 
 
 class Adapter(ABC):
-    """Base class for every format adapter. Register via the ``bohrin.adapters`` group."""
+    """Binds one environment format to the canonical task representation."""
 
-    #: Stable identifier, e.g. ``"lerobot_v3"``. Set on the subclass.
+    #: Stable identifier, matching the entry-point name.
     name: str = ""
 
     @abstractmethod
     def detect(self, path: Path) -> float:
-        """Confidence in ``[0, 1]`` that ``path`` is this adapter's format (cheap check)."""
-        raise NotImplementedError
+        """Confidence in ``[0.0, 1.0]`` that this adapter can read ``path``.
+
+        Detection reads files only and never imports the environment, so an uninstalled
+        optional dependency still produces a clear "install this extra" message rather
+        than an unhelpful "unknown format".
+        """
 
     @abstractmethod
-    def open(self, path: Path, config: ScanConfig) -> DatasetHandle:
-        """Open ``path`` and return a streaming :class:`DatasetHandle`."""
-        raise NotImplementedError
+    def load(self, path: Path, config: ScanConfig) -> TaskSource:
+        """Open ``path``. Raises :class:`MissingExtraError` if a required extra is absent."""
+
+
+__all__ = ["Adapter", "MissingExtraError", "TaskSource", "UnknownFormatError"]

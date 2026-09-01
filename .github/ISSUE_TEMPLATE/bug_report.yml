@@ -1,5 +1,5 @@
 name: Bug report
-description: Bohrin crashed, failed to read a dataset, or did something clearly wrong.
+description: Bohrin crashed, failed to read an environment, or did something clearly wrong.
 title: "[bug] "
 labels: ["bug"]
 body:
@@ -11,7 +11,7 @@ body:
         live one, or a format difference from a code difference.
 
         **If bohrin flagged something that is actually fine**, that is a false positive, not
-        a bug — please use the *False positive* template instead. It goes into detector
+        a bug — please use the *False positive* template instead. It goes into probe
         calibration rather than the bug queue.
 
   - type: textarea
@@ -25,13 +25,13 @@ body:
       required: true
 
   - type: input
-    id: dataset
+    id: environment
     attributes:
       label: Dataset
       description: >
-        The Hugging Face repo id if it is public (e.g. `lerobot/pusht`) — that lets us
+        The environment id or Hub path if it is public — that lets us
         reproduce it exactly. If it is private, describe the format and layout instead.
-      placeholder: "lerobot/pusht — or: private LeRobot v2.1, 340 episodes, SO-101, 2 cameras"
+      placeholder: "primeintellect/gsm8k — or: private verifiers taskset, 40 tasks, 1 reward fn"
     validations:
       required: true
 

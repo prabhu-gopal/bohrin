@@ -13,7 +13,7 @@
 - [ ] Added a test that fails before this change and passes after
 - [ ] Updated `CHANGELOG.md` under `## [Unreleased]` if this is user-visible
 
-### If this adds or changes a detector
+### If this adds or changes a probe
 
 - [ ] The mechanism sentence says *why* the defect degrades a trained policy
 - [ ] Linked evidence that the defect is real (issue, paper, or training run)
