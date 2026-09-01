@@ -45,7 +45,15 @@ def render(report: Report, console: Console) -> None:
     """Print the audit."""
     console.print()
     console.print(f"[bold]Bohrin[/bold]  ·  {escape(report.target)}")
-    console.print(f"[dim]{report.adapter} · {report.tasks_total} tasks · {len(report.results)} probes[/dim]")
+    line = f"{report.adapter} · {report.tasks_total} tasks · {len(report.results)} probes"
+    if report.isolation is not None:
+        line += f" · isolation: {report.isolation.effective.name.lower()}"
+    console.print(f"[dim]{escape(line)}[/dim]")
+    if report.isolation is not None and not report.isolation.is_bounded:
+        console.print(
+            "  [yellow]note[/yellow] verifier code ran in-process with no isolation boundary",
+            highlight=False,
+        )
     console.print()
 
     for result in report.results:
