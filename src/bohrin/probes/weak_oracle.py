@@ -83,9 +83,20 @@ class WeakOracleProbe(Probe):
                 detail={"baseline_failures": baseline_detail, "baseline_errors": baseline_errors},
             )
 
-        work: list[tuple[Task, Candidate]] = [
-            (task, cand) for task in measurable for op in operators for cand in op.apply(task)
-        ]
+        work: list[tuple[Task, Candidate]] = []
+        # Redundant mutants are a known validity threat in mutation testing, and here they
+        # also cost a real scoring call against someone else's environment. Two candidates
+        # whose payloads are equal after stripping are the same submission as far as any
+        # verifier is concerned, so only the first is sent.
+        for task in measurable:
+            submitted: set[str] = set()
+            for op in operators:
+                for cand in op.apply(task):
+                    key = cand.payload.strip()
+                    if key in submitted:
+                        continue
+                    submitted.add(key)
+                    work.append((task, cand))
         if not work:
             return ProbeResult(
                 probe_id=self.id,
