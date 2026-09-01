@@ -205,20 +205,21 @@ acceptance findings.
 
 ```python
 class Probe(ABC):
-    id: str                 # "weak_oracle"
-    family: str             # "acceptance" | "reliability"
+    id: str  # "weak_oracle"
+    family: str  # "acceptance" | "reliability"
     weight: float
 
     def explain(self) -> str: ...
     async def run(self, source: TaskSource, cfg: ScanConfig) -> ProbeResult: ...
 
+
 @dataclass(frozen=True, slots=True)
 class ProbeResult:
     probe_id: str
     status: Literal["ok", "not_applicable", "error"]
-    sub_score: float | None       # None unless status == "ok"
+    sub_score: float | None  # None unless status == "ok"
     exploits: tuple[Exploit, ...]
-    unverified: tuple[Candidate, ...]   # leads, never scored
+    unverified: tuple[Candidate, ...]  # leads, never scored
     tasks_probed: int
     detail: Mapping[str, Any]
 ```

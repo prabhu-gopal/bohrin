@@ -59,22 +59,27 @@ adapter layer replaceable and the probe set portable.
 @dataclass(frozen=True, slots=True)
 class Task:
     """One unit of work with a verifier attached."""
+
     id: str
     prompt: str
-    reference: Solution | None    # known-good, when the taskset provides one
-    reward_fns: tuple[str, ...]   # named criteria the verifier scores
+    reference: Solution | None  # known-good, when the taskset provides one
+    reward_fns: tuple[str, ...]  # named criteria the verifier scores
     metadata: Mapping[str, Any]
+
 
 @dataclass(frozen=True, slots=True)
 class Candidate:
     """A submission constructed by Bohrin, with a claim about its correctness."""
+
     payload: str
-    provenance: Provenance        # which operator produced it, from what
-    known_wrong: bool             # only True when independently established
+    provenance: Provenance  # which operator produced it, from what
+    known_wrong: bool  # only True when independently established
+
 
 @dataclass(frozen=True, slots=True)
 class Verdict:
     """What the verifier said."""
+
     reward: float
     per_fn: Mapping[str, float]
     passed: bool
@@ -147,8 +152,10 @@ Adapter surface:
 ```python
 class Adapter(ABC):
     name: str
-    def detect(self, path: Path) -> float: ...          # 0.0–1.0 confidence
+
+    def detect(self, path: Path) -> float: ...  # 0.0–1.0 confidence
     def load(self, path: Path, cfg: ScanConfig) -> TaskSource: ...
+
 
 class TaskSource(Protocol):
     def tasks(self) -> Iterator[Task]: ...
@@ -188,18 +195,24 @@ engine is `async` throughout, with **bounded** parallelism. Unbounded task
 creation against a customer's environment is a denial-of-service against the
 thing we were asked to audit.
 
-**The supported floor is Python 3.10, and that constrains the implementation:**
+**The supported floor is Python 3.11.** Two reasons, and they agree:
 
-| Wanted | 3.11+ | What we use |
-|---|---|---|
-| Structured task scope | `asyncio.TaskGroup` | `asyncio.gather` + explicit cancellation |
-| Timeout scope | `asyncio.timeout()` | `asyncio.wait_for` |
+1. The `verifiers` package — the only adapter target at launch — requires
+   `>=3.11,<3.14`. Supporting a version our sole integration cannot use is cost
+   without benefit.
+2. Python 3.10 reaches end of life on **31 October 2026**.
 
-Both replacements are ordinary and well understood; the point is that the CI
-matrix runs 3.10 and a `TaskGroup` would pass locally on a 3.13 laptop and fail
-the build. The previous codebase was bitten by exactly this class of
-version-sensitive difference, which is why the rule is to verify against a real
-3.10 interpreter rather than trust one local run.
+That makes `asyncio.TaskGroup` and `asyncio.timeout()` available. We use
+`asyncio.timeout`'s older sibling `wait_for`, and deliberately **do not** use
+`TaskGroup`:
+
+> `TaskGroup` cancels every sibling when one task raises. That is the right
+> behaviour for a set of subtasks that only make sense together, and the wrong
+> behaviour here — one task whose verifier hangs must not abandon the other
+> thirty-nine. `gather(return_exceptions=True)` gives per-item failure capture,
+> which is what an audit needs.
+
+So the choice stands on its own merits rather than on a version constraint.
 
 ```python
 sem = asyncio.Semaphore(cfg.concurrency)          # default 8
@@ -216,8 +229,8 @@ verdicts = await asyncio.gather(*(_one(t, c) for t, c in work),
 
 `return_exceptions=True` is deliberate: one task that times out must not
 abandon the other thirty-nine. Failures become per-task `error` entries in the
-report rather than an aborted audit. `ruff`'s `ASYNC` rules are enabled in
-`pyproject.toml` because this codebase is async end to end.
+report rather than an aborted audit. `ruff`'s `ASYNC` rules are enabled in `pyproject.toml` because this codebase is
+async end to end.
 
 ## Mutation via LibCST, not `ast`
 
@@ -235,6 +248,7 @@ mutation in incidental churn and making the report harder to trust.
 ```python
 class ConstantReturn(cst.CSTTransformer):
     """Replace a function body with `return <literal>` — structural wrongness."""
+
     def leave_FunctionDef(self, orig, updated): ...
 ```
 

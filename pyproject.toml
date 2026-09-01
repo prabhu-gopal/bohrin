@@ -7,7 +7,7 @@ name = "bohrin"
 dynamic = ["version"]
 description = "Audits the verifier, not the model. Finds RL tasks whose grader accepts provably wrong solutions."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Bohrin" }]
@@ -19,7 +19,6 @@ classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -36,14 +35,16 @@ dependencies = [
   "rich>=13.7",              # terminal report rendering
   "libcst>=1.4",             # mutation operators — see docs/01_ARCHITECTURE.md
   "pyyaml>=6.0",             # bohrin.yaml
-  "typing_extensions>=4.6; python_version < '3.11'",  # typing.Self backport
 ]
 
 [project.optional-dependencies]
 # The adapter for Prime Intellect's verifiers spec. Optional so that `pip install bohrin`
 # stays small and the tool can report a clear "install this extra" message rather than an
 # import error — see MissingExtraError in adapters/base.py.
-verifiers = ["verifiers>=1.0"]
+# NOTE: "v1" is the API *namespace* (`import verifiers.v1`), not the package version —
+# the package itself is on 0.3.x. It also requires Python >=3.11, which is one of the two
+# reasons this project's floor is 3.11; see CHANGELOG.
+verifiers = ["verifiers>=0.3.1"]
 
 dev = [
   "ruff>=0.6",
@@ -79,14 +80,17 @@ verifiers_v1 = "bohrin.adapters.verifiers_v1:VerifiersV1Adapter"
 weak_oracle = "bohrin.probes.weak_oracle:WeakOracleProbe"
 determinism = "bohrin.probes.determinism:DeterminismProbe"
 
+# Only operators that can establish a wrongness ground are registered. `off_by_one` and
+# `swap_operator` are deliberately absent until the differential comparator lands: without
+# it they can produce leads but not findings, and a registered operator that cannot
+# establish a ground is a false-accusation risk.
 [project.entry-points."bohrin.mutators"]
-constant_return = "bohrin.mutate.operators:ConstantReturn"
-empty_body      = "bohrin.mutate.operators:EmptyBody"
+empty_body       = "bohrin.mutate.operators:EmptyBody"
+identity_return  = "bohrin.mutate.operators:IdentityReturn"
+refusal          = "bohrin.mutate.operators:Refusal"
+constant_return  = "bohrin.mutate.operators:ConstantReturn"
 drop_side_effect = "bohrin.mutate.operators:DropSideEffect"
 negate_condition = "bohrin.mutate.operators:NegateCondition"
-off_by_one      = "bohrin.mutate.operators:OffByOne"
-swap_operator   = "bohrin.mutate.operators:SwapOperator"
-identity_return = "bohrin.mutate.operators:IdentityReturn"
 
 [tool.hatch.version]
 path = "src/bohrin/version.py"
@@ -104,7 +108,7 @@ include = ["src/", "tests/", "docs/", "README.md", "CHANGELOG.md", "LICENSE", "N
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
@@ -125,6 +129,11 @@ ignore = [
   "RUF002",           # ambiguous unicode in docstrings — same reason
   "RUF003",           # ambiguous unicode in comments — same reason
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# libcst's visitor protocol dictates the method names (`leave_FunctionDef`, `leave_If`).
+# Renaming them to satisfy N802 would silently stop the transformer from firing.
+"src/bohrin/mutate/operators.py" = ["N802"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["bohrin"]

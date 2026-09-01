@@ -13,6 +13,17 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 - Design documentation for the open core in `docs/`: architecture, the Verification Gap
   specification, the two open probe designs, and the open/proprietary boundary.
+- The probe framework, the `weak_oracle` and `determinism` probes, the baseline mutation
+  operators, the Verification Gap with its mandatory coverage descriptor, and the
+  `audit` / `list-probes` / `explain` command surface.
+
+### Changed
+
+- **Python 3.11 is the supported floor**, down from 3.10 in the previous project. Two
+  independent reasons: `verifiers`, the only adapter target at launch, requires
+  `>=3.11,<3.14`; and Python 3.10 reaches end of life on 31 October 2026. The CI matrix
+  and branch protection were updated to match — required checks went from nine to seven,
+  and leaving the 3.10 names in place would have blocked every future merge.
 
 ### Changed
 
