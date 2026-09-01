@@ -15,6 +15,7 @@ to be read before the code exists, and to be argued with.
 | [02_VERIFICATION_GAP.md](02_VERIFICATION_GAP.md) | What the number means and how it is computed |
 | [03_PROBES.md](03_PROBES.md) | Detailed design of the two probes shipping in the open core |
 | [04_RELEASE.md](04_RELEASE.md) | What is released, what is withheld, and what v0.1 must do |
+| [05_ROBUSTNESS.md](05_ROBUSTNESS.md) | Known weaknesses, ranked, with the evidence behind each |
 
 ## The one rule that governs every design decision here
 

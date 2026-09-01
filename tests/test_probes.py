@@ -222,3 +222,22 @@ def test_probe_result_rejects_ok_without_a_score() -> None:
 
     with pytest.raises(ValueError, match="with a sub_score"):
         ProbeResult(probe_id="x", status=ProbeStatus.ERROR, sub_score=0.0)
+
+
+async def test_redundant_candidates_are_not_submitted_twice() -> None:
+    """Two payloads equal after stripping are one submission to any verifier.
+
+    Redundant mutants are a documented validity threat in mutation testing; here they also
+    spend a real scoring call against someone else's environment for no information.
+    """
+    source = _fixtures.weak_source(1)
+    await WeakOracleProbe().run(source, CFG)
+
+    from bohrin.mutate import discover
+
+    task = next(iter(_fixtures.weak_source(1).tasks()))
+    generated = [c.payload.strip() for op in discover() for c in op.apply(task)]
+
+    assert len(generated) > len(set(generated)), "the fixture should generate a duplicate to guard against"
+    # +1 for the baseline submission, which is deliberately separate.
+    assert source.calls == len(set(generated)) + 1, "each distinct submission is scored exactly once"
