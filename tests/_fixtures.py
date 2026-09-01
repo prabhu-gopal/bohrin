@@ -67,6 +67,24 @@ def flaky_source(n: int = 3, *, flaky_tasks: frozenset[str] | None = None) -> Me
     return MemorySource(_tasks(n), grade)
 
 
+def broken_baseline_source(n: int = 3) -> MemorySource:
+    """A verifier that rejects even its own reference solution.
+
+    This is a misconfigured harness, not a weak verifier. Without a green baseline an
+    accepted mutant is indistinguishable from Bohrin submitting in a form the verifier
+    cannot read, so the probe must refuse to score rather than report exploits.
+    """
+    return MemorySource(_tasks(n), lambda _task, payload: 1.0 if payload == "only-this-exact-string" else 0.0)
+
+
+def no_reference_source(n: int = 3) -> MemorySource:
+    """A weak verifier on tasks that ship no reference solution."""
+    return MemorySource(
+        _tasks(n, reference=None),
+        lambda _task, payload: 1.0 if payload.strip() else 0.0,
+    )
+
+
 def exploding_source(n: int = 2) -> MemorySource:
     """A verifier that raises. Used to prove one bad task cannot abandon an audit."""
 
@@ -78,8 +96,10 @@ def exploding_source(n: int = 2) -> MemorySource:
 
 __all__ = [
     "REFERENCE",
+    "broken_baseline_source",
     "exploding_source",
     "flaky_source",
+    "no_reference_source",
     "strict_source",
     "weak_source",
 ]

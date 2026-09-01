@@ -48,6 +48,44 @@ for task in tasks:
 
 Sub-score = (tasks with ≥1 recorded exploit) / (tasks probed).
 
+### The green baseline — checked first, always
+
+Mutation testing assumes a **green baseline**: the unmutated code must pass the suite
+before any mutant means anything. Mutants run against a failing suite produce noise
+rather than signal.
+
+Here the consequence is sharper than noise. If the reference solution does not pass its
+own verifier, Bohrin cannot distinguish:
+
+* *this verifier is weak* — the finding we want to report, and
+* *Bohrin is submitting candidates in a form this verifier does not understand* — our own
+  integration bug.
+
+Reporting the first when the second is true means **blaming a customer for our defect**,
+which is the worst available failure for a product whose entire value is trust.
+
+So before any mutation is submitted:
+
+```
+for task with a reference:
+    submit the reference unchanged
+    if it does not pass  →  the task is UNMEASURABLE
+                            recorded as a BaselineFailure, excluded from the score
+if no task is measurable →  the probe reports ERROR, never OK
+```
+
+Two consequences worth stating:
+
+* The sub-score denominator is the **measurable** set, not every task. Dividing by tasks
+  that could not be baselined would silently dilute the score toward "clean".
+* A reference that fails its own verifier is itself a real defect, just a different one.
+  It is surfaced to the user rather than swallowed.
+
+Tasks that ship **no** reference are admitted unbaselined — the structural operators (an
+empty reply, a refusal) remain valid without one, and excluding those tasks would make the
+probe useless on the many tasksets that provide no reference. The count is reported so the
+weaker guarantee is visible rather than implied.
+
 ### Establishing wrongness
 
 **This is the crux of the entire probe, and where a naive implementation
@@ -191,6 +229,29 @@ Task 7: reward 1.0, 0.0, 1.0, 1.0, 0.0 for an identical submission
 
 — which makes it credible on sight and an unusually good first finding for a
 tool nobody has heard of.
+
+### Statistical power — reported, not assumed
+
+A null result here is easy to misread as "this verifier is deterministic". It is not.
+Disagreement is observed unless every repeat lands on the same side, so
+
+    P(detect) = 1 − p^N − (1 − p)^N
+
+for a verifier that flips with probability *p* over *N* repeats. At the default N = 5:
+
+| flake rate | 50% | 20% | 10% | 5% | 1% |
+|---|---|---|---|---|---|
+| **P(observed)** | 94% | 67% | 41% | **23%** | 5% |
+
+A verifier that flips 5% of the time is **missed roughly three times in four**. Published
+work on flaky-test detection reaches the same conclusion at far larger budgets: even a
+thousand reruns has under a 10% chance of surfacing a flake with a rate near 10⁻⁴.
+
+Bohrin therefore reports the detection power of the run alongside its result, and the
+terminal headline reads *"no variance observed in 5 runs"* rather than *"deterministic"*.
+**A null result bounds the flake rate; it does not establish determinism.** Saying more
+than that would be the same error the gap specification forbids elsewhere — reporting a
+non-measurement as a clean bill of health.
 
 ### Honest scope limit
 

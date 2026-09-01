@@ -41,6 +41,26 @@ class Unverified:
 
 
 @dataclass(frozen=True, slots=True)
+class BaselineFailure:
+    """The taskset's own reference solution did not pass its own verifier.
+
+    Mutation testing requires a green baseline: mutants run against a failing suite
+    produce noise rather than signal. Here the consequence is sharper than noise — with no
+    baseline, Bohrin cannot distinguish "this verifier is weak" from "Bohrin is submitting
+    candidates in a form this verifier does not understand", and reporting the first when
+    the second is true means blaming a customer for our own integration bug.
+
+    Such a task is excluded from the weak-oracle score and reported separately. It is also
+    worth the user's attention in its own right: a reference that fails its own verifier is
+    a real defect, just a different one.
+    """
+
+    task_id: str
+    reward: float
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class Flake:
     """A task whose verifier disagreed with itself across repeats of one submission."""
 
@@ -60,4 +80,4 @@ class Flake:
 
 Finding = Exploit | Flake
 
-__all__ = ["Exploit", "Finding", "Flake", "Unverified"]
+__all__ = ["BaselineFailure", "Exploit", "Finding", "Flake", "Unverified"]

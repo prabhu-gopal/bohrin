@@ -31,6 +31,29 @@ from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
 #: this probe exists to find.
 _TOLERANCE = 1e-9
 
+#: Flake rates the report quotes detection power for. Chosen to span the range a user
+#: actually cares about: a coin-flip verifier down to a rare intermittent one.
+_REFERENCE_RATES = (0.5, 0.2, 0.1, 0.05, 0.01)
+
+
+def detection_power(rate: float, repeats: int) -> float:
+    """Probability of observing disagreement in ``repeats`` runs of a verifier that flips
+    with probability ``rate``.
+
+    Disagreement is observed unless every run lands on the same side, so
+
+        P(detect) = 1 - rate**n - (1 - rate)**n
+
+    This matters because a "no variance observed" result is easy to misread as "this
+    verifier is deterministic". It is not: at five repeats a verifier that flips 5% of the
+    time is missed roughly 77% of the time. Published work on flaky-test detection makes
+    the same point at larger budgets — even a thousand reruns has under a 10% chance of
+    surfacing a flake with a rate near 1e-4.
+    """
+    if repeats < 2:
+        return 0.0
+    return 1.0 - rate**repeats - (1.0 - rate) ** repeats
+
 
 class DeterminismProbe(Probe):
     """Submit the identical candidate repeatedly and look for disagreement."""
@@ -110,14 +133,30 @@ class DeterminismProbe(Probe):
                 detail={"errors": errors},
             )
 
+        # Quote the power of the measurement alongside its result. A null finding here
+        # bounds the flake rate; it does not establish determinism, and the report must not
+        # let a reader believe otherwise.
+        power = {f"{r:g}": round(detection_power(r, config.repeats), 4) for r in _REFERENCE_RATES}
+
         return ProbeResult(
             probe_id=self.id,
             status=ProbeStatus.OK,
             tasks_probed=measured,
             sub_score=len(findings) / measured,
             findings=tuple(findings),
-            detail={"repeats": config.repeats, "tasks_measured": measured, "errors": errors},
+            detail={
+                "repeats": config.repeats,
+                "tasks_measured": measured,
+                "errors": errors,
+                "detection_power": power,
+                "power_note": (
+                    f"with {config.repeats} repeats, a verifier flipping 50% of the time is observed "
+                    f"{power['0.5'] * 100:.0f}% of the time and one flipping 5% of the time "
+                    f"{power['0.05'] * 100:.0f}% of the time; a null result bounds the rate rather "
+                    f"than proving determinism"
+                ),
+            },
         )
 
 
-__all__ = ["DeterminismProbe"]
+__all__ = ["DeterminismProbe", "detection_power"]

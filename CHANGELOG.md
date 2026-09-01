@@ -17,6 +17,18 @@ any `--json` output. It changes only when the serialized report shape changes.
   operators, the Verification Gap with its mandatory coverage descriptor, and the
   `audit` / `list-probes` / `explain` command surface.
 
+- **`weak_oracle` now requires a green baseline.** Where a task ships a reference
+  solution it is submitted unchanged first and must pass. Mutation testing assumes the
+  unmutated code passes; without that, an accepted mutant cannot be distinguished from
+  Bohrin submitting in a form the verifier does not understand — and reporting the former
+  when the latter is true blames a customer for our own bug. Tasks that fail their
+  baseline are excluded from the score and reported; if none can be baselined the probe
+  reports `error` rather than `ok`.
+- **`determinism` now reports the statistical power of its own measurement.** A null
+  result bounds the flake rate rather than establishing determinism: at five repeats a
+  verifier that flips 5% of the time is missed roughly 77% of the time. The terminal
+  headline reads "no variance observed in 5 runs" instead of implying a conclusion.
+
 ### Changed
 
 - **Python 3.11 is the supported floor**, down from 3.10 in the previous project. Two
