@@ -78,6 +78,64 @@ async def test_operators_decline_when_there_is_no_reference() -> None:
     assert list(DropSideEffect().apply(task)) == []
 
 
+# ------------------------------------------------------------- weak oracle: the baseline
+
+
+async def test_a_reference_that_fails_its_own_verifier_blocks_scoring() -> None:
+    """No green baseline, no score.
+
+    Mutation testing requires the unmutated code to pass first; here the stakes are higher
+    than noise. If the reference fails, an accepted mutant cannot be told apart from Bohrin
+    submitting in a form the verifier does not understand — and reporting the former when
+    the latter is true blames the customer for our integration bug.
+    """
+    result = await WeakOracleProbe().run(_fixtures.broken_baseline_source(3), CFG)
+
+    assert result.status is ProbeStatus.ERROR
+    assert result.sub_score is None, "an unbaselined probe must not contribute to the gap"
+    assert result.findings == (), "no exploit may be reported without a baseline"
+    assert "baseline" in result.reason
+
+
+async def test_baseline_failures_are_recorded_for_the_user() -> None:
+    """A reference failing its own verifier is itself worth reporting."""
+    result = await WeakOracleProbe().run(_fixtures.broken_baseline_source(2), CFG)
+
+    failures = result.detail["baseline_failures"]
+    assert len(failures) == 2
+    assert {f["task_id"] for f in failures} == {"task-0", "task-1"}
+    assert all("does not pass" in f["reason"] for f in failures)
+
+
+async def test_baseline_detail_has_the_same_shape_whatever_the_status() -> None:
+    """A key whose type depends on status breaks every consumer of the JSON."""
+    errored = await WeakOracleProbe().run(_fixtures.broken_baseline_source(2), CFG)
+    ok = await WeakOracleProbe().run(_fixtures.weak_source(2), CFG)
+
+    assert errored.status is ProbeStatus.ERROR
+    assert ok.status is ProbeStatus.OK
+    for result in (errored, ok):
+        assert isinstance(result.detail["baseline_failures"], list)
+        assert isinstance(result.detail["baseline_errors"], int)
+
+
+async def test_tasks_without_a_reference_are_still_probed() -> None:
+    """Excluding them would make the probe useless on tasksets that ship no reference."""
+    result = await WeakOracleProbe().run(_fixtures.no_reference_source(3), CFG)
+
+    assert result.status is ProbeStatus.OK
+    assert result.findings, "structural operators are valid without a reference"
+    assert result.detail["tasks_without_reference"] == 3
+
+
+async def test_the_baseline_denominator_excludes_unmeasurable_tasks() -> None:
+    """Dividing by tasks we could not baseline would dilute the score toward clean."""
+    result = await WeakOracleProbe().run(_fixtures.weak_source(4), CFG)
+
+    assert result.detail["tasks_measurable"] == 4
+    assert result.sub_score == result.detail["tasks_compromised"] / result.detail["tasks_measurable"]
+
+
 # ------------------------------------------------------------------- determinism probe
 
 
@@ -105,6 +163,25 @@ async def test_determinism_never_claims_an_exploit() -> None:
     result = await DeterminismProbe().run(_fixtures.flaky_source(3), CFG)
 
     assert all(isinstance(f, Flake) for f in result.findings)
+
+
+async def test_determinism_reports_the_power_of_its_own_measurement() -> None:
+    """A null result bounds the flake rate; it does not prove determinism."""
+    result = await DeterminismProbe().run(_fixtures.strict_source(2), CFG)
+
+    power = result.detail["detection_power"]
+    assert power["0.5"] > power["0.05"], "rarer flakiness must be harder to detect"
+    assert power["0.05"] < 0.5, "5 repeats cannot reliably catch a 5%-flaky verifier"
+    assert "bounds the rate" in result.detail["power_note"]
+
+
+def test_detection_power_matches_the_closed_form() -> None:
+    from bohrin.probes.determinism import detection_power
+
+    assert detection_power(0.5, 5) == pytest.approx(1 - 2 * 0.5**5)
+    assert detection_power(0.1, 10) == pytest.approx(1 - 0.1**10 - 0.9**10)
+    assert detection_power(0.5, 1) == 0.0, "one run cannot show disagreement"
+    assert detection_power(0.5, 40) == pytest.approx(1.0)
 
 
 async def test_determinism_needs_at_least_two_repeats() -> None:

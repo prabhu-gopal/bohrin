@@ -33,7 +33,11 @@ def _headline(result: ProbeResult) -> str:
     # "40 tasks" for a 4-task environment is worse than reporting nothing.
     n = len({f.task_id for f in result.findings})
     if result.probe_id == "determinism":
-        return f"{n} task(s) score inconsistently" if n else "no variance observed"
+        if n:
+            return f"{n} task(s) score inconsistently"
+        repeats = result.detail.get("repeats")
+        # "no variance observed in N runs" is what was measured. "deterministic" is not.
+        return f"no variance observed in {repeats} runs" if repeats else "no variance observed"
     return f"{n} task(s) accept known-wrong solutions" if n else "no accepted wrong solutions"
 
 

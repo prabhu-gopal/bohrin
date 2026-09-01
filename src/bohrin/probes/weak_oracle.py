@@ -10,15 +10,28 @@ is the discipline around what may be reported.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from bohrin.adapters.base import TaskSource
 from bohrin.config import ScanConfig
 from bohrin.execute.runner import ScoreOutcome, score_many
-from bohrin.ir.evidence import Exploit, Finding, Unverified
-from bohrin.ir.task import Candidate, Task
+from bohrin.ir.evidence import BaselineFailure, Exploit, Finding, Unverified
+from bohrin.ir.task import Candidate, Provenance, Task
 from bohrin.mutate import discover as discover_operators
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
+
+
+def _baseline_candidate(task: Task) -> Candidate:
+    """The reference itself, submitted unchanged. Never wrong by construction."""
+    return Candidate(
+        payload=task.reference or "",
+        provenance=Provenance(
+            operator="baseline",
+            base="reference",
+            detail="the taskset's own reference solution, submitted unchanged",
+        ),
+        ground=None,
+    )
 
 
 class WeakOracleProbe(Probe):
@@ -31,10 +44,11 @@ class WeakOracleProbe(Probe):
         return (
             "Generates submissions that are provably incorrect and offers them to the "
             "verifier. Anything accepted is a false positive: a task that rewards failure. "
-            "A candidate is only reported as an exploit when its wrongness was established "
-            "independently of the verifier being audited — otherwise it is a lead, because "
-            "a mutation that merely looks different may be behaviourally identical, and "
-            "reporting that as a defect would accuse a correct verifier."
+            "Where a reference solution exists it is submitted first and must pass — "
+            "without that green baseline, an accepted mutant cannot be distinguished from "
+            "Bohrin submitting candidates in a form the verifier does not understand. A "
+            "candidate is only reported as an exploit when its wrongness was established "
+            "independently of the verifier being audited; everything else is a lead."
         )
 
     async def run(self, source: TaskSource, config: ScanConfig) -> ProbeResult:
@@ -52,16 +66,31 @@ class WeakOracleProbe(Probe):
         if not tasks:
             return ProbeResult(probe_id=self.id, status=ProbeStatus.NOT_APPLICABLE, reason="the taskset is empty")
 
+        measurable, baseline_failures, baseline_errors = await self._establish_baseline(source, tasks, config)
+        # Serialized identically on every path: a key whose type depends on status breaks
+        # any consumer that reads the JSON.
+        baseline_detail = [{"task_id": b.task_id, "reward": b.reward, "reason": b.reason} for b in baseline_failures]
+
+        if not measurable:
+            return ProbeResult(
+                probe_id=self.id,
+                status=ProbeStatus.ERROR,
+                tasks_probed=len(tasks),
+                reason=(
+                    "no task could be baselined: every reference solution failed its own verifier, "
+                    "so an accepted mutant would be indistinguishable from a submission-format problem"
+                ),
+                detail={"baseline_failures": baseline_detail, "baseline_errors": baseline_errors},
+            )
+
         work: list[tuple[Task, Candidate]] = [
-            (task, cand) for task in tasks for op in operators for cand in op.apply(task)
+            (task, cand) for task in measurable for op in operators for cand in op.apply(task)
         ]
         if not work:
-            # Every operator declined. Honest outcome: the probe ran and found nothing it
-            # could safely try, which is different from finding a clean verifier.
             return ProbeResult(
                 probe_id=self.id,
                 status=ProbeStatus.NOT_APPLICABLE,
-                tasks_probed=len(tasks),
+                tasks_probed=len(measurable),
                 reason="no operator could establish wrongness for any task (is a reference solution available?)",
             )
 
@@ -69,20 +98,69 @@ class WeakOracleProbe(Probe):
         findings, unverified, errors = self._triage(outcomes)
 
         compromised = {f.task_id for f in findings}
+        unbaselined = sum(1 for t in measurable if t.reference is None)
         return ProbeResult(
             probe_id=self.id,
             status=ProbeStatus.OK,
-            tasks_probed=len(tasks),
-            sub_score=len(compromised) / len(tasks),
+            tasks_probed=len(measurable),
+            # Denominator is the measurable set, not every task. Dividing by tasks we could
+            # not baseline would silently dilute the score toward "clean".
+            sub_score=len(compromised) / len(measurable),
             findings=tuple(findings),
             unverified=tuple(unverified),
             detail={
                 "operators": [op.id for op in operators],
                 "candidates_submitted": len(work),
+                "tasks_measurable": len(measurable),
                 "tasks_compromised": len(compromised),
+                "baseline_failures": baseline_detail,
+                "baseline_errors": baseline_errors,
+                "tasks_without_reference": unbaselined,
                 "errors": errors,
             },
         )
+
+    @staticmethod
+    async def _establish_baseline(
+        source: TaskSource, tasks: Sequence[Task], config: ScanConfig
+    ) -> tuple[list[Task], list[BaselineFailure], int]:
+        """Confirm each reference passes its own verifier before trusting any mutant.
+
+        Tasks with no reference are admitted unbaselined: the structural operators (an
+        empty reply, a refusal) remain valid there, and excluding those tasks entirely
+        would make the probe useless on the many tasksets that ship no reference. The count
+        is recorded so the report can say which tasks carried the weaker guarantee.
+        """
+        with_reference = [t for t in tasks if t.reference is not None]
+        without_reference = [t for t in tasks if t.reference is None]
+
+        if not with_reference:
+            return without_reference, [], 0
+
+        outcomes = await score_many(source, [(t, _baseline_candidate(t)) for t in with_reference], config)
+
+        measurable: list[Task] = list(without_reference)
+        failures: list[BaselineFailure] = []
+        errors = 0
+
+        for out in outcomes:
+            if out.error is not None or out.verdict is None:
+                errors += 1
+                failures.append(
+                    BaselineFailure(task_id=out.task.id, reward=0.0, reason=out.error or "no verdict returned")
+                )
+                continue
+            if out.verdict.passed:
+                measurable.append(out.task)
+            else:
+                failures.append(
+                    BaselineFailure(
+                        task_id=out.task.id,
+                        reward=out.verdict.reward,
+                        reason="the reference solution does not pass this task's own verifier",
+                    )
+                )
+        return measurable, failures, errors
 
     @staticmethod
     def _triage(outcomes: Iterable[ScoreOutcome]) -> tuple[list[Finding], list[Unverified], int]:
