@@ -181,6 +181,84 @@ cross-process side effects. A sandbox escape caused by Bohrin on customer
 infrastructure would end a company whose product is trust — this is a product
 requirement, not an implementation detail.
 
+## Concurrency
+
+Probing is I/O-bound — hundreds of independent reward invocations — so the
+engine is `async` throughout, with **bounded** parallelism. Unbounded task
+creation against a customer's environment is a denial-of-service against the
+thing we were asked to audit.
+
+**The supported floor is Python 3.10, and that constrains the implementation:**
+
+| Wanted | 3.11+ | What we use |
+|---|---|---|
+| Structured task scope | `asyncio.TaskGroup` | `asyncio.gather` + explicit cancellation |
+| Timeout scope | `asyncio.timeout()` | `asyncio.wait_for` |
+
+Both replacements are ordinary and well understood; the point is that the CI
+matrix runs 3.10 and a `TaskGroup` would pass locally on a 3.13 laptop and fail
+the build. The previous codebase was bitten by exactly this class of
+version-sensitive difference, which is why the rule is to verify against a real
+3.10 interpreter rather than trust one local run.
+
+```python
+sem = asyncio.Semaphore(cfg.concurrency)          # default 8
+
+async def _one(task: Task, cand: Candidate) -> Verdict:
+    async with sem:
+        return await asyncio.wait_for(
+            source.score(task, cand), timeout=cfg.per_task_timeout
+        )
+
+verdicts = await asyncio.gather(*(_one(t, c) for t, c in work),
+                                return_exceptions=True)
+```
+
+`return_exceptions=True` is deliberate: one task that times out must not
+abandon the other thirty-nine. Failures become per-task `error` entries in the
+report rather than an aborted audit. `ruff`'s `ASYNC` rules are enabled in
+`pyproject.toml` because this codebase is async end to end.
+
+## Mutation via LibCST, not `ast`
+
+Mutation operators rewrite source. The stdlib `ast` module is lossy — it
+discards comments, whitespace and formatting, so a round trip reformats the
+whole file. **LibCST** is a concrete syntax tree: it preserves formatting and
+reprints exactly.
+
+That matters here for a product reason, not an aesthetic one. **The mutant is
+the evidence.** A finding shows the customer the exact code that passed their
+verifier, and they must be able to diff it against their reference and see a
+one-line change. An `ast` round trip reformats everything, burying the actual
+mutation in incidental churn and making the report harder to trust.
+
+```python
+class ConstantReturn(cst.CSTTransformer):
+    """Replace a function body with `return <literal>` — structural wrongness."""
+    def leave_FunctionDef(self, orig, updated): ...
+```
+
+Each operator declares which **wrongness ground** it can establish (see
+[03_PROBES.md](03_PROBES.md#establishing-wrongness)); an operator that cannot
+establish one may not emit an exploit.
+
+## Failure isolation
+
+Three independent boundaries, because a probe run touches code we did not write
+at three different levels.
+
+| Boundary | Mechanism | Protects against |
+|---|---|---|
+| Plugin load | `try/except` per entry point, warn and skip | One bad plugin killing discovery |
+| Probe run | Per-probe exception capture → `status="error"` | One probe aborting the audit |
+| Candidate execution | Sandbox + `wait_for` + resource ceilings | Untrusted code, hangs, exhaustion |
+
+The first is carried over verbatim in intent from the previous codebase, whose
+loader documented the rule plainly: *a plugin must never crash discovery.* The
+second is why `ProbeResult.status` exists and why an errored probe is excluded
+from the gap rather than scored zero — see
+[02_VERIFICATION_GAP.md](02_VERIFICATION_GAP.md#computation).
+
 ## Report contract
 
 `report/model.py` defines `Report`, serialised by `--json`. It carries

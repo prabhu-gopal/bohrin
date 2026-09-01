@@ -1,5 +1,5 @@
 name: False positive
-description: Bohrin flagged something on your data that is actually fine.
+description: Bohrin reported an exploit against a verifier that is actually correct.
 title: "[false positive] "
 labels: ["false-positive", "calibration"]
 body:
@@ -8,15 +8,15 @@ body:
       value: |
         **This is the most valuable report you can send us.**
 
-        Bohrin's only real asset is that its findings are trustworthy. A detector that
-        cries wolf is worse than no detector, and we cannot find those on synthetic data —
+        Bohrin's only real asset is that its findings are trustworthy. A probe that
+        cries wolf is worse than no probe, and we cannot find those on synthetic data —
         we need yours. Every report here goes directly into threshold calibration.
 
-        You do **not** need to share your dataset. The detector id, the numbers bohrin
+        You do **not** need to share your environment. The probe id, the numbers bohrin
         reported, and your explanation of why it is wrong is enough to act on.
 
   - type: input
-    id: detector-id
+    id: probe-id
     attributes:
       label: Detector ID
       description: >
@@ -30,7 +30,7 @@ body:
     id: the-finding
     attributes:
       label: The finding, as bohrin printed it
-      description: Copy the whole block, including the measured value and the episode count.
+      description: Copy the whole finding, including the candidate that passed and the wrongness ground.
       render: shell
     validations:
       required: true
@@ -42,20 +42,22 @@ body:
       description: >
         What does bohrin not know about your setup? This is the part we cannot guess.
       placeholder: |
-        Dimension 6 is a binary gripper open/close, so its variance is supposed to be near
-        zero between grasps. It is not a dead dimension — it is doing its job.
+        The candidate Bohrin submitted returns a constant, but for this task a constant IS
+        the correct answer — the reward function is right to accept it. The mutation was
+        behaviourally equivalent to the reference, so it should have been filtered before
+        submission rather than reported as an exploit.
     validations:
       required: true
 
   - type: textarea
-    id: dataset-context
+    id: environment-context
     attributes:
       label: Dataset context
       description: >
-        Robot/embodiment, control rate, action space (joint positions? EEF deltas?),
-        episode count, and the Hugging Face repo id if it is public.
+        Environment format, number of tasks, how many reward functions the task exposes,
+        whether a reference solution is available, and the Hub path if it is public.
       placeholder: |
-        SO-101, 30 Hz, 6-DoF joint positions + binary gripper, 220 episodes, private.
+        verifiers v1 taskset, 40 tasks, 1 reward function, reference solutions present, private.
     validations:
       required: true
 
@@ -75,5 +77,5 @@ body:
       description: >
         `bohrin scan <path> --json report.json` gives us the exact measured values and
         thresholds. Attach it or paste the relevant finding. It contains no raw data from
-        your dataset — only statistics.
+        your environment — only statistics.
       render: json
