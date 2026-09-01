@@ -94,7 +94,7 @@ async def test_a_reference_that_fails_its_own_verifier_blocks_scoring() -> None:
     assert result.status is ProbeStatus.ERROR
     assert result.sub_score is None, "an unbaselined probe must not contribute to the gap"
     assert result.findings == (), "no exploit may be reported without a baseline"
-    assert "baseline" in result.reason
+    assert "could be measured offline" in result.reason
 
 
 async def test_baseline_failures_are_recorded_for_the_user() -> None:
@@ -104,7 +104,9 @@ async def test_baseline_failures_are_recorded_for_the_user() -> None:
     failures = result.detail["baseline_failures"]
     assert len(failures) == 2
     assert {f["task_id"] for f in failures} == {"task-0", "task-1"}
-    assert all("does not pass" in f["reason"] for f in failures)
+    assert all("no rendering" in f["reason"] for f in failures), (
+        "the reason must say the search was attempted, not merely that one string failed"
+    )
 
 
 async def test_baseline_detail_has_the_same_shape_whatever_the_status() -> None:
@@ -239,5 +241,14 @@ async def test_redundant_candidates_are_not_submitted_twice() -> None:
     generated = [c.payload.strip() for op in discover() for c in op.apply(task)]
 
     assert len(generated) > len(set(generated)), "the fixture should generate a duplicate to guard against"
-    # +1 for the baseline submission, which is deliberately separate.
-    assert source.calls == len(set(generated)) + 1, "each distinct submission is scored exactly once"
+
+    from bohrin.adapters.verifiers_v1 import reference_renderings
+
+    # The baseline searches for a submission the verifier accepts, so it costs one call per
+    # rendering tried up to the first that passes — here the first, since the fixture
+    # accepts anything non-empty.
+    baseline_calls = 1
+    assert source.calls == len(set(generated)) + baseline_calls, (
+        f"expected {len(set(generated))} distinct mutants + {baseline_calls} baseline, got {source.calls}"
+    )
+    assert len(reference_renderings("x")) > 1, "the baseline must try more than one presentation"

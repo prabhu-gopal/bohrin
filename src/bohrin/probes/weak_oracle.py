@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 
 from bohrin.adapters.base import TaskSource
+from bohrin.adapters.verifiers_v1 import reference_renderings
 from bohrin.config import ScanConfig
 from bohrin.execute.runner import ScoreOutcome, score_many
 from bohrin.ir.evidence import BaselineFailure, Exploit, Finding, Unverified
@@ -21,17 +22,29 @@ from bohrin.mutate import discover as discover_operators
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
 
 
-def _baseline_candidate(task: Task) -> Candidate:
-    """The reference itself, submitted unchanged. Never wrong by construction."""
-    return Candidate(
-        payload=task.reference or "",
-        provenance=Provenance(
-            operator="baseline",
-            base="reference",
-            detail="the taskset's own reference solution, submitted unchanged",
-        ),
-        ground=None,
-    )
+def _baseline_candidates(task: Task) -> list[Candidate]:
+    """Plausible submissions of the known-good answer, most literal first.
+
+    A taskset stores the *answer*; the verifier may require a particular *presentation* of
+    it. Rather than assume the two are the same string, the baseline tries several and uses
+    whichever the verifier accepts. None is ever wrong by construction, so none carries a
+    ground and none can become an exploit.
+    """
+    reference = task.reference or ""
+    if not reference.strip():
+        return []
+    return [
+        Candidate(
+            payload=rendering,
+            provenance=Provenance(
+                operator="baseline",
+                base="reference",
+                detail=f"the taskset's known-good answer, submitted as {rendering[:40]!r}",
+            ),
+            ground=None,
+        )
+        for rendering in reference_renderings(reference)
+    ]
 
 
 class WeakOracleProbe(Probe):
@@ -66,7 +79,13 @@ class WeakOracleProbe(Probe):
         if not tasks:
             return ProbeResult(probe_id=self.id, status=ProbeStatus.NOT_APPLICABLE, reason="the taskset is empty")
 
-        measurable, baseline_failures, baseline_errors = await self._establish_baseline(source, tasks, config)
+        # Tasks the adapter has already declared unscoreable offline are excluded up front
+        # rather than discovered through one failure per candidate. Cheaper, and the reason
+        # reaches the user instead of an error count.
+        offline, refused = self._partition_scoreable(tasks)
+
+        measurable, baseline_failures, baseline_errors = await self._establish_baseline(source, offline, config)
+        baseline_failures = [*refused, *baseline_failures]
         # Serialized identically on every path: a key whose type depends on status breaks
         # any consumer that reads the JSON.
         baseline_detail = [{"task_id": b.task_id, "reward": b.reward, "reason": b.reason} for b in baseline_failures]
@@ -77,8 +96,9 @@ class WeakOracleProbe(Probe):
                 status=ProbeStatus.ERROR,
                 tasks_probed=len(tasks),
                 reason=(
-                    "no task could be baselined: every reference solution failed its own verifier, "
-                    "so an accepted mutant would be indistinguishable from a submission-format problem"
+                    "no task could be measured offline: every task either needs a runtime to score, "
+                    "or its reference solution fails its own verifier — in which case an accepted "
+                    "mutant would be indistinguishable from a submission-format problem"
                 ),
                 detail={"baseline_failures": baseline_detail, "baseline_errors": baseline_errors},
             )
@@ -108,6 +128,21 @@ class WeakOracleProbe(Probe):
         outcomes = await score_many(source, work, config)
         findings, unverified, errors = self._triage(outcomes)
 
+        # If nothing was successfully scored there is no measurement, and a sub-score of
+        # zero would report a verifier as clean that was never actually probed. This is the
+        # exact failure the gap specification forbids, and only a real environment surfaced
+        # it: every candidate errored while the probe reported "no accepted wrong solutions".
+        scored = sum(1 for out in outcomes if out.error is None and out.verdict is not None)
+        if scored == 0:
+            sample = next((out.error for out in outcomes if out.error), "unknown")
+            return ProbeResult(
+                probe_id=self.id,
+                status=ProbeStatus.ERROR,
+                tasks_probed=len(measurable),
+                reason=f"every scoring attempt failed ({errors} of {len(work)}); first error: {sample}",
+                detail={"baseline_failures": baseline_detail, "errors": errors, "candidates_submitted": len(work)},
+            )
+
         compromised = {f.task_id for f in findings}
         unbaselined = sum(1 for t in measurable if t.reference is None)
         return ProbeResult(
@@ -132,6 +167,31 @@ class WeakOracleProbe(Probe):
         )
 
     @staticmethod
+    def _partition_scoreable(tasks: Sequence[Task]) -> tuple[list[Task], list[BaselineFailure]]:
+        """Split tasks the adapter can score offline from ones it has refused.
+
+        A task whose reward function needs a runtime cannot be scored honestly without one
+        (scoring it offline would award full marks on a partial rubric). The adapter marks
+        those; excluding them here means the user is told once, clearly, rather than through
+        a wall of per-candidate errors.
+        """
+        offline: list[Task] = []
+        refused: list[BaselineFailure] = []
+        for task in tasks:
+            needs = task.metadata.get("requires_runtime") or ()
+            if needs:
+                refused.append(
+                    BaselineFailure(
+                        task_id=task.id,
+                        reward=0.0,
+                        reason=f"reward function(s) {', '.join(needs)} require a runtime; cannot be scored offline",
+                    )
+                )
+            else:
+                offline.append(task)
+        return offline, refused
+
+    @staticmethod
     async def _establish_baseline(
         source: TaskSource, tasks: Sequence[Task], config: ScanConfig
     ) -> tuple[list[Task], list[BaselineFailure], int]:
@@ -148,29 +208,54 @@ class WeakOracleProbe(Probe):
         if not with_reference:
             return without_reference, [], 0
 
-        outcomes = await score_many(source, [(t, _baseline_candidate(t)) for t in with_reference], config)
-
+        # Renderings are tried in waves: every still-unresolved task is scored against one
+        # rendering in parallel, and a task drops out as soon as one is accepted. Submitting
+        # all renderings at once would cost eight calls per task against a customer's
+        # environment where one usually suffices.
+        pending = {t.id: t for t in with_reference}
+        best: dict[str, tuple[float, str | None]] = {t.id: (0.0, None) for t in with_reference}
         measurable: list[Task] = list(without_reference)
-        failures: list[BaselineFailure] = []
         errors = 0
 
-        for out in outcomes:
-            if out.error is not None or out.verdict is None:
+        max_renderings = max((len(_baseline_candidates(t)) for t in with_reference), default=0)
+        for index in range(max_renderings):
+            wave = [
+                (task, _baseline_candidates(task)[index])
+                for task in pending.values()
+                if index < len(_baseline_candidates(task))
+            ]
+            if not wave:
+                break
+            for out in await score_many(source, wave, config):
+                reward, err = best[out.task.id]
+                if out.error is not None or out.verdict is None:
+                    best[out.task.id] = (reward, err or out.error)
+                    continue
+                if out.verdict.passed:
+                    measurable.append(out.task)
+                    pending.pop(out.task.id, None)
+                    best[out.task.id] = (out.verdict.reward, None)
+                elif out.verdict.reward > reward:
+                    best[out.task.id] = (out.verdict.reward, err)
+            if not pending:
+                break
+
+        failures: list[BaselineFailure] = []
+        for task_id in pending:
+            reward, err = best[task_id]
+            if err is not None:
                 errors += 1
-                failures.append(
-                    BaselineFailure(task_id=out.task.id, reward=0.0, reason=out.error or "no verdict returned")
+            failures.append(
+                BaselineFailure(
+                    task_id=task_id,
+                    reward=reward,
+                    reason=err
+                    or (
+                        "no rendering of the known-good answer passed this task's own verifier "
+                        "(tried the bare answer and several common presentations)"
+                    ),
                 )
-                continue
-            if out.verdict.passed:
-                measurable.append(out.task)
-            else:
-                failures.append(
-                    BaselineFailure(
-                        task_id=out.task.id,
-                        reward=out.verdict.reward,
-                        reason="the reference solution does not pass this task's own verifier",
-                    )
-                )
+            )
         return measurable, failures, errors
 
     @staticmethod

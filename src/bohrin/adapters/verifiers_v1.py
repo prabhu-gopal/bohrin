@@ -86,6 +86,34 @@ def _first_reference(data: Any) -> str | None:
     return None
 
 
+def reference_renderings(answer: str) -> list[str]:
+    """Plausible ways a correct answer might be *submitted*, most literal first.
+
+    The field a taskset stores holds the answer (``70``); the reward function may require a
+    particular presentation of it (``\\boxed{70}``). Those are not the same string, and
+    assuming they were made the baseline fail on the first real environment tried — aime25
+    scores with ``verify_boxed_math_answer``, so the bare answer never passes.
+
+    The baseline therefore searches: whichever rendering the verifier actually accepts is
+    the known-good submission. If none is accepted, the task is unmeasurable and is reported
+    as such rather than probed against a reference the verifier itself rejects.
+    """
+    # The unmodified value comes first and is never stripped: a verifier doing an exact
+    # string comparison rejects a reference whose trailing newline we removed, which would
+    # fail the baseline on a task that is in fact perfectly scoreable.
+    bare = answer.strip()
+    return [
+        answer,
+        *([bare] if bare != answer else []),
+        f"\\boxed{{{answer}}}",
+        f"$\\boxed{{{answer}}}$",
+        f"The answer is {answer}.",
+        f"The answer is \\boxed{{{answer}}}.",
+        f"**{answer}**",
+        f"\\boxed{{\\text{{{answer}}}}}",
+    ]
+
+
 def _taskset_id(path: Path) -> str | None:
     """The taskset id for a package directory.
 
@@ -147,7 +175,11 @@ class _VerifiersSource:
         self._id = taskset_id
         self._config = config
         try:
-            taskset = vf.load_taskset(vf.TasksetConfig(id=taskset_id))
+            # A taskset may specialise TasksetConfig with its own fields (dataset subsets,
+            # revisions, splits). Constructing the base class instead leaves those missing
+            # and load() dies with AttributeError, so resolve the taskset's own type.
+            config_type = vf.taskset_config_type(taskset_id)
+            taskset = vf.load_taskset(config_type(id=taskset_id))
         except ModuleNotFoundError as exc:
             raise MissingExtraError(
                 f"taskset {taskset_id!r} is not installed. A verifiers taskset is an installed "
@@ -234,4 +266,4 @@ class _VerifiersSource:
         )
 
 
-__all__ = ["VerifiersV1Adapter"]
+__all__ = ["VerifiersV1Adapter", "reference_renderings"]
