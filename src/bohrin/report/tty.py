@@ -84,6 +84,28 @@ def render(report: Report, console: Console) -> None:
         console.print(f"  [dim]{remaining} more finding(s) — see --json for the full record[/dim]")
         console.print()
 
+    # A task that could not be measured must be visible. Reporting "no findings" over a
+    # taskset that was silently reduced would let a user believe their whole environment
+    # was audited when part of it never ran.
+    for result in report.results:
+        skipped = result.detail.get("baseline_failures") or []
+        if not skipped:
+            continue
+        console.print(
+            f"  [yellow]note[/yellow] {len(skipped)} task(s) could not be measured by "
+            f"{escape(result.probe_id)} and are excluded from its score",
+            highlight=False,
+        )
+        for entry in list(skipped)[:3]:
+            console.print(
+                f"           [dim]{escape(str(entry.get('task_id')))}: "
+                f"{escape(str(entry.get('reason', ''))[:120])}[/dim]",
+                highlight=False,
+            )
+        if len(skipped) > 3:
+            console.print(f"           [dim]... and {len(skipped) - 3} more; see --json[/dim]")
+        console.print()
+
     if report.unverified:
         console.print(
             f"  [dim]note {report.unverified} accepted candidate(s) could not be shown to be wrong; "

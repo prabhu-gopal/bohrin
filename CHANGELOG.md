@@ -13,6 +13,9 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 - Design documentation for the open core in `docs/`: architecture, the Verification Gap
   specification, the two open probe designs, and the open/proprietary boundary.
+- **The `verifiers` v1 adapter.** Bohrin can now audit a real taskset. Candidates are
+  scored by constructing a trace and invoking the task's reward functions directly — no
+  agent, no model inference, no rollout — so a first audit takes seconds.
 - The probe framework, the `weak_oracle` and `determinism` probes, the baseline mutation
   operators, the Verification Gap with its mandatory coverage descriptor, and the
   `audit` / `list-probes` / `explain` command surface.
