@@ -13,6 +13,17 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 - Design documentation for the open core in `docs/`: architecture, the Verification Gap
   specification, the two open probe designs, and the open/proprietary boundary.
+- **Isolation is classified, enforced and recorded.** Scoring runs the taskset's own
+  reward functions, which is arbitrary third-party code. Bohrin now refuses to execute it
+  with no boundary unless `--unsafe-local` is passed, and the level used is written into
+  the report — a result produced in-process must never be mistaken for one produced inside
+  a container. The level below a container is called `subprocess` and described as
+  blast-radius containment, never a sandbox: process limits prevent denial of service, not
+  escape.
+- **Concurrency adapts to the machine.** Derived from core count and free memory rather
+  than fixed, so an audit does not crowd out the laptop running it. macOS is handled
+  explicitly because it exposes no `SC_AVPHYS_PAGES`, which would otherwise leave the
+  memory guard permanently disabled on exactly the machines it protects.
 - **The `verifiers` v1 adapter.** Bohrin can now audit a real taskset. Candidates are
   scored by constructing a trace and invoking the task's reward functions directly — no
   agent, no model inference, no rollout — so a first audit takes seconds.

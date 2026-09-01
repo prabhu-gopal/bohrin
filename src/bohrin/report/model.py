@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from bohrin.execute.isolation import Assessment
 from bohrin.ir.evidence import Exploit, Flake
 from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.scoring.gap import GapScore
@@ -20,6 +21,9 @@ class Report:
     gap: GapScore
     results: tuple[ProbeResult, ...]
     tasks_total: int
+    #: How the verifier's code was executed. Part of the evidence: a result produced with
+    #: no boundary must never be mistaken for one produced inside a container.
+    isolation: Assessment | None = None
 
     @property
     def findings(self) -> int:
@@ -37,6 +41,7 @@ class Report:
             "target": self.target,
             "adapter": self.adapter,
             "tasks_total": self.tasks_total,
+            "isolation": self.isolation.to_dict() if self.isolation else None,
             "verification_gap": {
                 "score": self.gap.score,
                 "coverage": {
