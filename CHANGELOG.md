@@ -9,6 +9,30 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-09-02
+
+The first release of Bohrin as a verifier auditor.
+
+**On the version number.** The 0.x line on PyPI belonged to a different tool — static
+analysis for robot demonstration data — which was renamed and is published as
+[`adduct`](https://pypi.org/project/adduct/), with its full history in that repository.
+Those releases are yanked and point users there. The major bump is deliberate: this is a
+different program, not an upgrade.
+
+**What it measures.** Two probes, and the honest limits of each are reported rather than
+implied. `weak_oracle` submits provably-wrong candidates and records the ones a verifier
+accepts; a candidate is only reported as an exploit when its wrongness was established
+independently of the verifier being audited, and where a reference exists it must pass
+first. `determinism` submits one identical candidate repeatedly and reports disagreement,
+quoting the detection power of the run because a null result bounds the flake rate rather
+than proving determinism.
+
+**Known limits, stated deliberately.** A task whose reward function requires a runtime is
+refused rather than scored on a partial rubric. `docs/05_ROBUSTNESS.md` records seven known
+weaknesses with the evidence behind each — most importantly that harness disruption is not
+yet reported as a finding, and that the false-positive rate is unmeasured until a public
+sweep measures one. No accuracy claim is made in the meantime.
+
 ### Added
 
 - Design documentation for the open core in `docs/`: architecture, the Verification Gap
@@ -57,7 +81,8 @@ any `--json` output. It changes only when the serialized report shape changes.
   static analysis for robot demonstration data — was renamed and is published as
   [`adduct`](https://pypi.org/project/adduct/), with its full history in that repository.
   The `bohrin` name now belongs to this project. Releases 0.1.0 and 0.2.0 on PyPI are
-  yanked and point users at `adduct`; the first release of the verifier auditor will be
-  1.0.0, so that the discontinuity reads as a break rather than an upgrade.
+  yanked and point users at `adduct`; the verifier auditor starts at 1.0.0, so that the
+  discontinuity reads as a break rather than an upgrade.
 
-[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/prabhu-gopal/bohrin/releases/tag/v1.0.0

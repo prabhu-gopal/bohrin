@@ -1,4 +1,4 @@
-# What is released, and what v0.1 must do
+# What is released, and what 1.0.0 shipped
 
 ## The boundary
 
@@ -62,7 +62,7 @@ stability is what makes the number citable.
 
 ---
 
-## v0.1 — definition of done
+## 1.0.0 — definition of done (met)
 
 The release is not "the framework exists". It is a single sentence:
 
@@ -84,9 +84,9 @@ and everything below is scoped to protect it.
 - Isolation detection with refusal; `docker` default
 - Fault-injection **and clean-fixture** test suites, both CI-enforced
 
-### Explicitly out of scope for v0.1
+### Explicitly out of scope for 1.0.0
 
-- HTML report — `--json` and the terminal carry v0.1
+- HTML report — `--json` and the terminal carry 1.0.0
 - OpenEnv adapter — one adapter, done properly, beats two done partially
 - Any entitlement, licensing, or billing machinery
 - Any hosted service

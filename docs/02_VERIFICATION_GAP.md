@@ -57,7 +57,7 @@ Rules, all of which exist to prevent a number that lies:
 
 ### Initial weights
 
-Equal weighting at v0.1. This is a deliberate refusal to over-engineer: there is
+Equal weighting at 1.0.0. This is a deliberate refusal to over-engineer: there is
 no evidence yet on which probe best predicts real harm, and inventing weights
 would be a claim we cannot support.
 
