@@ -15,11 +15,7 @@ accepts a patch that does not fix the bug.
 
 Bohrin finds those tasks in your environments and reports one number.
 
-> ⚠️ **Pre-release.** The design is in [`docs/`](docs/) and is the thing to read
-> and argue with right now. The implementation is in progress; there is nothing
-> to install yet.
-
-## What it will do
+## What it does
 
 ```console
 $ pip install bohrin
@@ -38,6 +34,28 @@ Bohrin  ·  40 tasks  ·  2 probes
 
 Every finding carries the candidate that passed, why it is wrong, and a command
 to reproduce it.
+
+### Reading a taskset
+
+Bohrin audits [`verifiers`](https://github.com/PrimeIntellect-ai/verifiers) v1
+tasksets. A taskset is an installed Python package, so install it first:
+
+```console
+$ pip install 'bohrin[verifiers]'
+$ pip install -e ./environments/my-taskset
+$ bohrin audit ./environments/my-taskset
+```
+
+Scoring invokes the task's reward functions directly — no agent, no model
+inference, no rollout — so an audit takes seconds.
+
+### What it will not do without being asked
+
+Scoring runs the taskset's own code. Bohrin refuses to execute it with no
+isolation boundary unless you pass `--unsafe-local`, and the level it ran under
+is recorded in the report. A task whose reward function needs a runtime is
+refused rather than scored on a partial rubric, because a partial rubric awards
+full marks to a submission that does nothing.
 
 ## The two open probes
 
