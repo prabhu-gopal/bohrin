@@ -17,37 +17,62 @@ Bohrin finds those tasks in your environments and reports one number.
 
 ## What it does
 
+This is a real run against
+[`scratchpad`](https://github.com/PrimeIntellect-ai/verifiers/tree/main/environments/scratchpad),
+a public environment in the `verifiers` repository — not an illustration:
+
 ```console
-$ pip install bohrin
-$ bohrin audit ./environments/my-taskset
+$ pip install 'bohrin[verifiers]'
+$ pip install ./environments/scratchpad      # a taskset is an installed package
+$ bohrin audit ./environments/scratchpad --max-tasks 8 --unsafe-local
 
-Bohrin  ·  40 tasks  ·  2 probes
+Bohrin  ·  environments/scratchpad
+verifiers_v1 · 8 tasks · 2 probes · isolation: none
+  note verifier code ran in-process with no isolation boundary
 
-  weak-oracle    ████████████░░░  7 tasks accept known-wrong solutions
-  determinism    ███░░░░░░░░░░░░  2 tasks score inconsistently
+  determinism    ░░░░░░░░░░░░░░░  no variance observed in 5 runs
+  weak_oracle    ███████████████  8 task(s) accept known-wrong solutions
 
-  VERIFICATION GAP: 31 / 100     coverage: 2 of 6 probes
-                                 (weak-oracle, determinism)
+  VERIFICATION GAP: 50 / 100   coverage: 2 of 2 probes
 
-  9 findings · bohrin-report.json
+  EXPLOIT ▸ 0: accepted identity_return (reward 1)
+           echoes the prompt verbatim instead of answering
+           submitted: Call the `scratchpad_roundtrip` tool with word="alpha". It
+returns a single word. Then reply wit
+           bohrin audit --task 0 --operator identity_return
 ```
 
 Every finding carries the candidate that passed, why it is wrong, and a command
 to reproduce it.
 
+### What that finding means
+
+`scratchpad` grades with `self.data.word in answer`, and its own prompt contains
+`word="alpha"`. So a model that echoes the prompt back scores full marks
+**without ever calling the tool** — on all 8 tasks.
+
+That matters more than one weak grader. The environment exists to test
+per-rollout isolation, and its docstring offers a mean reward of 1.0 as the
+evidence that isolation holds. A mean reward of 1.0 is also what you get from a
+model that never touches the server, so the number does not support the
+conclusion drawn from it.
+
+Bohrin reports this as an *exploit* rather than a lead because echoing the
+question is structurally not an answer — wrongness established without asking
+the verifier. Confirmed independently by scoring the same payload through
+`verifiers` directly, with Bohrin out of the loop.
+
 ### Reading a taskset
 
 Bohrin audits [`verifiers`](https://github.com/PrimeIntellect-ai/verifiers) v1
-tasksets. A taskset is an installed Python package, so install it first:
-
-```console
-$ pip install 'bohrin[verifiers]'
-$ pip install -e ./environments/my-taskset
-$ bohrin audit ./environments/my-taskset
-```
+tasksets. A taskset is an installed Python package, so install it before
+auditing the directory it came from.
 
 Scoring invokes the task's reward functions directly — no agent, no model
 inference, no rollout — so an audit takes seconds.
+
+A taskset that generates tasks forever is refused unless you bound it with
+`--max-tasks N`, rather than run until you notice.
 
 ### What it will not do without being asked
 
@@ -66,6 +91,26 @@ suite, and a surviving mutant is a wrong solution it accepted.
 **Determinism** — does the verifier return the same reward for the same
 submission? A grader that disagrees with itself injects noise straight into the
 reward signal.
+
+### What they will and will not find
+
+The open probes use six deterministic, model-free operators. They cost nothing
+but reward invocations and they are reproducible, but they do not find what a
+motivated attacker finds.
+
+Across six `verifiers` v1 environments they reported one defect — `scratchpad`,
+above — and **no false accusations**. Of the other five: three measured clean at
+full coverage, and two Bohrin declined to score, saying so in the report rather
+than reporting them clean (`gsm8k` needs a runtime; `reverse_text`'s own
+reference answer fails its own verifier).
+
+Two of the three "clean" results are a limit of the operators, not a verdict on
+the grader. `glossary` accepts any reply containing the answer as a substring,
+and `proposer_solver` grades on the last integer in the reply. Both are
+exploitable; no fixed operator here constructs the payload that does it.
+
+That gap is the honest boundary of the open core, and it is stated here rather
+than discovered later.
 
 ## The rule this codebase is built around
 
