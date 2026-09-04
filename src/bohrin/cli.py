@@ -49,6 +49,10 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--probe", action="append", default=[], metavar="ID", help="run only this probe (repeatable)")
     audit.add_argument("--all", dest="all_probes", action="store_true", help="include probes held back by default")
     audit.add_argument("--max-tasks", type=int, default=None, metavar="N", help="probe at most N tasks")
+    audit.add_argument("--task", action="append", default=[], metavar="ID", help="probe only this task id (repeatable)")
+    audit.add_argument(
+        "--operator", action="append", default=[], metavar="ID", help="apply only this operator (repeatable)"
+    )
     audit.add_argument("--repeats", type=int, default=DEFAULT_REPEATS, metavar="N", help="determinism repeats")
     audit.add_argument(
         "--concurrency",
@@ -105,6 +109,8 @@ def _cmd_audit(args: argparse.Namespace, console: Console, err: Console) -> int:
             max_tasks=args.max_tasks,
             repeats=args.repeats,
             only=frozenset(args.probe),
+            only_tasks=frozenset(args.task),
+            only_operators=frozenset(args.operator),
             all_probes=args.all_probes,
             unsafe_local=args.unsafe_local,
         )

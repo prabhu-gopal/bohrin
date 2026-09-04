@@ -27,7 +27,7 @@ class Coverage:
     total: int
 
     def __str__(self) -> str:
-        return f"{len(self.measured)} of {self.total} probes"
+        return f"{len(self.measured)} of {self.total} {'probe' if self.total == 1 else 'probes'}"
 
 
 @dataclass(frozen=True, slots=True)

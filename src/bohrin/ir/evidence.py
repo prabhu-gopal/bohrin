@@ -19,7 +19,10 @@ class Exploit:
     task_id: str
     candidate: Candidate
     verdict: Verdict
-    repro: str
+    #: The flags that re-run *just this finding*, without the command or the target — the
+    #: probe knows neither. :meth:`Report.command_for` composes the runnable command, so
+    #: the target and the isolation flag are added exactly once, where they are known.
+    repro_args: str
 
     @property
     def summary(self) -> str:
@@ -66,7 +69,8 @@ class Flake:
 
     task_id: str
     rewards: tuple[float, ...]
-    repro: str
+    #: See :attr:`Exploit.repro_args`.
+    repro_args: str
 
     @property
     def spread(self) -> float:
