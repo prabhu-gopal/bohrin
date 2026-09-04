@@ -63,6 +63,23 @@ class Adapter(ABC):
         than an unhelpful "unknown format".
         """
 
+    def check_requirements(self) -> None:  # noqa: B027 - an optional hook, not an abstract one
+        """Raise :class:`MissingExtraError` if this adapter's extra is not installed.
+
+        Called *before* the isolation gate, and deliberately so. Both are refusals, but
+        only one of them is the user's real problem: without the extra the audit cannot run
+        at any isolation level, so leading with "start docker" sends someone to fix
+        something that will not help, and they discover the missing extra only on the
+        second attempt.
+
+        This must not import or execute the *taskset* — that is what the isolation gate
+        protects. Checking whether Bohrin's own optional dependency is importable is a
+        different act from running a stranger's reward function.
+
+        Deliberately concrete and empty: an adapter with no optional dependency should not
+        have to implement anything to say so.
+        """
+
     @abstractmethod
     def load(self, path: Path, config: ScanConfig) -> TaskSource:
         """Open ``path``. Raises :class:`MissingExtraError` if a required extra is absent."""

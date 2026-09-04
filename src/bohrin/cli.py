@@ -102,6 +102,11 @@ def _cmd_audit(args: argparse.Namespace, console: Console, err: Console) -> int:
         # comes immediately before load(), which imports the taskset package and therefore
         # runs its module-level code — that is the first moment foreign code executes.
         adapter = detect(path)
+        # Before the isolation gate: a missing extra blocks the audit at every isolation
+        # level, so leading with "start docker" sends the user to fix the wrong thing and
+        # they meet the real problem only on the second run. This imports nothing from the
+        # taskset — see Adapter.check_requirements.
+        adapter.check_requirements()
         require(isolation, unsafe_local=args.unsafe_local)
         config = ScanConfig(
             concurrency=args.concurrency or default_concurrency(),
