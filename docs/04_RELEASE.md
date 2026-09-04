@@ -84,6 +84,20 @@ and everything below is scoped to protect it.
 - Isolation detection with refusal; `docker` default
 - Fault-injection **and clean-fixture** test suites, both CI-enforced
 
+### What 1.0.0 got wrong about its own definition of done
+
+The sentence above says "reproducible evidence". 1.0.0 did not literally meet it: every
+finding printed `bohrin audit --task N --operator X`, and neither flag existed, so the
+command a reader would paste exited with `unrecognized arguments`. Two further first-run
+defects sat on the same path — a taskset that generates tasks forever hung the audit with
+no output instead of honouring `--max-tasks`, and a missing extra was reported *after* the
+isolation refusal, so the first thing a new user was told to fix could not have helped.
+
+All three are fixed in 1.0.1, and all three were found by running the published tool
+against real public environments rather than by the test suite. The definition of done was
+right; the check that it had been met was missing. Every one now has a test that would
+have caught it.
+
 ### Explicitly out of scope for 1.0.0
 
 - HTML report — `--json` and the terminal carry 1.0.0
