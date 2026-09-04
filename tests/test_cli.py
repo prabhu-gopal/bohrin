@@ -43,7 +43,11 @@ def test_a_missing_path_is_a_message_not_a_traceback(capsys: pytest.CaptureFixtu
     assert captured.out == "", "a failed audit produces no findings on stdout"
     assert "error" in captured.err
     assert "Traceback" not in captured.err
-    assert "adapter" in captured.err.lower(), "the error should name what is installed"
+    # The extras hint belongs on a path that exists in an unrecognised format — see
+    # test_unknown_format_names_the_verifiers_extra. Offering it here would answer a
+    # mistyped path with advice to install something, which is the wrong problem.
+    assert "no such file or directory" in captured.err.lower()
+    assert "pip install" not in captured.err
 
 
 def test_unknown_format_names_the_verifiers_extra(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

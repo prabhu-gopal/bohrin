@@ -28,7 +28,14 @@ def detect(path: Path, adapters: list[Adapter] | None = None) -> Adapter:
 
     Raises :class:`UnknownFormatError` naming what is installed, because "unknown format"
     without that list gives the user nothing to act on.
+
+    A path that does not exist is reported as such first. Every adapter's ``detect``
+    returns 0.0 for it, so it would otherwise be indistinguishable from a real directory
+    in an unsupported format — and a mistyped path would be answered with advice about
+    installing extras, sending the user to fix the wrong problem.
     """
+    if not path.exists():
+        raise UnknownFormatError(f"no such file or directory: {str(path)!r}")
     candidates = adapters if adapters is not None else discover()
     scored = [(a.detect(path), a) for a in candidates]
     scored.sort(key=lambda pair: pair[0], reverse=True)

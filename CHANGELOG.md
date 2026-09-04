@@ -23,6 +23,13 @@ any `--json` output. It changes only when the serialized report shape changes.
   still marked infinite after any `--max-tasks` bound is now refused with a message naming
   the flag, because hanging with no output is the worst way for an audit to fail.
 
+### Fixed
+
+- **A path that does not exist now says so.** Every adapter's `detect` returns 0.0 for a
+  missing path, so a mistyped path was indistinguishable from a real directory in an
+  unsupported format and was answered with advice about installing extras — sending the
+  user to fix a problem they did not have.
+
 ### Known limitations
 
 - **Recall on real environments is bounded by the six open operators, and that is visible
