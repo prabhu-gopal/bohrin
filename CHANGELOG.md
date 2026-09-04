@@ -22,9 +22,6 @@ any `--json` output. It changes only when the serialized report shape changes.
   audited without it, which is not the task the customer runs. As a backstop, a taskset
   still marked infinite after any `--max-tasks` bound is now refused with a message naming
   the flag, because hanging with no output is the worst way for an audit to fail.
-
-### Fixed
-
 - **The reproduction command printed on every finding now runs.** It named `--task` and
   `--operator`, neither of which existed, and omitted the taskset path — so the first
   thing a reader would do with a finding was paste a command that exits with
