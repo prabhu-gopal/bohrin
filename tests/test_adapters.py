@@ -28,6 +28,21 @@ def test_an_unrecognised_directory_names_what_is_installed(tmp_path: Path) -> No
         detect(tmp_path)
 
 
+def test_a_missing_path_says_so_instead_of_advising_an_install(tmp_path: Path) -> None:
+    """A mistyped path must not be answered with advice about installing extras.
+
+    Every adapter's `detect` returns 0.0 for a path that is not there, so without an
+    explicit check a typo is indistinguishable from an unsupported format — and the user
+    is sent to fix the wrong problem.
+    """
+    missing = tmp_path / "definitely-not-here"
+
+    with pytest.raises(UnknownFormatError, match="no such file or directory") as excinfo:
+        detect(missing)
+
+    assert "pip install" not in str(excinfo.value), "a missing path is not an extras problem"
+
+
 def test_memory_source_satisfies_the_task_source_protocol() -> None:
     source = MemorySource([Task(id="t", prompt="p")], lambda _t, _p: 1.0)
     assert isinstance(source, TaskSource)

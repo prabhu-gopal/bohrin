@@ -21,9 +21,58 @@ environment.
 
 **Fixed:** candidates whose payload is identical after stripping are submitted once.
 
+### The taskset was read through the wrong hook
+
+The adapter called `Taskset.load()`. Upstream is explicit that `load` is the subclass hook
+that *builds* tasks, and that `__iter__` is the read path — `head`/`shuffle` views and the
+config-layer system prompt are applied there. Calling `load` directly discarded both.
+
+The loud symptom was that `--max-tasks` stopped bounding anything, so auditing
+`color_codeword` — an `INFINITE` taskset — ran past ten minutes with no output and growing
+memory, because the probes materialise the task list before scoring. The quiet symptom was
+worse: a taskset configured with a system prompt was audited without it, which is a
+different task from the one the customer runs, and nothing in the report said so.
+
+**Fixed:** the adapter iterates the taskset, and a taskset still marked infinite after any
+`--max-tasks` bound is refused with a message naming the flag.
+
+The reasoning that generalises: **when integrating a library, the hook you override is
+rarely the entry point you call.** This was found by running the tool against a real
+environment, not by the test suite — the seventh defect in this project found that way and
+the first that could not fail, only hang.
+
 ---
 
 ## Open — ranked by how likely they are to matter
+
+### 0. Recall is bounded by six fixed operators, and now measurably so
+
+The open probes carry six deterministic, model-free operators. A sweep of six `verifiers`
+v1 environments puts a number on what that buys:
+
+| Environment | Result |
+|---|---|
+| `scratchpad` | **gap 50/100** — 8 of 8 tasks accept a prompt echo |
+| `glossary` | 0/100 at full coverage |
+| `proposer_solver` | 0/100 at full coverage |
+| `color_codeword` | 0/100 at full coverage |
+| `reverse_text` | weak_oracle declined — no rendering of the reference passes its own verifier |
+| `gsm8k` | not measured — the reward needs a runtime |
+
+One defect found, zero false accusations. But two of the three clean results are a limit of
+the operators, not a verdict on the grader: `glossary` scores `answer.lower() in reply`, and
+`proposer_solver` scores on the last integer in the reply. Both accept submissions that are
+obviously not solutions; no fixed operator here constructs one.
+
+The single hit is instructive about *why* it hit. `scratchpad` grades `self.data.word in
+answer` while its own prompt contains `word="alpha"`, so `identity_return` — echo the
+prompt — lands. It was found by an operator that ignores the reference entirely, on a task
+where no reference was even discovered (`word` is not in the recognised names, see §4).
+The yield came from a structural operator, not a differential one.
+
+**Fix:** this is the boundary the proprietary attack engine is for — verifier-aware,
+model-generated payloads. What the open core owes in the meantime is to state the boundary,
+which `README.md` now does.
 
 ### 1. Harness disruption is discarded, not reported
 
@@ -67,6 +116,11 @@ base rate is unknown."*
 Bohrin's clean-fixture test proves zero false accusations **on a fixture we wrote**. That is
 a guard against regression, not a measurement of the real rate.
 
+The sweep in §0 adds the first real-environment evidence: zero false accusations across six
+environments. Six is not a rate. It is worth recording because it is the first time the
+precision machinery ran against code nobody here wrote, and worth discounting because a
+sample that size would not detect a 10% false-positive rate with any confidence.
+
 **Fix:** the public sweep. Audit real Hub environments, hand-check a random sample of
 findings, and publish the measured false-positive rate alongside the index. Until then no
 accuracy claim should be made.
@@ -81,8 +135,18 @@ possible, so the task is probed by structural operators alone. This is reported,
 hidden — but it means yield varies with a taskset's naming conventions rather than with
 its actual quality.
 
+The sweep in §0 is the first data on this, and it goes against the assumption. `scratchpad`
+stores its reference under `word`, which is not a recognised name, so all 8 tasks were
+probed with structural operators alone — and that is exactly where the one real finding came
+from. `reverse_text` shows the opposite edge: a reference *was* found, but the verifier
+wants it inside `<reversed_text>` tags, so no rendering passed and the whole taskset became
+unmeasurable for `weak_oracle`. A reference discovered by name is neither necessary for a
+finding nor sufficient for a baseline.
+
 **Fix:** measure how often a reference is found across real Hub environments before
-investing further. If it is rare, the differential operators matter far less than assumed.
+investing further. On the evidence so far the differential operators may matter less than
+assumed, and a baseline that can learn the required *presentation* from the task prompt
+would unlock more than more operators would.
 
 ### 5. Determinism cannot see rare flakiness
 
