@@ -245,3 +245,82 @@ def test_unmeasured_tasks_are_visible_in_the_terminal() -> None:
     assert "could not be measured" in out
     assert "99" in out
     assert "excluded from its score" in out
+
+
+# ------------------------------------------------------------------------- the read path
+
+
+class _CountingTaskset(vf.Taskset[_OfflineTask, vf.TasksetConfig]):
+    """Yields tasks forever, and records how many were actually built."""
+
+    INFINITE = True
+
+    def __init__(self, config: vf.TasksetConfig) -> None:
+        super().__init__(config)
+        self.built = 0
+
+    def load(self) -> Any:
+        while True:
+            yield _OfflineTask(_Data(idx=self.built, prompt="p"), self.config.task)
+            self.built += 1
+
+
+def _source_over(taskset: Any) -> Any:
+    from bohrin.adapters.verifiers_v1 import _VerifiersSource
+
+    source = object.__new__(_VerifiersSource)
+    source._vf = vf
+    source._id = "test"
+    source._config = ScanConfig()
+    source._taskset = taskset
+    source._by_id = {}
+    return source
+
+
+def test_max_tasks_actually_bounds_an_infinite_taskset() -> None:
+    """`head` lives on the iteration path, so the adapter must iterate, not call `load`.
+
+    Upstream is explicit that `load` is the subclass hook and `__iter__` is the read path:
+    `head`/`shuffle` views and the config-layer system prompt are applied there. Calling
+    `load()` directly discards the bound, and because the probes materialise the task list
+    before scoring, an infinite taskset then hangs the audit forever with no output. That
+    is exactly what a real environment (`color_codeword`) did.
+    """
+    taskset = _CountingTaskset(vf.TasksetConfig(id="test")).head(3)
+
+    tasks = list(_source_over(taskset).tasks())
+
+    assert len(tasks) == 3, "--max-tasks must bound the audit, not be silently discarded"
+
+
+def test_the_configured_system_prompt_reaches_the_audited_task(tmp_path: Path) -> None:
+    """Auditing a task without its system prompt audits a task that never runs.
+
+    The config-layer system prompt is applied on the iteration path, so this is the second
+    thing `load()` discarded. It reaches the verifier through the upstream task object the
+    source keeps for scoring — not through Bohrin's own `Task.prompt`, which carries the
+    task prompt an operator echoes.
+    """
+    prompt_file = tmp_path / "system.txt"
+    prompt_file.write_text("You are being audited.", encoding="utf-8")
+
+    taskset = _CountingTaskset(vf.TasksetConfig(id="test", system_prompt=prompt_file)).head(1)
+    source = _source_over(taskset)
+    (task,) = source.tasks()
+
+    scored = source._by_id[task.id]
+    assert scored.data.system_prompt == "You are being audited."
+
+
+def test_an_unbounded_infinite_taskset_is_refused_not_hung() -> None:
+    """Hanging with no output is the worst way for an audit to fail."""
+    from bohrin.adapters.base import MissingExtraError
+    from bohrin.adapters.verifiers_v1 import _require_bounded
+
+    unbounded = _CountingTaskset(vf.TasksetConfig(id="test"))
+
+    with pytest.raises(MissingExtraError, match="infinite"):
+        _require_bounded(unbounded, "test")
+
+    _require_bounded(unbounded.head(3), "test")  # bounded: no complaint
+    assert unbounded.built == 0, "the guard must not build a single task to decide"
