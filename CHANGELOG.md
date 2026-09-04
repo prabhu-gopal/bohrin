@@ -32,10 +32,13 @@ any `--json` output. It changes only when the serialized report shape changes.
   tool — 8 of 8 tasks, gap 50/100, confirmed independently through `verifiers` with Bohrin
   out of the loop. The environment's docstring cites a mean reward of 1.0 as evidence that
   per-rollout isolation works; that evidence does not hold, since 1.0 is reachable without
-  touching the server. Against the other five the operators reported nothing: `glossary`
-  and `deepwiki` grade by substring containment and `proposer_solver` by the last integer
-  in the reply, all plainly weak, but no model-free operator here constructs a payload that
-  exercises them. No false accusation was made in any run.
+  touching the server. Of the other five, three measured clean at full coverage and two
+  were declined rather than reported clean (`gsm8k` needs a runtime; `reverse_text`'s
+  reference fails its own verifier). Two of those three "clean" results are a limit of the
+  operators rather than a verdict on the grader: `glossary` grades by substring containment
+  and `proposer_solver` by the last integer in the reply, both exploitable, but no
+  model-free operator here constructs the payload that does it. No false accusation was
+  made in any run.
 
 ## [1.0.0] — 2026-09-02
 
