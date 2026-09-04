@@ -9,6 +9,12 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-09-05
+
+A correctness and first-run release. Every item below was found by running 1.0.0 against
+real public `verifiers` environments, not by the test suite — which is itself the finding
+worth recording.
+
 ### Fixed
 
 - **`--max-tasks` now actually bounds an audit, and an infinite taskset is refused rather
@@ -139,5 +145,6 @@ sweep measures one. No accuracy claim is made in the meantime.
   yanked and point users at `adduct`; the verifier auditor starts at 1.0.0, so that the
   discontinuity reads as a break rather than an upgrade.
 
-[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/prabhu-gopal/bohrin/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/prabhu-gopal/bohrin/releases/tag/v1.0.0
