@@ -9,6 +9,34 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--max-tasks` now actually bounds an audit, and an infinite taskset is refused rather
+  than hung.** The adapter read tasks by calling `Taskset.load()`, which is the subclass
+  hook that *builds* tasks; upstream applies `head`/`shuffle` views and the config-layer
+  system prompt on the iteration path instead. Calling `load()` discarded both. The visible
+  cost was severe: auditing `color_codeword` — an `INFINITE` taskset in the `verifiers`
+  repo — ran past ten minutes with no output and growing memory, because the probes
+  materialise the task list before scoring. The same run now completes in 10.5 seconds at
+  full coverage. The quieter cost was worse: a taskset configured with a system prompt was
+  audited without it, which is not the task the customer runs. As a backstop, a taskset
+  still marked infinite after any `--max-tasks` bound is now refused with a message naming
+  the flag, because hanging with no output is the worst way for an audit to fail.
+
+### Known limitations
+
+- **Recall on real environments is bounded by the six open operators, and that is visible
+  in the numbers.** Auditing six `verifiers` v1 environments found one real defect:
+  `scratchpad` scores with `self.data.word in answer` while its own prompt contains
+  `word="alpha"`, so echoing the prompt back scores full marks without ever calling the
+  tool — 8 of 8 tasks, gap 50/100, confirmed independently through `verifiers` with Bohrin
+  out of the loop. The environment's docstring cites a mean reward of 1.0 as evidence that
+  per-rollout isolation works; that evidence does not hold, since 1.0 is reachable without
+  touching the server. Against the other five the operators reported nothing: `glossary`
+  and `deepwiki` grade by substring containment and `proposer_solver` by the last integer
+  in the reply, all plainly weak, but no model-free operator here constructs a payload that
+  exercises them. No false accusation was made in any run.
+
 ## [1.0.0] — 2026-09-02
 
 The first release of Bohrin as a verifier auditor.

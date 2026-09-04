@@ -21,6 +21,13 @@ award full offline marks to a submission that does nothing — and Bohrin would 
 false exploit against a verifier that is in fact correct.
 
 Such tasks are refused rather than half-scored. See :func:`_requires_runtime`.
+
+**The read path is `iter(taskset)`, not `taskset.load()`.** `load` is the subclass hook
+that builds tasks; iterating the taskset is what applies the config-layer system prompt
+and any `head`/`shuffle` view on top. Calling `load` directly silently discards both —
+``--max-tasks`` stops bounding anything, so an infinite taskset hangs the audit forever,
+and a taskset configured with a system prompt gets audited without it, which is a
+different task from the one that actually runs.
 """
 
 from __future__ import annotations
@@ -133,6 +140,21 @@ def _taskset_id(path: Path) -> str | None:
     return None
 
 
+def _require_bounded(taskset: Any, taskset_id: str) -> None:
+    """Refuse a taskset that generates tasks forever.
+
+    `head` clears ``INFINITE`` on the view it returns, so this runs after any
+    ``--max-tasks`` bound has been applied. The probes materialise the task list before
+    scoring, so an unbounded infinite taskset does not fail — it hangs with no output,
+    which is the worst way for a tool to be wrong.
+    """
+    if getattr(taskset, "INFINITE", False):
+        raise MissingExtraError(
+            f"taskset {taskset_id!r} is infinite — it generates tasks on demand, forever. "
+            f"Bound it with --max-tasks N to audit a prefix of it."
+        )
+
+
 class VerifiersV1Adapter(Adapter):
     """Reads a `verifiers` v1 taskset."""
 
@@ -187,12 +209,13 @@ class _VerifiersSource:
             ) from exc
         if config.max_tasks is not None:
             taskset = taskset.head(config.max_tasks)
+        _require_bounded(taskset, taskset_id)
         self._taskset = taskset
         #: Bohrin task id -> the upstream task object, populated by tasks().
         self._by_id: dict[str, Any] = {}
 
     def tasks(self) -> Iterator[Task]:
-        for index, vf_task in enumerate(self._taskset.load()):
+        for index, vf_task in enumerate(self._taskset):
             data = vf_task.data
             reward_fns = tuple(fn.__name__ for fn in vf_task.hooks("reward"))
             needs_runtime = tuple(fn.__name__ for fn in vf_task.hooks("reward") if _requires_runtime(fn))
