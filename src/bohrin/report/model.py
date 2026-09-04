@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import shlex
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from bohrin.execute.isolation import Assessment
+from bohrin.execute.isolation import Assessment, Isolation
 from bohrin.ir.evidence import Exploit, Flake
 from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.scoring.gap import GapScore
@@ -24,6 +26,20 @@ class Report:
     #: How the verifier's code was executed. Part of the evidence: a result produced with
     #: no boundary must never be mistaken for one produced inside a container.
     isolation: Assessment | None = None
+
+    def command_for(self, finding: Exploit | Flake) -> str:
+        """The command that re-runs exactly this finding.
+
+        A finding is evidence only if the reader can re-run it, so this must be
+        copy-pasteable as printed. The probe emits the selecting flags and knows nothing
+        else; the target and `--unsafe-local` are added here, where they are known — and
+        `--unsafe-local` is added only when the audit actually ran without a boundary,
+        because printing it otherwise would teach the reader to pass it by reflex.
+        """
+        parts = ["bohrin audit", shlex.quote(self.target), finding.repro_args]
+        if self.isolation is not None and self.isolation.effective is Isolation.NONE:
+            parts.append("--unsafe-local")
+        return " ".join(parts)
 
     @property
     def findings(self) -> int:
@@ -49,17 +65,17 @@ class Report:
                     "total": self.gap.coverage.total,
                 },
             },
-            "probes": [_probe_to_dict(r) for r in self.results],
+            "probes": [_probe_to_dict(r, self.command_for) for r in self.results],
         }
 
 
-def _probe_to_dict(result: ProbeResult) -> dict[str, Any]:
+def _probe_to_dict(result: ProbeResult, command_for: Callable[[Exploit | Flake], str]) -> dict[str, Any]:
     out: dict[str, Any] = {
         "id": result.probe_id,
         "status": result.status.value,
         "tasks_probed": result.tasks_probed,
         "sub_score": result.sub_score,
-        "findings": [_finding_to_dict(f) for f in result.findings],
+        "findings": [_finding_to_dict(f, command_for) for f in result.findings],
         "unverified": [
             {
                 "task_id": u.task_id,
@@ -76,7 +92,7 @@ def _probe_to_dict(result: ProbeResult) -> dict[str, Any]:
     return out
 
 
-def _finding_to_dict(finding: Exploit | Flake) -> dict[str, Any]:
+def _finding_to_dict(finding: Exploit | Flake, command_for: Callable[[Exploit | Flake], str]) -> dict[str, Any]:
     if isinstance(finding, Exploit):
         return {
             "kind": "exploit",
@@ -86,14 +102,14 @@ def _finding_to_dict(finding: Exploit | Flake) -> dict[str, Any]:
             "detail": finding.candidate.provenance.detail,
             "payload": finding.candidate.payload,
             "reward": finding.verdict.reward,
-            "repro": finding.repro,
+            "repro": command_for(finding),
         }
     return {
         "kind": "flake",
         "task_id": finding.task_id,
         "rewards": list(finding.rewards),
         "spread": finding.spread,
-        "repro": finding.repro,
+        "repro": command_for(finding),
     }
 
 

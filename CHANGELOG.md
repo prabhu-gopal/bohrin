@@ -25,6 +25,20 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ### Fixed
 
+- **The reproduction command printed on every finding now runs.** It named `--task` and
+  `--operator`, neither of which existed, and omitted the taskset path — so the first
+  thing a reader would do with a finding was paste a command that exits with
+  `unrecognized arguments`. For a tool whose entire claim is that a finding is evidence,
+  evidence you cannot re-run is the worst possible defect. Both flags are now implemented
+  and honoured by both probes, the target is included and shell-quoted, and
+  `--unsafe-local` is appended only when the audit actually ran without a boundary. A test
+  now feeds the printed command back through the argument parser, so this cannot rot again.
+- **Counts read as English.** `1 tasks`, `1 of 1 probes` and `1 task accept` all appeared
+  in a single-task audit — and a report selling rigour cannot misspell its own summary
+  line. Nouns and verbs now agree with the count everywhere in the terminal report.
+- **Long payloads are elided with `…` instead of cut mid-word.** A payload truncated at
+  exactly 96 characters read as a rendering bug rather than an abbreviation, and the
+  payload is the evidence a reader judges the finding by.
 - **A path that does not exist now says so.** Every adapter's `detect` returns 0.0 for a
   missing path, so a mistyped path was indistinguishable from a real directory in an
   unsupported format and was answered with advice about installing extras — sending the

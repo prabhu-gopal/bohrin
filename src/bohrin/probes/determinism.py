@@ -86,10 +86,20 @@ class DeterminismProbe(Probe):
 
     async def run(self, source: TaskSource, config: ScanConfig) -> ProbeResult:
         tasks = list(source.tasks())
+        if config.only_tasks:
+            tasks = [t for t in tasks if t.id in config.only_tasks]
         if config.max_tasks is not None:
             tasks = tasks[: config.max_tasks]
         if not tasks:
-            return ProbeResult(probe_id=self.id, status=ProbeStatus.NOT_APPLICABLE, reason="the taskset is empty")
+            return ProbeResult(
+                probe_id=self.id,
+                status=ProbeStatus.NOT_APPLICABLE,
+                reason=(
+                    f"no task matched --task {', '.join(sorted(config.only_tasks))}"
+                    if config.only_tasks
+                    else "the taskset is empty"
+                ),
+            )
         if config.repeats < 2:
             return ProbeResult(
                 probe_id=self.id,
@@ -120,7 +130,7 @@ class DeterminismProbe(Probe):
                     Flake(
                         task_id=task.id,
                         rewards=tuple(seen),
-                        repro=f"bohrin audit --task {task.id} --probe determinism --repeats {config.repeats}",
+                        repro_args=f"--task {task.id} --probe determinism --repeats {config.repeats}",
                     )
                 )
 

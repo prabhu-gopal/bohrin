@@ -66,18 +66,34 @@ class WeakOracleProbe(Probe):
 
     async def run(self, source: TaskSource, config: ScanConfig) -> ProbeResult:
         operators = discover_operators()
+        if config.only_operators:
+            operators = [op for op in operators if op.id in config.only_operators]
         if not operators:
             return ProbeResult(
                 probe_id=self.id,
                 status=ProbeStatus.NOT_APPLICABLE,
-                reason="no mutation operators are registered",
+                reason=(
+                    f"no operator matched --operator {', '.join(sorted(config.only_operators))}"
+                    if config.only_operators
+                    else "no mutation operators are registered"
+                ),
             )
 
         tasks = list(source.tasks())
+        if config.only_tasks:
+            tasks = [t for t in tasks if t.id in config.only_tasks]
         if config.max_tasks is not None:
             tasks = tasks[: config.max_tasks]
         if not tasks:
-            return ProbeResult(probe_id=self.id, status=ProbeStatus.NOT_APPLICABLE, reason="the taskset is empty")
+            return ProbeResult(
+                probe_id=self.id,
+                status=ProbeStatus.NOT_APPLICABLE,
+                reason=(
+                    f"no task matched --task {', '.join(sorted(config.only_tasks))}"
+                    if config.only_tasks
+                    else "the taskset is empty"
+                ),
+            )
 
         # Tasks the adapter has already declared unscoreable offline are excluded up front
         # rather than discovered through one failure per candidate. Cheaper, and the reason
@@ -282,9 +298,11 @@ class WeakOracleProbe(Probe):
                 continue
             seen.add(key)
 
-            repro = f"bohrin audit --task {out.task.id} --operator {out.candidate.provenance.operator}"
+            repro_args = f"--task {out.task.id} --operator {out.candidate.provenance.operator}"
             if out.candidate.known_wrong:
-                findings.append(Exploit(task_id=out.task.id, candidate=out.candidate, verdict=verdict, repro=repro))
+                findings.append(
+                    Exploit(task_id=out.task.id, candidate=out.candidate, verdict=verdict, repro_args=repro_args)
+                )
             else:
                 unverified.append(
                     Unverified(

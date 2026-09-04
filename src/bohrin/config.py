@@ -94,6 +94,14 @@ class ScanConfig:
     #: Probe ids to run. Empty means "every discovered probe not in DEFAULT_EXCLUDED".
     only: frozenset[str] = field(default_factory=frozenset)
 
+    #: Task ids to probe. Empty means every task. This is what makes the `repro` command
+    #: on a finding runnable: a finding is evidence only if the customer can re-run just
+    #: that finding, without waiting for a whole audit to reproduce one line of it.
+    only_tasks: frozenset[str] = field(default_factory=frozenset)
+
+    #: Mutation operator ids to apply. Empty means every registered operator.
+    only_operators: frozenset[str] = field(default_factory=frozenset)
+
     #: Run every probe including those held back from a default audit.
     all_probes: bool = False
 

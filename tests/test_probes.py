@@ -39,7 +39,7 @@ async def test_every_reported_exploit_carries_a_wrongness_ground() -> None:
         assert isinstance(finding, Exploit)
         assert finding.candidate.known_wrong
         assert finding.candidate.ground is not None
-        assert finding.repro
+        assert finding.repro_args
 
 
 # --------------------------------------------------------------- weak oracle: precision

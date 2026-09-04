@@ -38,12 +38,14 @@ verifiers_v1 · 8 tasks · 2 probes · isolation: none
   EXPLOIT ▸ 0: accepted identity_return (reward 1)
            echoes the prompt verbatim instead of answering
            submitted: Call the `scratchpad_roundtrip` tool with word="alpha". It
-returns a single word. Then reply wit
-           bohrin audit --task 0 --operator identity_return
+returns a single word. Then reply wi…
+           bohrin audit environments/scratchpad --task 0 --operator
+identity_return --unsafe-local
 ```
 
 Every finding carries the candidate that passed, why it is wrong, and a command
-to reproduce it.
+to reproduce it. That last line is copy-pasteable: running it re-runs exactly
+that one finding, against that one task, with that one operator.
 
 ### What that finding means
 
