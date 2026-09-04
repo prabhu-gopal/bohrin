@@ -30,6 +30,12 @@ any `--json` output. It changes only when the serialized report shape changes.
   and honoured by both probes, the target is included and shell-quoted, and
   `--unsafe-local` is appended only when the audit actually ran without a boundary. A test
   now feeds the printed command back through the argument parser, so this cannot rot again.
+- **A missing extra is reported before the isolation refusal.** Auditing a `verifiers`
+  taskset without `bohrin[verifiers]` installed answered with "refusing to execute verifier
+  code with no isolation — start docker", so the user fixed Docker, re-ran, and only then
+  learned they needed the extra. Without the extra the audit cannot run at *any* isolation
+  level. The check is a new `Adapter.check_requirements` hook that runs before the gate and
+  deliberately imports nothing from the taskset — the isolation boundary is unchanged.
 - **Counts read as English.** `1 tasks`, `1 of 1 probes` and `1 task accept` all appeared
   in a single-task audit — and a report selling rigour cannot misspell its own summary
   line. Nouns and verbs now agree with the count everywhere in the terminal report.

@@ -172,11 +172,14 @@ class VerifiersV1Adapter(Adapter):
             return 0.95 if _taskset_id(path) else 0.7
         return 0.0
 
-    def load(self, path: Path, config: ScanConfig) -> TaskSource:
+    def check_requirements(self) -> None:
         if not _available():
             raise MissingExtraError(
                 "this looks like a verifiers taskset; reading it requires: pip install 'bohrin[verifiers]'"
             )
+
+    def load(self, path: Path, config: ScanConfig) -> TaskSource:
+        self.check_requirements()
         taskset_id = _taskset_id(path)
         if taskset_id is None:
             raise MissingExtraError(

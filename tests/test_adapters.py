@@ -46,3 +46,44 @@ def test_a_missing_path_says_so_instead_of_advising_an_install(tmp_path: Path) -
 def test_memory_source_satisfies_the_task_source_protocol() -> None:
     source = MemorySource([Task(id="t", prompt="p")], lambda _t, _p: 1.0)
     assert isinstance(source, TaskSource)
+
+
+def test_a_missing_extra_is_reported_before_the_isolation_refusal(tmp_path: Path) -> None:
+    """Both are refusals; only one is the user's actual problem.
+
+    Without the extra the audit cannot run at *any* isolation level, so leading with
+    "start docker" costs the user a round trip to fix something that will not help.
+    """
+    from bohrin.adapters.base import Adapter, MissingExtraError
+
+    class _NeedsExtra(Adapter):
+        name = "needs_extra"
+
+        def detect(self, path: Path) -> float:
+            return 1.0
+
+        def check_requirements(self) -> None:
+            raise MissingExtraError("install the thing")
+
+        def load(self, path: Path, config: object) -> TaskSource:  # pragma: no cover
+            raise AssertionError("load must not be reached when the extra is missing")
+
+    adapter = _NeedsExtra()
+    with pytest.raises(MissingExtraError, match="install the thing"):
+        adapter.check_requirements()
+
+
+def test_check_requirements_defaults_to_permitting(tmp_path: Path) -> None:
+    """An adapter with no optional dependency should not have to implement anything."""
+    from bohrin.adapters.base import Adapter
+
+    class _NoExtras(Adapter):
+        name = "no_extras"
+
+        def detect(self, path: Path) -> float:
+            return 1.0
+
+        def load(self, path: Path, config: object) -> TaskSource:  # pragma: no cover
+            raise AssertionError("not called")
+
+    _NoExtras().check_requirements()  # must not raise
