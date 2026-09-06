@@ -123,15 +123,22 @@ a separate advisory section of the report.
 Deterministic, no model inference, therefore fast and reproducible. Each is
 tagged with the wrongness ground it can establish.
 
-| Operator | Mutation | Ground |
+Six are registered today (`pyproject.toml` `[project.entry-points."bohrin.mutators"]`):
+
+| Operator | Submission it produces | Ground |
 |---|---|---|
-| `constant_return` | Replace body with `return <literal>` | Structural |
-| `empty_body` | Replace body with `pass` / no-op | Structural |
-| `drop_side_effect` | Remove the persistence/write, keep the return | Structural |
-| `negate_condition` | Invert a branch predicate | Differential |
-| `off_by_one` | Perturb a boundary by ±1 | Differential |
-| `swap_operator` | `<`↔`<=`, `+`↔`-`, `and`↔`or` | Differential |
-| `identity_return` | Echo the input unchanged | Structural |
+| `empty_body` | an empty reply, and a whitespace-only reply | Structural |
+| `identity_return` | the task prompt, echoed back verbatim | Structural |
+| `refusal` | `"I cannot complete this task."` | Structural |
+| `constant_return` | a fixed literal (`0`, `1`, `True`, `None`, `[]`, `""`), skipping any that equals the reference | Differential |
+| `drop_side_effect` | the reference code with every function body replaced by `pass` (LibCST) | Structural |
+| `negate_condition` | the reference code with every `if` predicate negated (LibCST) | Differential |
+
+Two more are named in `pyproject.toml` comments but **deliberately not yet registered** —
+`off_by_one` (perturb a boundary by ±1) and `swap_operator` (`<`↔`<=`, `+`↔`-`, `and`↔`or`).
+Both need an executable differential comparison to establish wrongness honestly; until that
+lands they could only emit leads, not findings, and a registered operator that cannot
+establish a ground is a false-accusation risk.
 
 `drop_side_effect` is the highest-yield operator in this domain and deserves
 comment: a reward function that checks a return value but never inspects the
@@ -147,7 +154,7 @@ That gap is honest, durable, and requires no crippling of the open code.
 ### Performance
 
 Scoring calls the reward function directly on a constructed `Trace` — no agent,
-no rollout. Cost is one reward invocation per admissible mutant. With ~7
+no rollout. Cost is one reward invocation per admissible mutant. With six
 operators over 40 tasks that is a few hundred cheap async calls, run concurrently
 with a bounded semaphore. A first audit completes in seconds.
 
@@ -277,12 +284,13 @@ class Probe(ABC):
 @dataclass(frozen=True, slots=True)
 class ProbeResult:
     probe_id: str
-    status: Literal["ok", "not_applicable", "error"]
-    sub_score: float | None  # None unless status == "ok"
-    exploits: tuple[Exploit, ...]
-    unverified: tuple[Candidate, ...]  # leads, never scored
-    tasks_probed: int
-    detail: Mapping[str, Any]
+    status: ProbeStatus  # OK | NOT_APPLICABLE | ERROR
+    tasks_probed: int = 0
+    sub_score: float | None = None  # None unless status is OK
+    findings: tuple[Finding, ...] = ()  # Exploit | Flake
+    unverified: tuple[Unverified, ...] = ()  # leads, never scored
+    reason: str = ""  # populated when status is not OK
+    detail: Mapping[str, Any] = field(default_factory=dict)
 ```
 
 `status` is not cosmetic. `not_applicable` and `error` are excluded from the gap

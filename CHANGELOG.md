@@ -9,6 +9,28 @@ any `--json` output. It changes only when the serialized report shape changes.
 
 ## [Unreleased]
 
+### Changed
+
+- **`pyyaml` is no longer a declared dependency.** It was listed for a `bohrin.yaml`
+  config file that was never implemented, so nothing in `src/bohrin/` imported it — which
+  breaks this project's own rule that every declared dependency is imported by a line of
+  code. A per-project config file can be added later when a user asks for one; the
+  dependency comes back with it. `types-PyYAML` is dropped from the dev extra for the same
+  reason. No runtime behaviour changes.
+
+### Fixed
+
+- **Documentation now matches the code.** `execute/runner.py` claimed a Python 3.10 floor
+  (the floor is 3.11) and attributed the `gather`-over-`TaskGroup` choice to that; the real
+  reason — `TaskGroup` cancels every sibling when one task raises, which would abandon an
+  audit over a single hung verifier — is now in the docstring. `docs/01_ARCHITECTURE.md`
+  referenced `report/html.py` and `report/json_out.py` (neither exists) and showed core
+  types that had drifted from `ir/task.py`. `docs/03_PROBES.md` listed seven mutation
+  operators including two (`off_by_one`, `swap_operator`) that are deliberately unregistered
+  pending the differential comparator, and omitted `refusal`, which ships. `CONTRIBUTING.md`
+  named Python 3.10 as supported. None of these changed behaviour; all of them would have
+  been found by a reader comparing a doc against the source.
+
 ## [1.0.1] — 2026-09-05
 
 A correctness and first-run release. Every item below was found by running 1.0.0 against
