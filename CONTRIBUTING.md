@@ -15,7 +15,7 @@ plenty.
 
 ## Setup
 
-Bohrin uses [uv](https://docs.astral.sh/uv/). Python 3.10–3.13 are supported.
+Bohrin uses [uv](https://docs.astral.sh/uv/). Python 3.11–3.13 are supported.
 
 ```bash
 git clone https://github.com/prabhu-gopal/bohrin

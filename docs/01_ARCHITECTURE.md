@@ -12,7 +12,7 @@ bohrin/
 │   ├── version.py            # __version__ + REPORT_SCHEMA_VERSION
 │   ├── cli.py                # argparse; audit / list-probes / explain
 │   ├── _plugins.py           # entry-point discovery — no privileged path
-│   ├── config.py             # ScanConfig; bohrin.yaml
+│   ├── config.py             # ScanConfig
 │   │
 │   ├── ir/                   # what a probe sees
 │   │   ├── task.py           # Task, Candidate, Verdict
@@ -41,8 +41,8 @@ bohrin/
 │   │   └── gap.py            # Verification Gap + coverage
 │   │
 │   └── report/
-│       ├── model.py          # Report — the versioned contract
-│       ├── tty.py │ html.py │ json_out.py
+│       ├── model.py          # Report — the versioned contract + to_dict() for --json
+│       ├── tty.py            # terminal renderer (html renderer deferred, see 04_RELEASE.md)
 │
 ├── tests/                    # mirrors src/bohrin/
 ├── docs/
@@ -62,9 +62,9 @@ class Task:
 
     id: str
     prompt: str
-    reference: Solution | None  # known-good, when the taskset provides one
-    reward_fns: tuple[str, ...]  # named criteria the verifier scores
-    metadata: Mapping[str, Any]
+    reference: str | None = None  # known-good answer text, when the taskset provides one
+    reward_fns: tuple[str, ...] = ()  # named criteria the verifier scores
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +73,11 @@ class Candidate:
 
     payload: str
     provenance: Provenance  # which operator produced it, from what
-    known_wrong: bool  # only True when independently established
+    ground: Ground | None = None  # how wrongness was established, or None if it was not
+
+    @property
+    def known_wrong(self) -> bool:  # True iff ground is not None
+        return self.ground is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,14 +85,15 @@ class Verdict:
     """What the verifier said."""
 
     reward: float
-    per_fn: Mapping[str, float]
     passed: bool
-    raw: Mapping[str, Any]
+    per_fn: Mapping[str, float] = field(default_factory=dict)
+    raw: Mapping[str, Any] = field(default_factory=dict)
 ```
 
-`known_wrong` is the load-bearing field. A `Candidate` may only set it when
+`ground` is the load-bearing field. A `Candidate` carries one only when its
 incorrectness has been established independently of the verifier under audit
-— see [03_PROBES.md](03_PROBES.md#establishing-wrongness). An exploit is
+(`Ground.STRUCTURAL` / `DIFFERENTIAL` / `INVARIANT`) — see
+[03_PROBES.md](03_PROBES.md#establishing-wrongness). An exploit is
 `known_wrong and passed`, and nothing else counts.
 
 ## The plugin seam

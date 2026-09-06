@@ -3,13 +3,13 @@
 Every probe routes its reward invocations through here so there is exactly one place that
 decides concurrency, timeouts and failure handling.
 
-**Python 3.10 is the supported floor**, and that constrains the implementation. The
-ergonomic APIs are both 3.11+:
-
-* ``asyncio.TaskGroup``  → replaced by ``asyncio.gather``
-* ``asyncio.timeout()``  → replaced by ``asyncio.wait_for``
-
-Using either would pass on a 3.13 laptop and fail the 3.10 job in CI.
+``asyncio.gather(..., return_exceptions=True)`` is used rather than ``asyncio.TaskGroup``
+on purpose, and not for a version reason — the floor is 3.11, where both exist.
+``TaskGroup`` cancels every sibling the moment one child raises: correct for subtasks that
+only make sense together, wrong for an audit, where one task whose verifier hangs must not
+abandon the other thirty-nine. ``gather`` with ``return_exceptions=True`` gives per-item
+failure capture, which is what an audit needs. Timeouts use ``asyncio.wait_for`` for the
+same per-item-isolation reason.
 """
 
 from __future__ import annotations
