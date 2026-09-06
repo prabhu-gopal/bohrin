@@ -67,7 +67,14 @@ plugins use. There is no privileged path for built-ins.
 - **Write a test that fails before your change and passes after.** For a bug fix, the test
   should encode the bug, not just the fix.
 - **Explain the *why* in comments, not the *what*.** The code says what it does.
-- **Update `CHANGELOG.md`** under `## [Unreleased]` for anything user-visible.
+- **Document anything user-visible, in the same PR**, in two places:
+  - `CHANGELOG.md` under `## [Unreleased]` — the terse, canonical entry.
+  - `docs/releases/unreleased.md` — the narrative version that feeds the website's
+    changelog page. Usually the same wording, expanded by a sentence or two of
+    context. See [`docs/releases/README.md`](docs/releases/README.md) for the format.
+
+  A PR that only touches internal scaffolding (CI, tests, a refactor with no
+  observable effect) needs neither. When in doubt, add both.
 
 ## Sign your commits (DCO)
 

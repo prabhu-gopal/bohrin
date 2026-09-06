@@ -7,7 +7,20 @@ All notable changes to this project are documented here. The format follows
 The **report schema** is versioned separately from the package — see `schema_version` in
 any `--json` output. It changes only when the serialized report shape changes.
 
+For the narrative, user-facing version of each release — with upgrade impact and context —
+see [`docs/releases/`](docs/releases/), which is what the website's changelog page is built
+from. The entries below are the terse canonical record.
+
 ## [Unreleased]
+
+### Added
+
+- **`docs/releases/` — one narrative release note per version**, with YAML frontmatter,
+  written for people who use Bohrin rather than people reading the source. The website's
+  changelog page is built from this folder; `CHANGELOG.md` stays the terse canonical
+  record. `docs/releases/README.md` documents the format and the per-PR process, and
+  `CONTRIBUTING.md` now asks contributors to update `docs/releases/unreleased.md` alongside
+  their changelog entry.
 
 ### Changed
 
