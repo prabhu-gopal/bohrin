@@ -25,6 +25,12 @@ at the repo root. The website's changelog page is built from that folder.
 [`releases/README.md`](releases/README.md) explains the format and the process
 for keeping it current.
 
+## Building the website from this folder
+
+[`WEBSITE.md`](WEBSITE.md) is the handoff spec for whoever builds the docs site:
+where the content lives, the sidebar structure, the frontmatter contract, how
+the changelog page behaves, and what triggers a rebuild.
+
 ## The one rule that governs every design decision here
 
 > **Bohrin must never falsely accuse a verifier.**

@@ -47,6 +47,9 @@ folder (per-release notes for the website) is introduced.
 - **`docs/releases/`** — one Markdown file per released version, written for
   people who use Bohrin, feeding the website's changelog page. See
   [`docs/releases/README.md`](./README.md) for the format and the process.
+- **`docs/WEBSITE.md`** — the handoff spec for the team building the docs site:
+  where the content lives, the sidebar structure, the frontmatter contract, the
+  changelog page behaviour, and the rebuild triggers.
 
 ## Verified
 

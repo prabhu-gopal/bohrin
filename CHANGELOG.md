@@ -21,6 +21,9 @@ from. The entries below are the terse canonical record.
   record. `docs/releases/README.md` documents the format and the per-PR process, and
   `CONTRIBUTING.md` now asks contributors to update `docs/releases/unreleased.md` alongside
   their changelog entry.
+- **`docs/WEBSITE.md`** — the content handoff for the team building the documentation site:
+  content location, sidebar/IA, the frontmatter contract, changelog-page behaviour, and
+  the rebuild triggers.
 
 ### Changed
 
