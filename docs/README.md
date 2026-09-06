@@ -17,6 +17,14 @@ to be read before the code exists, and to be argued with.
 | [04_RELEASE.md](04_RELEASE.md) | What is released, what is withheld, and what 1.0.0 shipped |
 | [05_ROBUSTNESS.md](05_ROBUSTNESS.md) | Known weaknesses, ranked, with the evidence behind each |
 
+## Release notes
+
+[`releases/`](releases/) holds one Markdown file per released version — the
+narrative, user-facing companion to the terse [`CHANGELOG.md`](../CHANGELOG.md)
+at the repo root. The website's changelog page is built from that folder.
+[`releases/README.md`](releases/README.md) explains the format and the process
+for keeping it current.
+
 ## The one rule that governs every design decision here
 
 > **Bohrin must never falsely accuse a verifier.**
