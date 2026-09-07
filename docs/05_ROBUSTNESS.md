@@ -9,6 +9,49 @@ entry names the evidence, not just an opinion.
 
 ## Fixed, recorded here because the reasoning generalises
 
+### Three operators could report a correct verifier as broken
+
+The governing rule is that Bohrin must never falsely accuse a verifier. Four paths
+broke it, and all four shared one root cause: **a difference in source was being
+treated as evidence of a difference in behaviour.**
+
+| Path | Trigger |
+|---|---|
+| `constant_return` | reference `"1.0"`, a correct numeric grader, candidate `"1"` |
+| `constant_return` | reference `"true"`, a correct case-folding grader, candidate `"True"` |
+| `negate_condition` | a branch whose two arms do the same thing |
+| `drop_side_effect` | a reference whose function bodies were already `pass` |
+
+The first is the one that mattered. Numeric answers are the commonest task shape in
+the ecosystem, and the result was a Verification Gap of 50/100 against a flawless
+grader — the exact failure mode that would end the product's credibility if it
+appeared in a published index.
+
+**Why the tests did not catch it.** The clean fixture was an exact-string matcher.
+It models a *strict* verifier, and a strict verifier rejects every rendering
+difference, so the fixture was structurally incapable of exercising this class. The
+missing fixture was a verifier that is **lenient about presentation and still
+entirely correct** — the shape most real verifiers actually have.
+
+**Fixed:** `mutate/equivalence.py` adds `provably_distinct` (no ground unless the
+payloads differ under every normalisation a correct verifier might apply) and
+`code_equivalent` (Trivial Compiler Equivalence on Python bytecode). `negate_condition`
+now carries no ground at all, because TCE cannot help it: an inert negation compiles
+differently precisely because the source differs. `tests/_fixtures.py` gains a table of
+lenient-but-correct graders, and every registered operator is run against every one of
+them.
+
+The reasoning that generalises, twice over:
+
+1. **A clean fixture only guards the failures it can express.** Zero findings on a
+   fixture that cannot produce the failure is not evidence of anything. Ours proved
+   only that we do not accuse *strict* verifiers.
+2. **Verify a guard by removing it.** Each of the four fixes was reverted in turn to
+   confirm the suite went red. Three reverts were initially silent — one because a
+   defence-in-depth check covered for the other, and one because the test graded with
+   a substring matcher that rejected the mutant before the ground was ever consulted.
+   A test that cannot fail is not protecting anything.
+
 ### Redundant candidates were being submitted twice
 
 `empty_body` emitted `""` and a whitespace-only reply. Every verifier strips, so both are
