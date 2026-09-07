@@ -17,6 +17,7 @@ from importlib.metadata import entry_points
 PROBES = "bohrin.probes"
 ADAPTERS = "bohrin.adapters"
 MUTATORS = "bohrin.mutators"
+RELATIONS = "bohrin.relations"
 
 
 def load_plugin_classes(group: str) -> dict[str, type]:
