@@ -52,6 +52,58 @@ The reasoning that generalises, twice over:
    a substring matcher that rejected the mutant before the ground was ever consulted.
    A test that cannot fail is not protecting anything.
 
+### A taskset that failed to load escaped as a traceback
+
+Loading a taskset imports the customer's package and runs its module-level code, so it can
+raise anything. Only `ModuleNotFoundError` was handled; everything else escaped the CLI's
+user-error set as a raw Python stack trace with exit 1.
+
+Found by running the tool against a taskset written for a slightly different `verifiers`
+API (`import verifiers as vf` rather than `verifiers.v1`) — the first thing tried, not a
+constructed edge case. `verifiers` is pre-1.0, so version drift is the normal condition.
+
+**Why it matters more than a cosmetic bug.** A stack trace reads as *Bohrin crashed* when
+the truth is *your taskset did not load*. That is the blame inversion this project exists
+to avoid, and it undoes the impression every other carefully worded error path builds.
+
+**Fixed:** `TasksetLoadError` names the taskset, quotes the underlying error, states the
+fault is not Bohrin's, and exits 2. The original exception stays chained.
+
+The reasoning that generalises: **at a boundary where foreign code runs, the exception
+type is not knowable — only the boundary is.** Enumerating expected exception types there
+fails open into a traceback; catching broadly and re-raising as a domain error fails closed
+into a message.
+
+### An audit could not fail a CI job
+
+Every completed audit returned 0. An audit reporting 20 exploits at a gap of 50 was
+indistinguishable, to a pipeline, from a clean one.
+
+**Fixed:** opt-in `--fail-on-finding` and `--fail-on-gap SCORE`, with the exit-code
+contract in `--help`. The design point is **exit 3**: a gate can pass because nothing was
+*found* or because nothing was *measured*, and folding those together is how a tool
+reports a false green. `code_golf` — every task needs a runtime — exits 3, not 0.
+
+This is the coverage descriptor's logic applied to the exit code, and it is the same
+distinction SARIF draws with `invocation.executionSuccessful`.
+
+### A clean score implied more than it had measured
+
+`glossary` scores 0/100 and grades by substring containment; `proposer_solver` scores
+0/100 and grades on the last integer in a reply. Both are exploitable. The report said
+`0 / 100 · coverage: 2 of 2 probes` and nothing else, and a reasonable reader concludes
+their verifier is sound.
+
+§0 below had always said so. The report had not — and the report is what people read.
+
+**Fixed:** a clean score carries a line naming how many operators were tried and what a
+clean result bounds.
+
+The reasoning that generalises: **a false reassurance is a false accusation pointed the
+other way.** The governing rule forbids reporting a correct verifier as broken; reporting
+an unmeasured verifier as clean is the same error, and for a certification product it is
+the more expensive one.
+
 ### Redundant candidates were being submitted twice
 
 `empty_body` emitted `""` and a whitespace-only reply. Every verifier strips, so both are
@@ -102,6 +154,17 @@ v1 environments puts a number on what that buys:
 | `reverse_text` | weak_oracle declined — no rendering of the reference passes its own verifier |
 | `gsm8k` | not measured — the reward needs a runtime |
 
+Re-measured cold against all 19 published environments (fresh clone, fresh venv): 12
+measured at full coverage, 7 refused, **two defects found, zero false accusations**. The
+second is `deepwiki` at 25/100 — its reward is `answer.lower() in reply.lower()` with
+`answer="python"`, and its prompt names the repo `modelcontextprotocol/python-sdk`, so
+echoing the prompt scores full marks without ever calling the tool the task exists to
+exercise. Confirmed independently with Bohrin out of the loop.
+
+That is now **two independent real environments with the same root cause: the answer is
+sitting in the prompt.** A pattern with two data points, not an anecdote — and the
+strongest available argument for a dedicated answer-leakage check.
+
 One defect found, zero false accusations. But two of the three clean results are a limit of
 the operators, not a verdict on the grader: `glossary` scores `answer.lower() in reply`, and
 `proposer_solver` scores on the last integer in the reply. Both accept submissions that are
@@ -110,14 +173,31 @@ obviously not solutions; no fixed operator here constructs one.
 The single hit is instructive about *why* it hit. `scratchpad` grades `self.data.word in
 answer` while its own prompt contains `word="alpha"`, so `identity_return` — echo the
 prompt — lands. It was found by an operator that ignores the reference entirely, on a task
-where no reference was even discovered (`word` is not in the recognised names, see §4).
+where no reference was even discovered (`word` is not in the recognised names, see §5).
 The yield came from a structural operator, not a differential one.
 
 **Fix:** this is the boundary the proprietary attack engine is for — verifier-aware,
 model-generated payloads. What the open core owes in the meantime is to state the boundary,
 which `README.md` now does.
 
-### 1. Harness disruption is discarded, not reported
+### 1. Seven of nineteen real environments cannot be audited
+
+Measured across the full published `verifiers` set: 37% are refused rather than scored.
+Four distinct causes, needing four different fixes.
+
+| Cause | Environments | What would fix it |
+|---|---|---|
+| Reward needs a runtime | `code_golf`, `gsm8k`, `bash_interception`, `wiki_search` | Container-backed execution (§7) |
+| Reference fails its own verifier | `reverse_text` | A baseline that learns required *presentation* from the prompt |
+| No adapter recognises it | `compact` | Adapter coverage |
+| Upstream API drift | `nemo_gym_weather` | Version-tolerant adapter |
+
+Refusing is the correct behaviour — each is reported, never scored as clean — but coverage
+this narrow bounds how useful the tool is regardless of how sound it is. Container
+execution alone converts four of the seven, which makes it the single highest-value item
+open.
+
+### 2. Harness disruption is discarded, not reported
 
 A candidate that **crashes the verifier**, exhausts its memory, or trips its timeout is
 currently recorded as an `error` and counted as noise.
@@ -135,7 +215,7 @@ when a well-formed submission causes the verifier to error or time out. Needs ca
 separate a verifier defect from a Bohrin defect — an ordinary string payload should never
 crash a well-written reward function, so the burden is on us to keep payloads well-formed.
 
-### 2. The gap pools distinct mechanisms into one number
+### 3. The gap pools distinct mechanisms into one number
 
 The literature is explicit that reward hacking covers separable mechanisms — learned-reward
 exploitation, test-suite exploitation, execution-environment manipulation, under-investment
@@ -149,7 +229,7 @@ pool, and that limitation belongs in the specification rather than in a reader's
 **Fix:** state it in `02_VERIFICATION_GAP.md`, and lead the report with the per-probe
 breakdown rather than the composite where space allows.
 
-### 3. The false-positive rate is unmeasured
+### 4. The false-positive rate is unmeasured
 
 Comparable work validates a detector by manually auditing a random sample of flagged and
 unflagged runs, and is candid when it has not: *"calibration is an assumption, not a
@@ -168,7 +248,7 @@ sample that size would not detect a 10% false-positive rate with any confidence.
 findings, and publish the measured false-positive rate alongside the index. Until then no
 accuracy claim should be made.
 
-### 4. A reference is discovered by name, not by contract
+### 5. A reference is discovered by name, not by contract
 
 `TaskData` standardises `prompt` and `description` but not a reference solution, so it is
 looked up under recognised names (`answer`, `solution`, …) and is `None` otherwise.
@@ -191,7 +271,7 @@ investing further. On the evidence so far the differential operators may matter 
 assumed, and a baseline that can learn the required *presentation* from the task prompt
 would unlock more than more operators would.
 
-### 5. Determinism cannot see rare flakiness
+### 6. Determinism cannot see rare flakiness
 
 At the default five repeats, a verifier flipping 5% of the time is missed roughly three
 times in four. Reported honestly as detection power, and it remains a real ceiling.
@@ -200,7 +280,7 @@ times in four. Reported honestly as detection power, and it remains a real ceili
 tasks already suspected. This is the strategy the flaky-test literature recommends after
 finding that even a thousand reruns has under a 10% chance of surfacing a flake near 1e-4.
 
-### 6. Isolation is classified, not provided
+### 7. Isolation is classified, not provided
 
 Bohrin refuses to run unshielded and records the level, but on the offline path the
 verifier's reward function still executes in-process when the user accepts that.
@@ -208,7 +288,7 @@ verifier's reward function still executes in-process when the user accepts that.
 **Fix:** a container-backed execution mode, which also unlocks the runtime-dependent
 tasks currently refused outright — likely the single largest coverage gain available.
 
-### 7. A verifier could detect it is being audited
+### 8. A verifier could detect it is being audited
 
 Nothing prevents a reward function from recognising Bohrin's candidates and behaving
 differently. No evidence this happens today, and it would be self-defeating for an honest

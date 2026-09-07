@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from bohrin.adapters.base import TasksetLoadError
 from bohrin.adapters.verifiers_v1 import (
     VerifiersV1Adapter,
     _first_reference,
@@ -195,6 +196,41 @@ def test_an_uninstalled_taskset_says_how_to_install_it(tmp_path: Path) -> None:
 
     with pytest.raises(MissingExtraError, match="pip install"):
         VerifiersV1Adapter().load(tmp_path, ScanConfig())
+
+
+def test_a_taskset_that_raises_while_loading_never_shows_a_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The blame inversion: a stack trace reads as "Bohrin crashed".
+
+    Loading runs the customer's own module-level code, so the exception can be anything.
+    ``ModuleNotFoundError`` was the only type handled, and everything else — the common
+    case being a taskset written against a drifted ``verifiers`` API — escaped the CLI's
+    user-error set as a raw traceback with exit 1.
+    """
+    (tmp_path / "taskset.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "exploding-taskset"\n', encoding="utf-8")
+
+    def explode(_taskset_id: str) -> Any:
+        raise AttributeError("module 'verifiers.legacy' has no attribute 'TaskData'")
+
+    monkeypatch.setattr(vf, "taskset_config_type", explode)
+
+    with pytest.raises(TasksetLoadError) as caught:
+        VerifiersV1Adapter().load(tmp_path, ScanConfig())
+
+    message = str(caught.value)
+    assert "not inside Bohrin" in message, "the message must not let a reader blame the auditor"
+    assert "AttributeError" in message, "the underlying cause must survive into the message"
+    # Chained, so a debugger can still reach the original.
+    assert isinstance(caught.value.__cause__, AttributeError)
+
+
+def test_a_taskset_load_error_is_a_user_error_not_a_crash() -> None:
+    """It must sit in the CLI's user-error set, or the message above never gets printed."""
+    from bohrin.cli import _USER_ERRORS
+
+    assert TasksetLoadError in _USER_ERRORS
 
 
 # -------------------------------------------------------------------- reference lookup

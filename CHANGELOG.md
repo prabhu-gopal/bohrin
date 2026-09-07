@@ -15,6 +15,25 @@ from. The entries below are the terse canonical record.
 
 ### Added
 
+- **`bohrin audit` can gate a CI job.** Two opt-in flags — `--fail-on-finding` (exit 1 on
+  any finding) and `--fail-on-gap SCORE` (exit 1 at or above a Verification Gap) — with a
+  documented exit-code contract printed in `--help`: `0` clean, `1` over the gate, `2` bad
+  input, `3` gate not evaluated. Previously every completed audit returned 0, so an audit
+  reporting 20 exploits at a gap of 50 was indistinguishable from a clean one and the only
+  workaround was grepping stdout.
+
+  Gating is opt-in, matching `semgrep scan` and `trivy`, so nothing already scripting
+  `bohrin audit` starts failing. **Exit 3 is the part that is not copied from anywhere.**
+  Trivy's documented trap is that a pipeline missing its exit-code flag merges happily on
+  critical findings; Bohrin has a worse version available, because a gate can pass either
+  because nothing was *found* or because nothing was *measured*, and those are different
+  claims. A gap of `None`, or coverage short of the full probe set, now exits 3 rather
+  than being folded into pass or fail — the same distinction SARIF draws with
+  `invocation.executionSuccessful` and error-level `toolExecutionNotifications`. A
+  pipeline can then treat "we could not tell" differently from "it is clean". Verified on
+  a real environment: `code_golf`, whose tasks all need a runtime, exits 3 rather than
+  reporting a false green.
+
 - **`docs/releases/` — one narrative release note per version**, with YAML frontmatter,
   written for people who use Bohrin rather than people reading the source. The website's
   changelog page is built from this folder; `CHANGELOG.md` stays the terse canonical
@@ -24,6 +43,32 @@ from. The entries below are the terse canonical record.
 
 ### Changed
 
+- **Findings are grouped by the operator that produced them.** One operator landing on 20
+  tasks is one defect with one fix, and the report printed it 20 times — six full blocks
+  then "14 more findings", which pushed any *second*, different defect off the screen
+  behind the first one's repetitions. `scratchpad` now reports
+  `identity_return accepted on 20 tasks` once, with a worked example and the reproduction
+  command, and the whole audit fits on one screen. A single-task finding still reads as
+  it did. Distinct operators are never merged.
+
+- **A Verification Gap of 0 now says what it does not prove.** Bohrin reports only defects
+  its operators can construct a payload for, so a clean result is an under-approximation:
+  absence of findings is absence of evidence, not evidence of absence. Two environments in
+  this project's own sweep score 0 and are nonetheless exploitable — `glossary` grades by
+  substring containment, `proposer_solver` by the last integer in a reply — and no
+  model-free operator here builds those payloads. `docs/05_ROBUSTNESS.md` has always said
+  so; the report did not, and the report is what people read. A clean score now carries a
+  line naming how many operators were tried and what a clean result bounds. A false
+  reassurance is a false accusation pointed the other way, and it is the one a
+  certification product can least afford.
+
+- **`--no-color` is accepted after the subcommand.** `bohrin audit ./env --no-color` is
+  what people type and it failed with `unrecognized arguments`. Both positions now work.
+
+- **`bohrin explain <unknown-probe>` exits 2 rather than 1.** An unknown probe id is bad
+  input, and 2 is what every other bad input in the tool returns; leaving it at 1 would
+  have collided with the new "findings" code and made the contract incoherent.
+
 - **`pyyaml` is no longer a declared dependency.** It was listed for a `bohrin.yaml`
   config file that was never implemented, so nothing in `src/bohrin/` imported it — which
   breaks this project's own rule that every declared dependency is imported by a line of
@@ -32,6 +77,18 @@ from. The entries below are the terse canonical record.
   reason. No runtime behaviour changes.
 
 ### Fixed
+
+- **A taskset that fails to load is a message, not a traceback.** Loading imports the
+  customer's own package and runs its module-level code, so it can raise anything — but
+  only `ModuleNotFoundError` was handled, and everything else escaped the CLI's user-error
+  set as a raw Python stack trace with exit 1. This is not exotic: it was reached on the
+  first attempt with a taskset written against a slightly different `verifiers` API
+  (`import verifiers as vf` rather than `verifiers.v1`), and `verifiers` is pre-1.0, so
+  version drift is the normal case rather than the edge case. A stack trace reads as
+  *Bohrin crashed* when the truth is *your taskset did not load* — the blame inversion
+  this project exists to avoid. A new `TasksetLoadError` names the taskset, quotes the
+  underlying error, states that the fault is not Bohrin's, and exits 2; the original
+  exception stays chained so nothing is lost.
 
 - **Bohrin no longer reports a correct verifier as exploited.** Four paths claimed a
   wrongness ground from a difference in *source* rather than a difference in

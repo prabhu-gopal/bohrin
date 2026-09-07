@@ -9,13 +9,16 @@ from __future__ import annotations
 from rich.console import Console
 from rich.markup import escape
 
-from bohrin.ir.evidence import Exploit, Flake
+from bohrin.ir.evidence import Exploit, Finding, Flake
 from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.report.model import Report
 
 _BAR_WIDTH = 15
-#: Findings shown in full. The rest are named in a tail line pointing at --json, because a
-#: terminal is a triage surface and the machine-readable output is the full record.
+#: Finding *groups* shown in full. The rest are named in a tail line pointing at --json,
+#: because a terminal is a triage surface and the machine-readable output is the full
+#: record. Groups rather than findings: 20 tasks failing one operator is one defect, and
+#: printing it 20 times is the alert fatigue every vulnerability-management writeup names
+#: as the thing that makes a report go unread.
 _DETAIL_LIMIT = 6
 
 #: Characters of a payload's first line shown before it is elided. The full payload is in
@@ -54,6 +57,51 @@ def _headline(result: ProbeResult) -> str:
     return f"{n} tasks accept known-wrong solutions"
 
 
+def _grouped(report: Report) -> dict[tuple[str, str], list[Finding]]:
+    """Collapse findings that share a root cause, preserving report order.
+
+    The key is the operator, because that *is* the mechanism: every task `identity_return`
+    lands on fails for one reason, and one fix closes all of them. Grouping by anything
+    finer would split a single defect; grouping by anything coarser would merge two.
+    """
+    groups: dict[tuple[str, str], list[Finding]] = {}
+    for result in report.results:
+        for finding in result.findings:
+            if isinstance(finding, Exploit):
+                key = ("exploit", finding.candidate.provenance.operator)
+            else:
+                key = ("flake", result.probe_id)
+            groups.setdefault(key, []).append(finding)
+    return groups
+
+
+def _zero_score_caveat(report: Report) -> str | None:
+    """What a clean score does and does not mean.
+
+    A gap of 0 is an *under-approximation*: Bohrin reports only defects its operators can
+    construct a payload for, so absence of findings is absence of evidence, not evidence
+    of absence. Two of the environments in this project's own sweep score 0 and are
+    nonetheless exploitable — `glossary` grades by substring containment, `proposer_solver`
+    by the last integer in the reply — and no model-free operator here builds those
+    payloads.
+
+    `docs/05_ROBUSTNESS.md` has always said so. The report did not, and the report is what
+    people read; a reader who concludes "my verifier is fine" from a clean run has been
+    misled by omission. That is the same failure as a false accusation, pointed the other
+    way, and it is the one a certification product can least afford.
+    """
+    if report.gap.score is None or report.gap.score > 0:
+        return None
+    operators = sorted({op for result in report.results for op in (result.detail.get("operators") or ())})
+    count = len(operators) if operators else None
+    which = f"the {count} model-free operators" if count else "the model-free operators"
+    return (
+        f"a clean result bounds what {which} could construct — it is not a proof that the "
+        f"verifier is sound. Graders that accept by substring or by the last number in a "
+        f"reply score 0 here and are still exploitable."
+    )
+
+
 def render(report: Report, console: Console) -> None:
     """Print the audit."""
     console.print()
@@ -81,27 +129,48 @@ def render(report: Report, console: Console) -> None:
     # The gap and its coverage are rendered by GapScore.__str__ so the two cannot drift
     # apart, and so no caller can accidentally print a bare number.
     console.print(f"  [bold]{escape(str(report.gap))}[/bold]")
+    caveat = _zero_score_caveat(report)
+    if caveat is not None:
+        console.print(f"  [dim]note {escape(caveat)}[/dim]", highlight=False)
     console.print()
 
+    groups = _grouped(report)
     shown = 0
-    for result in report.results:
-        for finding in result.findings:
-            if shown >= _DETAIL_LIMIT:
-                break
-            shown += 1
-            if isinstance(finding, Exploit):
-                console.print(f"  [red]EXPLOIT[/red] ▸ {escape(finding.summary)}", highlight=False)
-                console.print(f"           [dim]{escape(finding.candidate.provenance.detail)}[/dim]", highlight=False)
-                payload = finding.candidate.payload.strip() or "(empty)"
-                line = payload.splitlines()[0] if payload.splitlines() else payload
-                # Mark the cut. Truncating mid-word with no ellipsis reads as a rendering
-                # bug rather than an abbreviation, and the payload is the evidence.
-                first = line if len(line) <= _PAYLOAD_CHARS else line[: _PAYLOAD_CHARS - 1].rstrip() + "…"
-                console.print(f"           submitted: [cyan]{escape(first)}[/cyan]", highlight=False)
-            elif isinstance(finding, Flake):
-                console.print(f"  [yellow]FLAKE[/yellow]   ▸ {escape(finding.summary)}", highlight=False)
-            console.print(f"           [dim]{escape(report.command_for(finding))}[/dim]", highlight=False)
-            console.print()
+    for (_kind, label), findings in list(groups.items())[:_DETAIL_LIMIT]:
+        first_finding = findings[0]
+        shown += len(findings)
+        tasks = len({f.task_id for f in findings})
+        if isinstance(first_finding, Exploit):
+            if tasks == 1:
+                console.print(f"  [red]EXPLOIT[/red] ▸ {escape(first_finding.summary)}", highlight=False)
+            else:
+                # One defect, stated once. The count is the severity signal; the worked
+                # example below is the evidence. Printing the same operator N times buries
+                # a second, different defect under the first one's repetitions.
+                console.print(
+                    f"  [red]EXPLOIT[/red] ▸ {escape(label)} accepted on "
+                    f"{_plural(tasks, 'task')} [dim](reward {first_finding.verdict.reward:g})[/dim]",
+                    highlight=False,
+                )
+            console.print(f"           [dim]{escape(first_finding.candidate.provenance.detail)}[/dim]", highlight=False)
+            payload = first_finding.candidate.payload.strip() or "(empty)"
+            line = payload.splitlines()[0] if payload.splitlines() else payload
+            # Mark the cut. Truncating mid-word with no ellipsis reads as a rendering
+            # bug rather than an abbreviation, and the payload is the evidence.
+            first = line if len(line) <= _PAYLOAD_CHARS else line[: _PAYLOAD_CHARS - 1].rstrip() + "…"
+            prefix = "submitted" if tasks == 1 else f"example (task {escape(first_finding.task_id)})"
+            console.print(f"           {prefix}: [cyan]{escape(first)}[/cyan]", highlight=False)
+        elif isinstance(first_finding, Flake):
+            if tasks == 1:
+                console.print(f"  [yellow]FLAKE[/yellow]   ▸ {escape(first_finding.summary)}", highlight=False)
+            else:
+                console.print(
+                    f"  [yellow]FLAKE[/yellow]   ▸ identical submissions scored inconsistently on "
+                    f"{_plural(tasks, 'task')}",
+                    highlight=False,
+                )
+        console.print(f"           [dim]{escape(report.command_for(first_finding))}[/dim]", highlight=False)
+        console.print()
 
     remaining = report.findings - shown
     if remaining > 0:

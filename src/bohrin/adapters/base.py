@@ -31,6 +31,20 @@ class UnknownFormatError(Exception):
     """No adapter recognised the path."""
 
 
+class TasksetLoadError(Exception):
+    """A taskset was found but could not be loaded, and the fault is not Bohrin's.
+
+    Loading a taskset imports the customer's own package and runs its module-level code,
+    so *any* exception it raises arrives here: a bad import against a moving upstream API,
+    a missing dataset file, a config field that no longer exists. Left uncaught these
+    escape as a raw traceback, which reads as "Bohrin crashed" when the truth is "your
+    taskset did not load" — the blame inversion this project exists to avoid.
+
+    The underlying error is chained (``raise ... from exc``) so the cause is never lost,
+    and the CLI prints the message rather than the stack.
+    """
+
+
 @runtime_checkable
 class TaskSource(Protocol):
     """A loaded taskset: enumerate tasks, and score candidates against their verifier."""

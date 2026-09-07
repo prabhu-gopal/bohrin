@@ -31,21 +31,45 @@ verifiers_v1 · 8 tasks · 2 probes · isolation: none
   note verifier code ran in-process with no isolation boundary
 
   determinism    ░░░░░░░░░░░░░░░  no variance observed in 5 runs
-  weak_oracle    ███████████████  8 task(s) accept known-wrong solutions
+  weak_oracle    ███████████████  8 tasks accept known-wrong solutions
 
   VERIFICATION GAP: 50 / 100   coverage: 2 of 2 probes
 
-  EXPLOIT ▸ 0: accepted identity_return (reward 1)
+  EXPLOIT ▸ identity_return accepted on 8 tasks (reward 1)
            echoes the prompt verbatim instead of answering
-           submitted: Call the `scratchpad_roundtrip` tool with word="alpha". It
-returns a single word. Then reply wi…
+           example (task 0): Call the `scratchpad_roundtrip` tool with
+word="alpha". It returns a single word. Then reply wi…
            bohrin audit environments/scratchpad --task 0 --operator
 identity_return --unsafe-local
 ```
 
+Findings are grouped by the operator that produced them, because one operator
+landing on eight tasks is one defect with one fix — not eight findings.
+
 Every finding carries the candidate that passed, why it is wrong, and a command
 to reproduce it. That last line is copy-pasteable: running it re-runs exactly
 that one finding, against that one task, with that one operator.
+
+### In CI
+
+An audit is exit 0 by default, whatever it finds, so adding Bohrin to a pipeline
+never breaks it by surprise. Ask for a gate when you want one:
+
+```bash
+bohrin audit ./environments/my-taskset --fail-on-gap 20
+```
+
+| Exit | Meaning |
+|---|---|
+| `0` | the audit ran; no gate was set, or the gate passed |
+| `1` | a gate was set and the audit is over it |
+| `2` | bad input, or the taskset could not be loaded |
+| `3` | a gate was set but coverage was incomplete — **no verdict, not a pass** |
+
+Exit 3 is the one worth wiring up deliberately. A gate can pass because nothing
+was *found*, or because nothing was *measured*, and those are not the same claim
+— a taskset whose rewards all need a runtime measures nothing and would
+otherwise report a green build. Bohrin says it could not tell instead.
 
 ### What that finding means
 
