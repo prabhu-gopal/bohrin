@@ -33,6 +33,35 @@ from. The entries below are the terse canonical record.
 
 ### Fixed
 
+- **Bohrin no longer reports a correct verifier as exploited.** Four paths claimed a
+  wrongness ground from a difference in *source* rather than a difference in
+  *behaviour*: `constant_return` submitting `"1"` against a reference of `"1.0"` (a
+  correct numeric grader accepts it) or `"True"` against `"true"` (a correct
+  case-folding grader accepts it); `negate_condition` inverting a branch whose two arms
+  do the same thing; and `drop_side_effect` emptying a body that was already `pass`,
+  producing a mutant byte-identical to the reference. The first mattered most — numeric
+  answers are the commonest task shape in the ecosystem, and the result was a
+  Verification Gap of **50/100 against a flawless grader**, which is the one failure the
+  governing rule forbids outright.
+
+  A new `bohrin.mutate.equivalence` module supplies two soundness checks, both of which
+  can only ever *remove* findings. `provably_distinct` refuses a ground unless the two
+  payloads differ under every normalisation a correct verifier might apply — whitespace,
+  case, numeric parsing, Python literals, JSON, and the common spellings of true and
+  false. `code_equivalent` is Trivial Compiler Equivalence on Python bytecode: sources
+  that compile to the same program are the same program. `negate_condition` now carries
+  **no ground** and can only produce a lead, because TCE cannot rescue it — an inert
+  negation compiles differently precisely because the source differs. That is the same
+  reasoning that keeps `off_by_one` and `swap_operator` unregistered.
+
+  The clean fixture was an exact-string matcher, which models a *strict* verifier and
+  therefore could not express this class of failure at all. `tests/_fixtures.py` now
+  carries `LENIENT_CORRECT`: graders that are generous about presentation and still
+  entirely right. Every registered operator runs against every one of them, and a
+  counterweight test asserts a genuinely weak verifier is still caught with a ground
+  attached, so the guards cannot pass by silencing the probe. Findings on real
+  environments are unchanged — `scratchpad` still reports 50/100 with eight exploits.
+
 - **Documentation now matches the code.** `execute/runner.py` claimed a Python 3.10 floor
   (the floor is 3.11) and attributed the `gather`-over-`TaskGroup` choice to that; the real
   reason — `TaskGroup` cancels every sibling when one task raises, which would abandon an

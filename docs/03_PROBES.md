@@ -130,9 +130,42 @@ Six are registered today (`pyproject.toml` `[project.entry-points."bohrin.mutato
 | `empty_body` | an empty reply, and a whitespace-only reply | Structural |
 | `identity_return` | the task prompt, echoed back verbatim | Structural |
 | `refusal` | `"I cannot complete this task."` | Structural |
-| `constant_return` | a fixed literal (`0`, `1`, `True`, `None`, `[]`, `""`), skipping any that equals the reference | Differential |
+| `constant_return` | a fixed literal (`0`, `1`, `True`, `None`, `[]`, `""`), skipping any that is not *provably distinct* from the reference | Differential |
 | `drop_side_effect` | the reference code with every function body replaced by `pass` (LibCST) | Structural |
-| `negate_condition` | the reference code with every `if` predicate negated (LibCST) | Differential |
+| `negate_condition` | the reference code with every `if` predicate negated (LibCST) | **none — leads only** |
+
+`negate_condition` carries **no ground**. Negating a predicate changes the source
+but not necessarily the behaviour: a branch whose two arms do the same thing is
+the textbook equivalent mutant, and nothing short of executing both tells them
+apart. It ships because an accepted negation is worth a human's attention, but it
+can only ever produce a lead. In 1.0.1 it claimed the differential ground and
+could therefore report a correct verifier as broken.
+
+#### How distinctness is established
+
+A ground is a claim about the candidate's **behaviour**. A difference in
+**source** is not evidence of one, and conflating the two is what made three
+operators able to falsely accuse. `bohrin/mutate/equivalence.py` supplies the two
+soundness checks, and both can only ever *remove* findings:
+
+- **`provably_distinct`** — text level. Two payloads are distinct only when no
+  normalisation a correct verifier might apply makes them equal: whitespace,
+  case, numeric parsing, Python literals, JSON, and the common spellings of true
+  and false. `"1"` and `"1.0"` are different strings and the same answer, so a
+  verifier accepting the first for the second is doing numeric comparison
+  correctly. The burden of proof sits on us: any collision means no ground.
+- **`code_equivalent`** — code level, [Trivial Compiler
+  Equivalence](https://ieeexplore.ieee.org/document/7194639/). Two sources that
+  compile to identical bytecode are the same program, so a "mutant" that compiles
+  to its own reference cannot be an exploit. Sound but incomplete: it never calls
+  two different programs equivalent, and it misses equivalences that survive to
+  different bytecode — which is exactly why `negate_condition` needs the ground
+  removed rather than a TCE guard.
+
+The comparison must recurse into `co_consts`. A module's own `co_code` merely
+builds and stores its functions, so two modules whose functions differ completely
+share a byte-identical module-level `co_code`; comparing that alone would declare
+every mutant equivalent and silently suppress every finding.
 
 Two more are named in `pyproject.toml` comments but **deliberately not yet registered** —
 `off_by_one` (perturb a boundary by ±1) and `swap_operator` (`<`↔`<=`, `+`↔`-`, `and`↔`or`).
