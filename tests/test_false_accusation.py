@@ -34,8 +34,10 @@ from bohrin.config import ScanConfig
 from bohrin.ir.evidence import Exploit
 from bohrin.mutate import discover as discover_operators
 from bohrin.mutate.equivalence import code_equivalent, collides_under, provably_distinct
-from bohrin.probes.base import ProbeResult
+from bohrin.probes import registry as probe_registry
+from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.probes.weak_oracle import WeakOracleProbe
+from bohrin.scoring.gap import verification_gap
 
 CONFIG = ScanConfig(unsafe_local=True)
 
@@ -129,6 +131,28 @@ async def test_the_guards_did_not_simply_disable_the_probe() -> None:
     assert result.findings, "the guards silenced the probe on a verifier that accepts anything"
     assert result.sub_score == 1.0
     assert all(f.candidate.known_wrong for f in _exploits(result))
+
+
+@pytest.mark.parametrize(("name", "reference", "equal"), LENIENT_CORRECT, ids=[c[0] for c in LENIENT_CORRECT])
+async def test_a_full_audit_of_a_correct_verifier_scores_zero(
+    name: str, reference: str, equal: Callable[[str, str], bool]
+) -> None:
+    """The number the customer actually sees, not a probe's internal sub-score.
+
+    Every other test here asserts on one probe. A user reads the Verification Gap, which
+    is computed across all of them, so the invariant is stated where they see it: a
+    verifier that is correct scores zero, at full coverage.
+    """
+    probes = probe_registry.discover()
+    source = lenient_source(reference, equal)
+    results = [await probe.run(source, CONFIG) for probe in probes]
+
+    gap = verification_gap(results, probes)
+
+    assert gap.score == 0.0, f"a correct {name!r} verifier was scored {gap.score}"
+    # Zero at *no* coverage would be vacuous: the probes must actually have measured it.
+    assert len(gap.coverage.measured) == len(probes)
+    assert all(r.status is ProbeStatus.OK for r in results)
 
 
 # --------------------------------------------------------------- the underlying checks
