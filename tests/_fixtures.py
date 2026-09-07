@@ -14,6 +14,8 @@ verifier, so the clean fixture is the guard that keeps the product honest.
 from __future__ import annotations
 
 import itertools
+import json
+from collections.abc import Callable
 
 from bohrin.adapters.memory import MemorySource
 from bohrin.ir.task import Task
@@ -85,6 +87,78 @@ def no_reference_source(n: int = 3) -> MemorySource:
     )
 
 
+#: Graders that are **correct but not exact-string**, as ``(name, reference, equal)``.
+#:
+#: This table is the guard that 1.0.1 was missing. ``strict_source`` above accepts only a
+#: byte-identical reference, so it models a strict verifier and can never catch an operator
+#: that mistakes a *rendering* difference for a *behaviour* difference. Every grader here
+#: is right to accept what it accepts, so a probe reporting any finding against one of them
+#: is falsely accusing a correct verifier.
+#:
+#: The references are chosen to collide with ``constant_return``'s literals under exactly
+#: one normalisation each, which is how the defect was originally reproduced.
+LENIENT_CORRECT: tuple[tuple[str, str, Callable[[str, str], bool]], ...] = (
+    ("numeric", "1.0", lambda reply, ref: _as_float(reply) is not None and _as_float(reply) == _as_float(ref)),
+    ("numeric-zero", "0.0", lambda reply, ref: _as_float(reply) is not None and _as_float(reply) == _as_float(ref)),
+    ("trailing-zeros", "1.00", lambda reply, ref: _as_float(reply) is not None and _as_float(reply) == _as_float(ref)),
+    ("case-folding", "true", lambda reply, ref: reply.strip().casefold() == ref.strip().casefold()),
+    ("case-folding-none", "none", lambda reply, ref: reply.strip().casefold() == ref.strip().casefold()),
+    ("json-equal", "[ ]", lambda reply, ref: _as_json(reply) is not None and _as_json(reply) == _as_json(ref)),
+    ("whitespace", "  42  ", lambda reply, ref: reply.strip() == ref.strip()),
+)
+
+
+def _as_float(text: str) -> float | None:
+    try:
+        return float(text.strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_json(text: str) -> str | None:
+    try:
+        return json.dumps(json.loads(text.strip()), sort_keys=True)
+    except (ValueError, RecursionError):
+        return None
+
+
+def lenient_source(reference: str, equal: Callable[[str, str], bool], n: int = 2) -> MemorySource:
+    """A verifier that is lenient about presentation and still entirely correct."""
+    return MemorySource(
+        _tasks(n, reference=reference),
+        lambda task, payload: 1.0 if equal(payload, task.reference or "") else 0.0,
+    )
+
+
+#: A reference whose function bodies are already ``pass``. Emptying them produces a mutant
+#: byte-identical to the reference the verifier has just accepted as correct, so reporting
+#: it is an accusation that the verifier accepted its own known-good answer.
+TRIVIAL_REFERENCE = "def solve(items):\n    pass\n"
+
+#: A reference where negating the branch predicate cannot change behaviour, because both
+#: arms do the same thing. The textbook equivalent mutant.
+EQUIVALENT_BRANCH_REFERENCE = "def solve(x):\n    if x > 0:\n        return abs(x)\n    return abs(x)\n"
+
+
+def exact_match_source(reference: str, n: int = 2) -> MemorySource:
+    """A correct exact-match verifier over a caller-supplied reference."""
+    return MemorySource(
+        _tasks(n, reference=reference),
+        lambda task, payload: 1.0 if payload == task.reference else 0.0,
+    )
+
+
+def substring_source(reference: str = REFERENCE, n: int = 2) -> MemorySource:
+    """A genuinely weak verifier: anything containing the answer passes.
+
+    Not a clean fixture — this one *should* produce findings. It is here so the
+    false-accusation tests can prove they have not simply disabled the probe.
+    """
+    return MemorySource(
+        _tasks(n, reference=reference), lambda task, payload: 1.0 if (task.reference or "") in payload else 0.0
+    )
+
+
 def exploding_source(n: int = 2) -> MemorySource:
     """A verifier that raises. Used to prove one bad task cannot abandon an audit."""
 
@@ -95,11 +169,17 @@ def exploding_source(n: int = 2) -> MemorySource:
 
 
 __all__ = [
+    "EQUIVALENT_BRANCH_REFERENCE",
+    "LENIENT_CORRECT",
     "REFERENCE",
+    "TRIVIAL_REFERENCE",
     "broken_baseline_source",
+    "exact_match_source",
     "exploding_source",
     "flaky_source",
+    "lenient_source",
     "no_reference_source",
     "strict_source",
+    "substring_source",
     "weak_source",
 ]

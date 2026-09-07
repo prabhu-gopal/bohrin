@@ -5,8 +5,11 @@ invocations. The proprietary attack engine adds model-generated, verifier-aware 
 synthesis on top of this same contract; these operators find real defects but do not find
 what a frontier attacker finds, and that gap is stated rather than disguised.
 
-Every operator here either establishes a :class:`~bohrin.ir.task.Ground` or declines to
-emit. See ``docs/03_PROBES.md``.
+Every operator here either establishes a :class:`~bohrin.ir.task.Ground`, emits an
+explicitly ungrounded candidate that can only ever become a lead, or declines to emit at
+all. Nothing here may claim a ground it cannot support: a ground is a claim about the
+candidate's *behaviour*, and a difference in *source* is not evidence of one. See
+``docs/03_PROBES.md`` and :mod:`bohrin.mutate.equivalence`.
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ import libcst as cst
 
 from bohrin.ir.task import Candidate, Ground, Provenance, Task
 from bohrin.mutate.base import MutationOperator
+from bohrin.mutate.equivalence import code_equivalent, collides_under
 
 
 def _cand(op: str, base: str, detail: str, payload: str, ground: Ground | None) -> Candidate:
@@ -70,9 +74,16 @@ class Refusal(MutationOperator):
 class ConstantReturn(MutationOperator):
     """Submit a fixed literal.
 
-    Only claims the differential ground when a reference exists and differs from the
-    literal. Without a reference there is no way to know the constant is wrong — a task
-    whose answer genuinely is ``0`` would otherwise be reported as a false positive.
+    Only claims the differential ground when a reference exists and the literal is
+    *provably distinct* from it. Without a reference there is no way to know the
+    constant is wrong — a task whose answer genuinely is ``0`` would otherwise be
+    reported as a false positive.
+
+    Distinctness is not string inequality. ``"1"`` and ``"1.0"`` are different strings
+    and the same answer, so a verifier comparing numerically is right to accept the
+    first for the second. In 1.0.1 this operator guarded with ``lit == ref`` and
+    therefore reported exactly that correct verifier as exploited. See
+    :mod:`bohrin.mutate.equivalence`.
     """
 
     id = "constant_return"
@@ -84,8 +95,12 @@ class ConstantReturn(MutationOperator):
         if not ref:
             return
         for lit in self._LITERALS:
-            if lit == ref:
-                continue  # this literal IS the answer here; emitting it would be a false accusation
+            collision = collides_under(lit, ref)
+            if collision is not None:
+                # Indistinguishable from the answer under a normalisation a correct
+                # verifier may apply. Emitting nothing is the contract for "this
+                # operator cannot establish wrongness for this task".
+                continue
             yield _cand(
                 self.id,
                 "constant",
@@ -140,12 +155,17 @@ class DropSideEffect(MutationOperator):
     requires_code = True
 
     def apply(self, task: Task) -> Iterator[Candidate]:
-        module = _parse(task.reference or "")
+        source = task.reference or ""
+        module = _parse(source)
         if module is None:
             return
         tf = _BodyStripper()
         mutated = module.visit(tf)
-        if not tf.changed:
+        # `changed` only records that the transformer fired. A reference whose bodies
+        # are already `pass` produces a mutant identical to the reference, which the
+        # verifier has just accepted as the known-good answer — reporting that as an
+        # exploit accuses a verifier of accepting the correct solution.
+        if not tf.changed or code_equivalent(mutated.code, source):
             return
         yield _cand(
             self.id,
@@ -157,33 +177,48 @@ class DropSideEffect(MutationOperator):
 
 
 class NegateCondition(MutationOperator):
-    """Invert every branch predicate."""
+    """Invert every branch predicate.
+
+    Emits **leads, not findings.** Negating a predicate changes the source but does not
+    reliably change behaviour: a branch whose arms do the same thing is the textbook
+    equivalent mutant, and there is no way to tell the difference without executing
+    both. Trivial Compiler Equivalence does not help here — the negation compiles to
+    different bytecode precisely because the source differs.
+
+    Claiming the differential ground anyway is what made this operator able to report a
+    correct verifier as exploited. It therefore carries no ground until the execution
+    comparator lands, which is the same reason ``off_by_one`` and ``swap_operator`` are
+    not registered at all. An accepted candidate from here is reported in the advisory
+    section and excluded from scoring.
+    """
 
     id = "negate_condition"
     rationale = "Inverting a branch takes the opposite path on the inputs that exercise it."
     requires_code = True
 
     def apply(self, task: Task) -> Iterator[Candidate]:
-        module = _parse(task.reference or "")
+        source = task.reference or ""
+        module = _parse(source)
         if module is None:
             return
         tf = _ConditionNegator()
         mutated = module.visit(tf)
-        if not tf.changed or mutated.code == module.code:
+        if not tf.changed or code_equivalent(mutated.code, source):
             return
         yield _cand(
             self.id,
             "reference",
-            "every `if` predicate negated; control flow inverted",
+            "every `if` predicate negated; control flow inverted (unverified: the negation may not change behaviour)",
             mutated.code,
-            Ground.DIFFERENTIAL,
+            None,
         )
 
 
-# `off_by_one` and `swap_operator` are declared in pyproject but intentionally not yet
-# implemented: both need a differential check to establish wrongness honestly, and that
-# check lands with the execution comparator. Registering an operator that cannot establish
-# a ground would produce leads, not findings.
+# `off_by_one` and `swap_operator` are deliberately absent from this module and from the
+# entry points in pyproject: both need an executable differential check to establish
+# wrongness honestly, and that check lands with the execution comparator. `negate_condition`
+# above is the same case caught late — it ships, but carries no ground, so it can only ever
+# produce a lead.
 
 __all__ = [
     "ConstantReturn",

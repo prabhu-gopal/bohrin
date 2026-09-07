@@ -19,6 +19,7 @@ from bohrin.execute.runner import ScoreOutcome, score_many
 from bohrin.ir.evidence import BaselineFailure, Exploit, Finding, Unverified
 from bohrin.ir.task import Candidate, Provenance, Task
 from bohrin.mutate import discover as discover_operators
+from bohrin.mutate.equivalence import code_equivalent
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
 
 
@@ -124,12 +125,22 @@ class WeakOracleProbe(Probe):
         # also cost a real scoring call against someone else's environment. Two candidates
         # whose payloads are equal after stripping are the same submission as far as any
         # verifier is concerned, so only the first is sent.
+        equivalent_suppressed = 0
         for task in measurable:
             submitted: set[str] = set()
             for op in operators:
                 for cand in op.apply(task):
                     key = cand.payload.strip()
                     if key in submitted:
+                        continue
+                    # Trivial Compiler Equivalence, applied to every grounded candidate
+                    # regardless of which operator produced it. A candidate that compiles to
+                    # the same program as the reference *is* that reference, so a verifier
+                    # accepting it is accepting its own known-good answer. The first-party
+                    # operators guard themselves; this is the backstop for third-party ones,
+                    # which reach the same seam with no privileged path and no review.
+                    if cand.known_wrong and task.reference and code_equivalent(cand.payload, task.reference):
+                        equivalent_suppressed += 1
                         continue
                     submitted.add(key)
                     work.append((task, cand))
@@ -178,6 +189,9 @@ class WeakOracleProbe(Probe):
                 "baseline_failures": baseline_detail,
                 "baseline_errors": baseline_errors,
                 "tasks_without_reference": unbaselined,
+                # Candidates that compiled to the reference itself. A non-zero count means
+                # an operator tried to accuse a verifier of accepting its own answer.
+                "equivalent_suppressed": equivalent_suppressed,
                 "errors": errors,
             },
         )
