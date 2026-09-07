@@ -16,6 +16,7 @@ from __future__ import annotations
 import itertools
 import json
 from collections.abc import Callable
+from typing import Any
 
 from bohrin.adapters.memory import MemorySource
 from bohrin.ir.task import Task
@@ -159,6 +160,37 @@ def substring_source(reference: str = REFERENCE, n: int = 2) -> MemorySource:
     )
 
 
+def behavioural_source(reference: str, inputs: tuple[int, ...], n: int = 2) -> MemorySource:
+    """A correct verifier that **executes** the submission and compares its outputs.
+
+    This is the only shape of fixture that can catch an equivalent mutant being reported.
+    A textual grader rejects a mutated source outright — it is not the reference string —
+    so the mutation never reaches the verdict and the test passes for the wrong reason.
+    A behavioural grader accepts any program that behaves like the reference, which is
+    precisely correct, and therefore accepts an inert mutation. If the operator that
+    produced it claimed a ground, that acceptance becomes a false accusation.
+
+    Executes fixture-local code only, on inputs this module supplies.
+    """
+
+    def outputs(source: str) -> list[object] | None:
+        namespace: dict[str, Any] = {}
+        try:
+            exec(compile(source, "<fixture>", "exec"), namespace)
+            solve = namespace["solve"]
+            return [solve(value) for value in inputs]
+        except Exception:
+            return None
+
+    expected = outputs(reference)
+
+    def grade(_task: Task, payload: str) -> float:
+        produced = outputs(payload)
+        return 1.0 if produced is not None and produced == expected else 0.0
+
+    return MemorySource(_tasks(n, reference=reference), grade)
+
+
 def exploding_source(n: int = 2) -> MemorySource:
     """A verifier that raises. Used to prove one bad task cannot abandon an audit."""
 
@@ -173,6 +205,7 @@ __all__ = [
     "LENIENT_CORRECT",
     "REFERENCE",
     "TRIVIAL_REFERENCE",
+    "behavioural_source",
     "broken_baseline_source",
     "exact_match_source",
     "exploding_source",

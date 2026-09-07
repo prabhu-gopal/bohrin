@@ -25,9 +25,9 @@ from _fixtures import (
     EQUIVALENT_BRANCH_REFERENCE,
     LENIENT_CORRECT,
     TRIVIAL_REFERENCE,
+    behavioural_source,
     exact_match_source,
     lenient_source,
-    substring_source,
     weak_source,
 )
 from bohrin.config import ScanConfig
@@ -85,7 +85,10 @@ async def test_negating_an_inert_branch_is_a_lead_and_never_a_finding() -> None:
     the negation compiles to different bytecode — so the operator must not claim a ground
     in the first place.
     """
-    source = substring_source(reference=EQUIVALENT_BRANCH_REFERENCE)
+    # A behavioural grader is required here: it accepts any program that behaves like
+    # the reference, so it *correctly* accepts the inert negation. A textual grader would
+    # reject the mutated source outright and the test would pass for the wrong reason.
+    source = behavioural_source(EQUIVALENT_BRANCH_REFERENCE, inputs=(-2, 0, 3))
     result = await WeakOracleProbe().run(source, CONFIG)
 
     negations = [f for f in _exploits(result) if f.candidate.provenance.operator == "negate_condition"]
