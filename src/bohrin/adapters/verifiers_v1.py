@@ -38,7 +38,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from bohrin.adapters.base import Adapter, MissingExtraError, TaskSource
+from bohrin.adapters.base import Adapter, MissingExtraError, TasksetLoadError, TaskSource
 from bohrin.ir.task import Candidate, Task, Verdict
 
 if TYPE_CHECKING:
@@ -209,6 +209,18 @@ class _VerifiersSource:
             raise MissingExtraError(
                 f"taskset {taskset_id!r} is not installed. A verifiers taskset is an installed "
                 f"Python package — install it first (pip install -e <path>) and re-run. ({exc})"
+            ) from exc
+        except Exception as exc:
+            # Deliberately broad. These two calls import the taskset's package and run its
+            # module-level code, so the exception type is whatever the customer's code (or
+            # a version-drifted `verifiers`) happens to raise — AttributeError, TypeError,
+            # KeyError, a bare RuntimeError. Enumerating them is guesswork that fails open
+            # into a traceback; the boundary is what is knowable, not the type.
+            raise TasksetLoadError(
+                f"taskset {taskset_id!r} is installed but failed to load: "
+                f"{type(exc).__name__}: {exc}. This is an error inside the taskset or its "
+                f"`verifiers` version, not inside Bohrin — the audit never started. Check "
+                f"that the taskset imports on its own (python -c 'import {taskset_id}')."
             ) from exc
         if config.max_tasks is not None:
             taskset = taskset.head(config.max_tasks)

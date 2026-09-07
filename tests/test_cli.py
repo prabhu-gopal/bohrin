@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import shlex
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from bohrin.cli import main
+from bohrin.cli import EXIT_CLEAN, EXIT_FINDINGS, EXIT_UNDECIDED, EXIT_USER_ERROR, main
 from bohrin.ir.task import Ground
 
 
@@ -32,7 +33,7 @@ def test_explain_prints_the_probe_rationale(capsys: pytest.CaptureFixture[str]) 
 
 
 def test_explain_unknown_probe_lists_what_exists(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["explain", "no_such_probe"]) == 1
+    assert main(["explain", "no_such_probe"]) == EXIT_USER_ERROR
     err = capsys.readouterr().err
     assert "unknown probe" in err.lower()
     assert "weak_oracle" in err, "telling the user what is wrong without what to try is not help"
@@ -158,3 +159,222 @@ def test_a_single_task_is_not_reported_as_1_tasks() -> None:
     assert "1 task ·" in out and "1 tasks" not in out
     assert "1 probe ·" in out and "1 probes" not in out
     assert "1 task accepts a known-wrong solution" in out, "the verb must agree with the count"
+
+
+# ----------------------------------------------------------------------- the CI gate
+
+
+def _gate_on(report: Any, **flags: Any) -> int:
+    """Run the gate alone, so the contract is tested without a live taskset."""
+    import argparse
+    import io
+
+    from rich.console import Console
+
+    from bohrin.cli import _gate
+
+    args = argparse.Namespace(**{"fail_on_finding": False, "fail_on_gap": None, **flags})
+    return _gate(args, report, Console(file=io.StringIO(), no_color=True))
+
+
+def test_without_a_gate_flag_an_audit_with_findings_still_exits_zero() -> None:
+    """Gating is opt-in, as in `semgrep scan` and `trivy`.
+
+    Anyone already scripting `bohrin audit` must not start failing because a gate was
+    added, so the default has to stay 0 even when the audit reports exploits.
+    """
+    assert _gate_on(_report_with_one_exploit("./t", isolation_none=True)) == EXIT_CLEAN
+
+
+def test_a_finding_fails_the_gate_when_asked() -> None:
+    report = _report_with_one_exploit("./t", isolation_none=True)
+    assert _gate_on(report, fail_on_finding=True) == EXIT_FINDINGS
+
+
+def test_the_gap_threshold_is_inclusive() -> None:
+    report = _report_with_one_exploit("./t", isolation_none=True)  # gap 50
+    assert _gate_on(report, fail_on_gap=50.0) == EXIT_FINDINGS
+    assert _gate_on(report, fail_on_gap=51.0) == EXIT_CLEAN
+
+
+def test_an_unmeasured_audit_is_undecided_and_never_passes_a_gate() -> None:
+    """The failure this exit code exists for.
+
+    A gap of None means no probe produced a measurement. Comparing that numerically
+    would read as clean and merge the pipeline — the same trap trivy documents, where a
+    missing flag lets critical findings through. "We could not tell" is not "it is fine",
+    so it gets its own code rather than being folded into either.
+    """
+    from bohrin.scoring.gap import Coverage, GapScore
+
+    report = _report_with_one_exploit("./t", isolation_none=True)
+    blind = replace(report, gap=GapScore(score=None, coverage=Coverage((), 2)))
+
+    assert _gate_on(blind, fail_on_gap=90.0) == EXIT_UNDECIDED
+    assert _gate_on(blind, fail_on_finding=True) == EXIT_UNDECIDED
+
+
+def test_partial_coverage_is_undecided_because_a_passing_score_would_understate() -> None:
+    """A gap computed from one of two probes is a different quantity, not a lenient one."""
+    from bohrin.scoring.gap import Coverage, GapScore
+
+    report = _report_with_one_exploit("./t", isolation_none=True)
+    partial = replace(report, gap=GapScore(score=0.0, coverage=Coverage(("weak_oracle",), 2)))
+
+    assert _gate_on(partial, fail_on_gap=10.0) == EXIT_UNDECIDED
+
+
+def test_a_clean_fully_covered_audit_passes_the_gate() -> None:
+    """The counterweight: the gate must be passable, or it is just a failure generator."""
+    from bohrin.probes.base import ProbeResult, ProbeStatus
+    from bohrin.scoring.gap import Coverage, GapScore
+
+    report = _report_with_one_exploit("./t", isolation_none=True)
+    clean = replace(
+        report,
+        gap=GapScore(score=0.0, coverage=Coverage(("weak_oracle", "determinism"), 2)),
+        results=(ProbeResult(probe_id="weak_oracle", status=ProbeStatus.OK, sub_score=0.0, tasks_probed=1),),
+    )
+
+    assert _gate_on(clean, fail_on_gap=10.0) == EXIT_CLEAN
+    assert _gate_on(clean, fail_on_finding=True) == EXIT_CLEAN
+
+
+# ------------------------------------------------------- grouping and the zero caveat
+
+
+def _render(report: Any) -> str:
+    import io
+
+    from rich.console import Console
+
+    from bohrin.report.tty import render
+
+    buf = io.StringIO()
+    render(report, Console(file=buf, width=200, no_color=True))
+    return buf.getvalue()
+
+
+def _exploits_across(n: int) -> Any:
+    """One operator, n tasks — the `scratchpad` shape: one defect, many tasks."""
+    from bohrin.ir.evidence import Exploit
+    from bohrin.ir.task import Candidate, Provenance, Verdict
+    from bohrin.probes.base import ProbeResult, ProbeStatus
+    from bohrin.scoring.gap import Coverage, GapScore
+
+    findings = tuple(
+        Exploit(
+            task_id=str(i),
+            candidate=Candidate(
+                payload=f"echo {i}",
+                provenance=Provenance(operator="identity_return", base="identity", detail="echoes the prompt"),
+                ground=Ground.STRUCTURAL,
+            ),
+            verdict=Verdict(reward=1.0, passed=True),
+            repro_args=f"--task {i} --operator identity_return",
+        )
+        for i in range(n)
+    )
+    base = _report_with_one_exploit("./t", isolation_none=True)
+    return replace(
+        base,
+        gap=GapScore(score=50.0, coverage=Coverage(("weak_oracle", "determinism"), 2)),
+        results=(
+            ProbeResult(
+                probe_id="weak_oracle", status=ProbeStatus.OK, sub_score=1.0, tasks_probed=n, findings=findings
+            ),
+        ),
+        tasks_total=n,
+    )
+
+
+def test_one_operator_across_many_tasks_is_reported_once() -> None:
+    """20 tasks failing one operator is one defect, not 20 findings.
+
+    Before grouping, `scratchpad` printed six near-identical blocks and then "14 more" —
+    so a second, different defect would have been pushed off the screen by the first
+    one's repetitions.
+    """
+    out = _render(_exploits_across(20))
+
+    assert out.count("EXPLOIT") == 1, "one root cause must produce one block"
+    assert "identity_return accepted on 20 tasks" in out
+    assert "example (task 0)" in out, "the worked example is the evidence and must survive"
+    assert "more finding" not in out, "nothing is truncated away when it all fits in one group"
+
+
+def test_a_single_finding_still_reads_naturally() -> None:
+    """Grouping must not make the common one-task case read like a summary."""
+    out = _render(_report_with_one_exploit("./t", isolation_none=True))
+
+    assert "7: accepted empty_body" in out
+    assert "submitted:" in out and "example (task" not in out
+
+
+def test_two_different_operators_stay_two_findings() -> None:
+    """The counterweight: grouping must not merge distinct defects."""
+    from bohrin.ir.evidence import Exploit
+    from bohrin.ir.task import Candidate, Provenance, Verdict
+    from bohrin.probes.base import ProbeResult, ProbeStatus
+
+    report = _exploits_across(3)
+    other = Exploit(
+        task_id="99",
+        candidate=Candidate(
+            payload="",
+            provenance=Provenance(operator="empty_body", base="constant", detail="empty reply"),
+            ground=Ground.STRUCTURAL,
+        ),
+        verdict=Verdict(reward=1.0, passed=True),
+        repro_args="--task 99 --operator empty_body",
+    )
+    merged = replace(
+        report,
+        results=(
+            ProbeResult(
+                probe_id="weak_oracle",
+                status=ProbeStatus.OK,
+                sub_score=1.0,
+                tasks_probed=4,
+                findings=(*report.results[0].findings, other),
+            ),
+        ),
+    )
+
+    out = _render(merged)
+    assert out.count("EXPLOIT") == 2
+    assert "identity_return" in out and "empty_body" in out
+
+
+def test_a_zero_score_says_what_it_does_not_prove() -> None:
+    """False reassurance is a false accusation pointed the other way.
+
+    `glossary` scores 0 and grades by substring containment, so it is exploitable — just
+    not by any model-free operator here. A reader who takes 0/100 as "sound" has been
+    misled by omission, and the report is what they read.
+    """
+    from bohrin.probes.base import ProbeResult, ProbeStatus
+    from bohrin.scoring.gap import Coverage, GapScore
+
+    report = replace(
+        _report_with_one_exploit("./t", isolation_none=True),
+        gap=GapScore(score=0.0, coverage=Coverage(("weak_oracle", "determinism"), 2)),
+        results=(
+            ProbeResult(
+                probe_id="weak_oracle",
+                status=ProbeStatus.OK,
+                sub_score=0.0,
+                tasks_probed=5,
+                detail={"operators": ["a", "b", "c", "d", "e", "f"]},
+            ),
+        ),
+    )
+
+    out = " ".join(_render(report).split())
+    assert "not a proof that the verifier is sound" in out
+    assert "6 model-free operators" in out, "the caveat must say how much was actually tried"
+
+
+def test_a_nonzero_score_carries_no_caveat() -> None:
+    """It applies to a clean result only; on a real finding it would be noise."""
+    assert "not a proof" not in _render(_exploits_across(3))
