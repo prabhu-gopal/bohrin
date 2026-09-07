@@ -173,6 +173,20 @@ def code_equivalent(left: str, right: str) -> bool:
     semantically inert but compiles differently, such as negating a branch whose two
     arms do the same thing. That second class is why an operator which cannot
     establish wrongness structurally emits a lead rather than a finding.
+
+    **Do not add a size limit here.** It is the obvious hardening and it is unsound.
+    ``compile`` runs on third-party text, so guarding it by length looks prudent, but
+    the failure directions are not symmetric: returning ``True`` when the programs
+    differ would suppress a real finding, while returning ``False`` when they are the
+    same **fails to suppress a false accusation** — the failure this module exists to
+    prevent. A length guard returns ``False``, so it trades the guarantee for nothing.
+
+    It also buys nothing measurable. Compilation is linear and cheap next to work the
+    caller already does: on a typical reference ``compile`` takes ~0.02 ms against
+    ~6.4 ms for the LibCST parse the code-level operators run over the same string,
+    and a whole 40-task audit spends single-digit milliseconds here. Hostile input is
+    not a lever either — deeply nested sources are rejected by the parser in
+    microseconds, and the pathological cases raise, which is caught below.
     """
     try:
         left_code = compile(left, "<candidate>", "exec")
