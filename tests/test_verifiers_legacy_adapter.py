@@ -255,3 +255,51 @@ def test_a_task_from_another_source_is_rejected() -> None:
     source = _source_with(_ScoringRubric(1.0), attainable=1.0)
     with pytest.raises(KeyError):
         asyncio.run(source.score(Task(id="nope", prompt="p"), _candidate()))
+
+
+# --------------------------------------------------------------------------- splits
+
+
+class _Env:
+    """An environment exposing one split, the other raising the way upstream does."""
+
+    def __init__(self, train: list[dict[str, Any]] | None, evaluation: list[dict[str, Any]] | None) -> None:
+        self._train = train
+        self._eval = evaluation
+
+    def get_dataset(self, n: int | None = None) -> Any:
+        if self._train is None:
+            raise ValueError("dataset is not set")
+        return self._train[:n] if n else self._train
+
+    def get_eval_dataset(self, n: int | None = None) -> Any:
+        if self._eval is None:
+            raise ValueError("eval dataset is not set")
+        return self._eval[:n] if n else self._eval
+
+
+def test_the_training_split_is_preferred_when_there_is_one() -> None:
+    split, rows = _LegacySource._read_dataset(_Env([{"a": 1}], [{"b": 2}]), "e", None)
+    assert (split, list(rows)) == ("train", [{"a": 1}])
+
+
+def test_an_evaluation_only_environment_is_read_rather_than_refused() -> None:
+    """Environments published for evaluation populate only their eval split.
+
+    `hellaswag`, `boolq` and `winogrande` are all in this shape, so treating the training
+    split as the only corpus would refuse a large class of published environments outright.
+    """
+    split, rows = _LegacySource._read_dataset(_Env(None, [{"b": 2}]), "e", None)
+    assert (split, list(rows)) == ("eval", [{"b": 2}])
+
+
+def test_an_empty_split_falls_through_rather_than_being_audited_as_zero_tasks() -> None:
+    split, _rows = _LegacySource._read_dataset(_Env([], [{"b": 2}]), "e", None)
+    assert split == "eval"
+
+
+def test_an_environment_with_no_readable_split_names_both_failures() -> None:
+    from bohrin.adapters.base import TasksetLoadError
+
+    with pytest.raises(TasksetLoadError, match=r"train:.*eval:"):
+        _LegacySource._read_dataset(_Env(None, None), "e", None)

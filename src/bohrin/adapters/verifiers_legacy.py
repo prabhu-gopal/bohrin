@@ -254,14 +254,7 @@ class _LegacySource:
         self._scoring = _scoring_funcs(env.rubric)
         # Full marks, for deciding acceptance. Summed once: a rubric is fixed for the run.
         self._attainable = sum(weight for _, weight in self._scoring)
-        try:
-            dataset = env.get_dataset(n=config.max_tasks) if config.max_tasks is not None else env.get_dataset()
-        except Exception as exc:
-            raise TasksetLoadError(
-                f"environment {env_id!r} loaded but its dataset could not be read: "
-                f"{type(exc).__name__}: {exc}. This is an error inside the environment, not "
-                f"inside Bohrin — the audit never started."
-            ) from exc
+        self._split, dataset = self._read_dataset(env, env_id, config.max_tasks)
         self._rows: list[dict[str, Any]] = [dict(row) for row in dataset]
         #: Bohrin task id -> its row, populated by tasks().
         self._by_id: dict[str, dict[str, Any]] = {}
@@ -284,8 +277,35 @@ class _LegacySource:
                     "key": str(row.get("task", "")),
                     "requires_runtime": needs_runtime,
                     "offline_scoreable": not needs_runtime,
+                    "split": self._split,
                 },
             )
+
+    @staticmethod
+    def _read_dataset(env: Any, env_id: str, max_tasks: int | None) -> tuple[str, Any]:
+        """The environment's tasks, and which split they came from.
+
+        An environment published for evaluation rather than training populates only its
+        eval split, and asking for the training one raises. Three of the first three such
+        environments audited — `hellaswag`, `boolq`, `winogrande` — are in that shape, so
+        the training split alone is not a corpus. The split is recorded on every task and
+        reported, because "audited on the eval split" and "audited on the training split"
+        are different claims and the report may not blur them.
+        """
+        failures: list[str] = []
+        for split, reader in (("train", env.get_dataset), ("eval", env.get_eval_dataset)):
+            try:
+                dataset = reader(n=max_tasks) if max_tasks is not None else reader()
+            except Exception as exc:
+                failures.append(f"{split}: {type(exc).__name__}: {exc}")
+                continue
+            if dataset is not None and len(dataset):
+                return split, dataset
+            failures.append(f"{split}: empty")
+        raise TasksetLoadError(
+            f"environment {env_id!r} loaded but has no readable tasks ({'; '.join(failures)}). "
+            f"This is an error inside the environment, not inside Bohrin — the audit never started."
+        )
 
     def _state_for(self, row: dict[str, Any], payload: str) -> Any:
         """A rollout state whose single assistant reply is ``payload``.
