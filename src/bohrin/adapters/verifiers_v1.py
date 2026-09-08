@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING, Any
 
 from bohrin.adapters.base import Adapter, MissingExtraError, TasksetLoadError, TaskSource
 from bohrin.ir.task import Candidate, Task, Verdict
+from bohrin.relations import renderings as relation_renderings
 
 if TYPE_CHECKING:
     from bohrin.config import ScanConfig
@@ -104,21 +105,14 @@ def reference_renderings(answer: str) -> list[str]:
     The baseline therefore searches: whichever rendering the verifier actually accepts is
     the known-good submission. If none is accepted, the task is unmeasurable and is reported
     as such rather than probed against a reference the verifier itself rejects.
+
+    The list was hard-coded here until it became what it always was — an informal set of
+    metamorphic relations. It now comes from :mod:`bohrin.relations`, where each rewriting
+    carries the argument for why it preserves meaning and a third party can add their own
+    without patching Bohrin. This function keeps the flat shape its callers expect; use
+    :func:`bohrin.relations.renderings` when the relation's id is wanted too.
     """
-    # The unmodified value comes first and is never stripped: a verifier doing an exact
-    # string comparison rejects a reference whose trailing newline we removed, which would
-    # fail the baseline on a task that is in fact perfectly scoreable.
-    bare = answer.strip()
-    return [
-        answer,
-        *([bare] if bare != answer else []),
-        f"\\boxed{{{answer}}}",
-        f"$\\boxed{{{answer}}}$",
-        f"The answer is {answer}.",
-        f"The answer is \\boxed{{{answer}}}.",
-        f"**{answer}**",
-        f"\\boxed{{\\text{{{answer}}}}}",
-    ]
+    return [rendering for _relation_id, rendering in relation_renderings(answer)]
 
 
 def _taskset_id(path: Path) -> str | None:

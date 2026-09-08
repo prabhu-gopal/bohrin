@@ -13,6 +13,46 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Added
+
+- **A declared, extensible catalogue of metamorphic relations** (`bohrin.relations`). A
+  metamorphic relation states how a verifier's verdict must change — or must not change —
+  when its input is transformed in a known way. It is the standard answer to the oracle
+  problem, and it is what Bohrin was already doing informally: `reference_renderings` was
+  eight hard-coded presentations of one answer, with no stated reason why any of them
+  preserved meaning.
+
+  Each relation now carries a **certification** — one sentence saying why the rewriting
+  preserves meaning *by construction* — and relations are **partial**: one that does not
+  apply to an answer returns nothing rather than guessing. `trailing_zeros_dropped` means
+  something for `70.0` and nothing for `banana`, and silence is the correct output. That
+  partiality is the soundness mechanism; a relation that over-claims would let Bohrin
+  report a verifier for rejecting an answer that was never equivalent.
+
+  Four relations are new and were chosen from measured evidence rather than convenience. A
+  category-level audit of four widely-used verifiers over 307,420 verdicts found
+  self-validation — a verifier accepting certified-equivalent renderings of its own ground
+  truth — ranging from **53.8% to 95.2%**, with **whitespace and punctuation alone
+  accounting for 93.0%** of in-contract failures on one verifier, and fractions for a
+  further 25.4% on another. So `inline_math`, `decimal_point`, `trailing_zeros_dropped`
+  and `latex_fraction` join the existing eight, and presentational rewritings are tried
+  first because those are the ones that actually fire.
+
+  A thousands separator (`1000` → `1,000`) is **deliberately absent**: the comma is a
+  decimal separator in much of the world, so the rewriting is only meaning-preserving
+  under an assumption about locale — and an assumption is exactly what a certification may
+  not contain.
+
+  The catalogue is discovered through a new `bohrin.relations` entry-point group, on the
+  same footing as probes, adapters and operators. A third party adds a domain's notation
+  or a house answer format by publishing a package, not by patching Bohrin. Built-in order
+  is fixed in code rather than by the entry-point table, so installing a plugin cannot
+  reorder — and therefore cannot change the meaning of — an existing audit's baseline
+  search.
+
+  `reference_renderings` keeps its signature and is now a view onto the catalogue, so the
+  adapter and every existing caller are unchanged.
+
 ## [1.0.2] — 2026-09-07
 
 ### Added
