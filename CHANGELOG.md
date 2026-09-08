@@ -15,6 +15,33 @@ from. The entries below are the terse canonical record.
 
 ### Added
 
+- **A reference solution is discovered by contract, not only by field name.** Lookup asked
+  whether the answer sat under one of six names we had thought of — a guess about naming
+  convention, and it failed on any taskset that named the field after its domain.
+  `scratchpad` stores its answer as `word` and grades with `self.data.word in answer`, so
+  every one of its tasks was probed with **no reference at all**.
+
+  Bohrin now asks the better question: **which task-data field does the verifier itself
+  consult?** That is the contract, and it is readable from the reward function's own source
+  — a field the grader compares against is the grader's notion of the right answer, by
+  definition. Name-based lookup still runs first, so nothing about existing tasksets
+  changes; this is a fallback for the ones that named it otherwise.
+
+  It is **parsed, not pattern-matched**, and that is load-bearing. A regular expression over
+  the source matches inside comments, docstrings and string literals: on a reward whose
+  docstring mentions a since-renamed field, a regex finds four candidates where the code
+  reads one — and because discovery requires *exactly one* candidate, those phantoms
+  silently suppress a real reference. The AST sees only what the code does, and also
+  recognises `getattr(self.data, "word")`.
+
+  Deliberately conservative, because a wrong reference is worse than none — it becomes the
+  baseline, and `constant_return` claims a differential ground against it. Standard
+  `TaskData` fields are excluded outright; two candidate fields yield nothing, since there
+  is no principled way to choose; non-scalar values are ignored, having no single
+  submission form; and an unreadable or unparseable reward yields nothing rather than a
+  guess. On the public corpus `scratchpad` gains its reference and no environment gains a
+  false finding.
+
 - **A `ground_truth_rejected` probe — the rejection half of the Verification Gap.** Every
   probe so far asked whether a verifier accepts work that is wrong. This asks whether it
   rejects work that is right, by submitting the taskset's **own declared answer**, rendered

@@ -273,7 +273,7 @@ sample that size would not detect a 10% false-positive rate with any confidence.
 findings, and publish the measured false-positive rate alongside the index. Until then no
 accuracy claim should be made.
 
-### 5. A reference is discovered by name, not by contract
+### 5. A reference is discovered by name, then by contract — and still missing for some
 
 `TaskData` standardises `prompt` and `description` but not a reference solution, so it is
 looked up under recognised names (`answer`, `solution`, …) and is `None` otherwise.
@@ -290,6 +290,13 @@ from. `reverse_text` shows the opposite edge: a reference *was* found, but the v
 wants it inside `<reversed_text>` tags, so no rendering passed and the whole taskset became
 unmeasurable for `weak_oracle`. A reference discovered by name is neither necessary for a
 finding nor sufficient for a baseline.
+
+**Partly fixed.** A reference is now also read from the field the reward function itself
+consults, parsed from its source rather than pattern-matched. `scratchpad` gains its
+reference (`word`) this way. Three environments — `interception`, `grayscale_interception`,
+`web_search_interception` — expose no non-standard field at all, so no discovery strategy
+can help them; `alphabet_sort` buries its expected turns inside an `info` dict, which has
+no single submission form. The remaining limit is real but smaller than assumed.
 
 **Fix:** measure how often a reference is found across real Hub environments before
 investing further. On the evidence so far the differential operators may matter less than

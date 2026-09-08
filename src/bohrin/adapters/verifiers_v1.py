@@ -32,7 +32,9 @@ different task from the one that actually runs.
 
 from __future__ import annotations
 
+import ast
 import inspect
+import textwrap
 import tomllib
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -79,6 +81,122 @@ def _requires_runtime(fn: Callable[..., Any]) -> bool:
     except (TypeError, ValueError):  # builtins and C callables have no signature
         return False
     return param is not None and param.default is inspect.Parameter.empty
+
+
+#: Task-data fields that are never a reference answer, whatever a reward function does
+#: with them. `TaskData` standardises these, and a reward reading `self.data.prompt` is
+#: reading the question, not the answer -- submitting the prompt as a known-good baseline
+#: would be nonsense, and worse, would make `constant_return` compare against it.
+_NEVER_A_REFERENCE = frozenset(
+    {
+        "idx",
+        "name",
+        "description",
+        "prompt",
+        "system_prompt",
+        "image",
+        "workdir",
+        "network_allow",
+        "network_block",
+        "artifacts",
+        "timeout",
+        "resources",
+        "info",
+        "metadata",
+    }
+)
+
+
+class _DataFieldReader(ast.NodeVisitor):
+    """Collects the ``self.data.<field>`` names a reward function actually reads.
+
+    Parsed, not pattern-matched. A regular expression over the source is the obvious
+    implementation and it is wrong here in a way that matters: it matches inside comments
+    and docstrings. A reward whose docstring says *"compares against self.data.answer"*
+    would contribute a phantom field, and because :func:`_reference_by_contract` requires
+    exactly one candidate, one phantom silently suppresses a real discovery. The AST sees
+    only what the code does.
+
+    Two access forms are recognised, because both appear in real tasksets:
+    ``self.data.word`` and ``getattr(self.data, "word")``.
+    """
+
+    def __init__(self) -> None:
+        self.fields: set[str] = set()
+
+    @staticmethod
+    def _is_self_data(node: ast.expr) -> bool:
+        return (
+            isinstance(node, ast.Attribute)
+            and node.attr == "data"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "self"
+        )
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        if self._is_self_data(node.value):
+            self.fields.add(node.attr)
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id == "getattr"
+            and node.args
+            and self._is_self_data(node.args[0])
+            and len(node.args) > 1
+            and isinstance(node.args[1], ast.Constant)
+            and isinstance(node.args[1].value, str)
+        ):
+            self.fields.add(node.args[1].value)
+        self.generic_visit(node)
+
+
+def _reference_by_contract(vf_task: Any) -> str | None:
+    """The answer a reward function actually reads, when the field is not one we guess.
+
+    Name-based lookup asks "is the answer stored under one of six names we thought of?".
+    That is a guess about naming convention, and it fails on tasksets that named the field
+    after their domain -- `scratchpad` stores its answer as ``word`` and grades with
+    ``self.data.word in answer``, so all its tasks were probed with no reference at all.
+
+    This asks the better question: **which task-data field does the verifier itself
+    consult?** That is the contract, and it is readable from the reward function's own
+    source. A field the grader compares against is the grader's notion of the right answer,
+    by definition.
+
+    Deliberately conservative, because a wrong reference is worse than none -- it becomes
+    the baseline, and `constant_return` claims a differential ground against it:
+
+    * standard `TaskData` fields are excluded outright (:data:`_NEVER_A_REFERENCE`);
+    * **exactly one** remaining candidate must be found. Two fields consulted by the reward
+      leave no principled way to choose, and picking either would be the guess this
+      function exists to replace;
+    * anything that is not plain scalar text is ignored, since a dict or list has no single
+      submission form.
+
+    A source that cannot be read or parsed yields nothing. Failing closed here costs a
+    reference; failing open would invent one.
+    """
+    reader = _DataFieldReader()
+    for fn in vf_task.hooks("reward"):
+        try:
+            source = textwrap.dedent(inspect.getsource(fn))
+            reader.visit(ast.parse(source))
+        except (OSError, TypeError, SyntaxError, ValueError, RecursionError):
+            # Builtins and C callables have no source; a decorated or dynamically built
+            # reward may not dedent to something parseable. Neither is our business.
+            continue
+
+    candidates = sorted(reader.fields - _NEVER_A_REFERENCE)
+    if len(candidates) != 1:
+        return None
+
+    value = getattr(vf_task.data, candidates[0], None)
+    if value is None or isinstance(value, (bool, dict, list, tuple, set)):
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _first_reference(data: Any) -> str | None:
@@ -235,7 +353,9 @@ class _VerifiersSource:
             yield Task(
                 id=task_id,
                 prompt=str(getattr(data, "prompt", "") or getattr(data, "description", "") or ""),
-                reference=_first_reference(data),
+                # Name-based lookup first (cheap, and the convention most tasksets follow),
+                # then the reward function's own contract for the ones that named it otherwise.
+                reference=_first_reference(data) or _reference_by_contract(vf_task),
                 reward_fns=reward_fns,
                 metadata={
                     "taskset": self._id,

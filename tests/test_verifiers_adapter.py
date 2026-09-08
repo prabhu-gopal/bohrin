@@ -360,3 +360,132 @@ def test_an_unbounded_infinite_taskset_is_refused_not_hung() -> None:
 
     _require_bounded(unbounded.head(3), "test")  # bounded: no complaint
     assert unbounded.built == 0, "the guard must not build a single task to decide"
+
+
+# ------------------------------------------------- reference discovery by contract
+
+
+class _FakeData:
+    def __init__(self, **fields: Any) -> None:
+        for key, value in fields.items():
+            setattr(self, key, value)
+
+
+class _FakeTask:
+    """A stand-in exposing the two things contract discovery reads: hooks and data."""
+
+    def __init__(self, data: Any, *rewards: Any) -> None:
+        self.data = data
+        self._rewards = rewards
+
+    def hooks(self, _kind: str) -> tuple[Any, ...]:
+        return self._rewards
+
+
+def _reward_reading_word(self: Any, trace: Any) -> float:
+    return float(self.data.word in (trace or ""))
+
+
+def _reward_with_a_phantom_in_its_docstring(self: Any, trace: Any) -> float:
+    """Grade the reply.
+
+    Historically compared against self.data.answer, before the rename. See also
+    getattr(self.data, "legacy_target") in the old harness.
+    """
+    # self.data.old_field is no longer read
+    _marker = "self.data.phantom"
+    return float(self.data.word in (trace or ""))
+
+
+def _reward_reading_two_fields(self: Any, trace: Any) -> float:
+    return float(self.data.word in (trace or "") and self.data.other in (trace or ""))
+
+
+def _reward_reading_only_the_prompt(self: Any, trace: Any) -> float:
+    return float(self.data.prompt in (trace or ""))
+
+
+def test_a_reference_is_found_from_the_field_the_reward_actually_reads() -> None:
+    """Name-based lookup asks whether the answer sits under a name we thought of.
+
+    `scratchpad` stores its answer as `word` and grades with `self.data.word in answer`,
+    so every one of its tasks was probed with no reference at all. The contract is
+    readable from the reward itself.
+    """
+    from bohrin.adapters.verifiers_v1 import _reference_by_contract
+
+    task = _FakeTask(_FakeData(word="alpha"), _reward_reading_word)
+    assert _reference_by_contract(task) == "alpha"
+
+
+def test_a_field_named_only_in_a_comment_or_docstring_is_not_a_contract() -> None:
+    """Why this is parsed rather than pattern-matched.
+
+    A regex over the source matches inside comments, docstrings and string literals. Here
+    it would find four fields where the code reads one — and because discovery requires
+    *exactly* one candidate, those phantoms would silently suppress a real reference.
+    """
+    from bohrin.adapters.verifiers_v1 import _reference_by_contract
+
+    task = _FakeTask(
+        _FakeData(word="alpha", answer="wrong", legacy_target="wrong", old_field="wrong", phantom="wrong"),
+        _reward_with_a_phantom_in_its_docstring,
+    )
+    assert _reference_by_contract(task) == "alpha"
+
+
+def test_two_candidate_fields_yield_nothing() -> None:
+    """A wrong reference is worse than none: it becomes the baseline, and
+    `constant_return` claims a differential ground against it. With two fields consulted
+    there is no principled choice, and picking either is the guess this replaces."""
+    from bohrin.adapters.verifiers_v1 import _reference_by_contract
+
+    task = _FakeTask(_FakeData(word="alpha", other="beta"), _reward_reading_two_fields)
+    assert _reference_by_contract(task) is None
+
+
+def test_a_reward_reading_only_standard_fields_yields_nothing() -> None:
+    """`self.data.prompt` is the question, not the answer. Submitting it as a known-good
+    baseline would be nonsense, and would make every operator compare against it."""
+    from bohrin.adapters.verifiers_v1 import _reference_by_contract
+
+    task = _FakeTask(_FakeData(prompt="what is 2+2?"), _reward_reading_only_the_prompt)
+    assert _reference_by_contract(task) is None
+
+
+def test_a_getattr_access_is_recognised() -> None:
+    from bohrin.adapters.verifiers_v1 import _reference_by_contract
+
+    def reward(self: Any, trace: Any) -> float:
+        return float(getattr(self.data, "codeword") in (trace or ""))  # noqa: B009
+
+    task = _FakeTask(_FakeData(codeword="BAED"), reward)
+    assert _reference_by_contract(task) == "BAED"
+
+
+def test_an_unreadable_reward_fails_closed() -> None:
+    """No source means no contract. Failing closed costs a reference; failing open
+    invents one."""
+    from bohrin.adapters.verifiers_v1 import _reference_by_contract
+
+    task = _FakeTask(_FakeData(word="alpha"), len)  # a builtin has no source
+    assert _reference_by_contract(task) is None
+
+
+def test_a_non_scalar_field_is_not_a_reference() -> None:
+    """A dict or list has no single submission form."""
+    from bohrin.adapters.verifiers_v1 import _reference_by_contract
+
+    def reward(self: Any, trace: Any) -> float:
+        return float(bool(self.data.turns))
+
+    assert _reference_by_contract(_FakeTask(_FakeData(turns=["a", "b"]), reward)) is None
+    assert _reference_by_contract(_FakeTask(_FakeData(turns={"a": 1}), reward)) is None
+
+
+def test_the_recognised_name_still_wins_when_present() -> None:
+    """Contract discovery is a fallback, not a replacement: the cheap, conventional path
+    runs first so nothing about existing tasksets changes."""
+    from bohrin.adapters.verifiers_v1 import _first_reference
+
+    assert _first_reference(_FakeData(answer="70", word="alpha")) == "70"
