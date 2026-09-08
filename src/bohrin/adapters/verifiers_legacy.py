@@ -57,9 +57,29 @@ _VERIFIERS_LOGGER = "verifiers"
 _RUNTIME_PARAMS = frozenset({"client", "judge_client", "judge", "model", "sampling_args"})
 
 
-def _available() -> bool:
+def _installed_version() -> str | None:
+    """The installed `verifiers` version, or None when the package is absent."""
+    from importlib.metadata import PackageNotFoundError, version
+
     try:
-        import verifiers  # noqa: F401
+        return version("verifiers")
+    except PackageNotFoundError:
+        return None
+
+
+def _available() -> bool:
+    """Whether the API this adapter reads is importable — not merely `verifiers` itself.
+
+    Checking the namespace rather than the package matters because the package can be
+    present and still lack it. A taskset is an installed Python package with its own pins,
+    and installing one into the same environment as Bohrin can resolve `verifiers` down to a
+    version predating `verifiers.legacy` — the environment's pin wins, and nothing warns.
+    Without this check the audit starts and fails once per task with a raw
+    ModuleNotFoundError, which reads as a broken taskset rather than a resolvable version
+    conflict.
+    """
+    try:
+        import verifiers.legacy  # noqa: F401
     except ImportError:
         return False
     return True
@@ -206,10 +226,20 @@ class VerifiersLegacyAdapter(Adapter):
         return 0.9 if distribution_name(path) else 0.7
 
     def check_requirements(self) -> None:
-        if not _available():
+        if _available():
+            return
+        installed = _installed_version()
+        if installed is None:
             raise MissingExtraError(
                 "this looks like a verifiers environment; reading it requires: pip install 'bohrin[verifiers]'"
             )
+        raise MissingExtraError(
+            f"this looks like a verifiers environment, but the installed verifiers "
+            f"({installed}) has no `verifiers.legacy` module. Bohrin needs 0.3.0 or newer to "
+            f"read this API. A taskset carries its own pins, so installing one alongside "
+            f"Bohrin can resolve verifiers downwards — check with `pip show verifiers`, then "
+            f"reinstall the extra: pip install --upgrade 'bohrin[verifiers]'"
+        )
 
     def load(self, path: Path, config: ScanConfig) -> TaskSource:
         self.check_requirements()

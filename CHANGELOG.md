@@ -45,6 +45,16 @@ from. The entries below are the terse canonical record.
 
 ### Fixed
 
+- **A `verifiers` resolved below the version holding the API is named, not hit once per
+  task.** A taskset is an installed Python package carrying its own pins, so installing one
+  into the same environment as Bohrin can resolve `verifiers` *downwards* — one published
+  environment pins `verifiers==0.1.5`, which is enough to drag a working 0.3.1 down to a
+  version with no `verifiers.legacy` module at all. The package still imports, so Bohrin
+  started the audit and then failed once per task with a raw `ModuleNotFoundError`, which
+  reads as a broken taskset rather than a version conflict the user can fix in one command.
+  Bohrin now checks the namespace rather than the package, and reports the installed
+  version, the required one, and the cause.
+
 - **A rubric whose reward functions raise is now refused, not scored.** Upstream catches a
   reward function that raises, logs it, and records zero for that function. The total that
   comes back is a partial rubric wearing a complete rubric's number, and it is wrong in
