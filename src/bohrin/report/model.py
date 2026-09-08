@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from bohrin.execute.isolation import Assessment, Isolation
-from bohrin.ir.evidence import Exploit, Finding, GroundTruthRejected
+from bohrin.ir.evidence import Exploit, Finding, GroundTruthRejected, HarnessDisruption
 from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.scoring.gap import GapScore
 from bohrin.version import REPORT_SCHEMA_VERSION, __version__
@@ -113,6 +113,18 @@ def _finding_to_dict(finding: Finding, command_for: Callable[[Finding], str]) ->
             # Named in the record itself, so a consumer aggregating findings cannot roll
             # this into a gap contribution by mistake.
             "scored": False,
+            "repro": command_for(finding),
+        }
+    if isinstance(finding, HarnessDisruption):
+        return {
+            "kind": "harness_disruption",
+            "task_id": finding.task_id,
+            "operator": finding.operator,
+            "error": finding.error,
+            "payload": finding.payload,
+            # Nothing was accepted, so this is not an acceptance exploit and carries no
+            # ground. Named in the record so a consumer cannot roll it into one.
+            "ground": None,
             "repro": command_for(finding),
         }
     return {

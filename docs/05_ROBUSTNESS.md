@@ -222,7 +222,7 @@ this narrow bounds how useful the tool is regardless of how sound it is. Contain
 execution alone converts four of the seven, which makes it the single highest-value item
 open.
 
-### 2. Harness disruption is discarded, not reported
+### 2. Harness disruption — now reported, and firing nowhere yet
 
 A candidate that **crashes the verifier**, exhausts its memory, or trips its timeout is
 currently recorded as an `error` and counted as noise.
@@ -235,10 +235,22 @@ as exploit attempts*. Bohrin does the fail-closed half and drops the logging hal
 A submission that crashes a grader is a real robustness defect in that grader, and it is
 one a customer would want to know about.
 
-**Fix:** a `harness_disruption` finding class, distinct from an acceptance exploit, raised
-when a well-formed submission causes the verifier to error or time out. Needs care to
-separate a verifier defect from a Bohrin defect — an ordinary string payload should never
-crash a well-written reward function, so the burden is on us to keep payloads well-formed.
+**Fixed.** A `HarnessDisruption` finding class, distinct from an acceptance exploit and
+carrying no ground, is raised when a well-formed submission makes the verifier fail. It is
+excluded from the `weak_oracle` sub-score, because nothing was accepted and a crash must
+not read as the verifier rewarding wrong work.
+
+Separating a verifier defect from ours is handled by a guard rather than by care: a
+disruption is only reported for a task where **another candidate scored successfully**. A
+task where everything failed is environmental — possibly our own bug — and is reported as
+unmeasurable instead.
+
+**It fires nowhere on the current corpus.** Every environment was probed with an empty
+reply, a plain refusal, a 100 KB payload and a heavy-emoji payload; no reward function
+raised. The two errors seen are Bohrin's own runtime refusal (`bash_interception`) and
+upstream API drift (`nemo_gym_weather`), neither triggered by a payload. Reported here
+rather than counted as yield — the check exists because a customer's private taskset is
+not one we have tested.
 
 ### 3. The gap pools distinct mechanisms into one number
 

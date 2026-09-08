@@ -124,6 +124,42 @@ class GroundTruthRejected:
         return f"{self.task_id}: no rendering of the declared answer was accepted ({n} tried)"
 
 
-Finding = Exploit | Flake | GroundTruthRejected
+@dataclass(frozen=True, slots=True)
+class HarnessDisruption:
+    """A well-formed submission made the verifier crash, hang, or blow a limit.
 
-__all__ = ["BaselineFailure", "Exploit", "Finding", "Flake", "GroundTruthRejected", "Unverified"]
+    A reward function is a program, and a program that raises on an ordinary string reply
+    is broken in a way its author would want to know about. Published work on reward
+    hacking treats this as a first-class exploit category — agents avoid unfavourable
+    scoring by "triggering timeouts, crashing the harness, exhausting memory or disk" — and
+    scores such attempts fail-closed *while still logging them as exploit attempts*. Bohrin
+    did the fail-closed half and dropped the logging half, counting the crash as noise.
+
+    **The burden of well-formedness is ours.** Every payload Bohrin submits is a plain
+    string; an ordinary string must never crash a well-written reward function, so a crash
+    is the verifier's defect and not ours. To keep that honest, this is only reported for a
+    task where **some other candidate scored successfully** — that isolates the payload as
+    the trigger. A task where every attempt failed is a setup, network or environment
+    problem, and is reported as an unmeasurable task rather than blamed on the grader.
+
+    Distinct from :class:`Exploit`: nothing was accepted. It is a robustness defect in the
+    verifier, not a false positive in its judgement, so it carries no ``Ground`` and does
+    not claim one.
+    """
+
+    task_id: str
+    #: The exception or timeout, as reported by the runner.
+    error: str
+    #: The submission that triggered it, so the reader can judge well-formedness.
+    payload: str
+    operator: str = ""
+    repro_args: str = ""
+
+    @property
+    def summary(self) -> str:
+        return f"{self.task_id}: the verifier failed on a well-formed submission ({self.error[:80]})"
+
+
+Finding = Exploit | Flake | GroundTruthRejected | HarnessDisruption
+
+__all__ = ["BaselineFailure", "Exploit", "Finding", "Flake", "GroundTruthRejected", "HarnessDisruption", "Unverified"]

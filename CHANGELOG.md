@@ -15,6 +15,29 @@ from. The entries below are the terse canonical record.
 
 ### Added
 
+- **A verifier that crashes on a well-formed submission is now a finding, not noise.** A
+  reward function is a program, and one that raises on an ordinary string reply is broken
+  in a way its author would want to know about. Bohrin recorded such a failure as an
+  `error`, counted it, and reported nothing — closing the top-ranked open weakness in
+  `docs/05_ROBUSTNESS.md`. Published reward-hacking work treats exactly this as a
+  first-class exploit category (agents avoid unfavourable scoring by "triggering timeouts,
+  crashing the harness, exhausting memory or disk") and scores such attempts fail-closed
+  **while still logging them as exploit attempts**; Bohrin did the fail-closed half and
+  dropped the logging half.
+
+  **The burden of well-formedness is ours**, so the report is guarded twice. Every payload
+  Bohrin submits is a plain string, and a disruption is only reported for a task where
+  **some other candidate scored successfully** — that isolates the payload as the trigger.
+  A task where every attempt failed is a setup, network or environment problem (possibly
+  ours), and is reported as an unmeasurable task rather than blamed on the grader.
+
+  A `HarnessDisruption` is **distinct from an acceptance exploit** and carries no ground:
+  nothing was accepted. It is deliberately excluded from the `weak_oracle` sub-score, so a
+  crash cannot raise the Verification Gap as though the verifier had rewarded wrong work
+  — it did the opposite. Measured on the public `verifiers` corpus, no verifier crashes on
+  a well-formed payload, so this fires nowhere today; it is reported honestly rather than
+  claimed as yield.
+
 - **A reference solution is discovered by contract, not only by field name.** Lookup asked
   whether the answer sat under one of six names we had thought of — a guess about naming
   convention, and it failed on any taskset that named the field after its domain.
