@@ -114,6 +114,14 @@ other half of the gap: verifiers that reject answers that are correct.
 
 ## Fixed
 
+- **A CI gate no longer fails a clean taskset because a probe did not apply.** Registering
+  a third probe made four clean public environments start exiting `3`, because the gate
+  read "not every probe reported a score" as "we could not tell". A probe that *cannot*
+  apply — `ground_truth_rejected` where the taskset declares no answer — has nothing to
+  measure, which is not the same as failing to measure. Only a probe that errors now blocks
+  the gate, and the message names it.
+
+
 - **An empty reply was silently dropped on tasks whose answer is a bare number.** Python
   discards a bare constant expression as dead code, so `70` compiles to exactly the same
   bytecode as an empty string. The equivalence guard added in 1.0.2 therefore treated an
