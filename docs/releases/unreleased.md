@@ -114,6 +114,23 @@ other half of the gap: verifiers that reject answers that are correct.
 
 ## Fixed
 
+- **An empty reply was silently dropped on tasks whose answer is a bare number.** Python
+  discards a bare constant expression as dead code, so `70` compiles to exactly the same
+  bytecode as an empty string. The equivalence guard added in 1.0.2 therefore treated an
+  empty submission as "the reference itself" and never sent it — along with
+  `constant_return`'s literals on the same tasks.
+
+  Numeric answers are the commonest task shape there is, so this cost recall where it
+  matters most, and it did so **without any sign**: nothing failed, nothing was reported,
+  the candidate just never ran. **If you audited a taskset with numeric answers, re-run
+  it** — findings may appear that were previously suppressed.
+
+  Equivalence now declines to apply when the reference is not a program. It still catches
+  what it was built for, and it cannot reintroduce a false accusation: an empty reply is
+  structurally wrong whatever the answer is, and `constant_return` is separately guarded by
+  a comparison of the payloads *as answers*.
+
+
 - **A task id with a space broke the reproduction command.** Task ids come from the
   taskset and often contain spaces — `glossary` names its tasks after people — so
   `--task Ada Lovelace` split into two arguments and the printed command failed with

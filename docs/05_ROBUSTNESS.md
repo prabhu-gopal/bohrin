@@ -52,6 +52,28 @@ The reasoning that generalises, twice over:
    a substring matcher that rejected the mutant before the ground was ever consulted.
    A test that cannot fail is not protecting anything.
 
+### The equivalence guard suppressed candidates on bare-answer references
+
+Python discards a bare constant expression statement as dead code, so `compile("70")` is
+byte-identical to `compile("")`. Trivial Compiler Equivalence therefore judged an empty
+submission to be "the same program as the reference" and dropped it before it reached the
+verifier — on every task whose answer is a bare number, which is the commonest shape in the
+ecosystem.
+
+**Fixed:** TCE declines to apply when the reference does not compile to a program that does
+anything. It still catches what it was built for, and it cannot reintroduce a false
+accusation, because the un-suppressed candidates carry independent grounds.
+
+Two things generalise:
+
+1. **A guard is a change to recall as well as to precision, and only one of those fails
+   loudly.** A false accusation is visible in a report. A wrongly suppressed candidate is
+   visible nowhere — nothing errors and nothing is printed. Every suppression added here
+   now needs a test asserting the thing it must *not* suppress.
+2. **Found because a test failed for the wrong reason.** It surfaced while writing an
+   unrelated harness-disruption test that would not fire; the tempting move was to adjust
+   the fixture until it passed, and the fixture was correct. The check was wrong.
+
 ### A taskset with no reward function was reported as clean
 
 A task carrying no reward hook has no verifier. Everything submitted to it scores zero, so

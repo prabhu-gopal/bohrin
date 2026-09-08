@@ -42,6 +42,9 @@ _MAX_PARSE = 4096
 #: Strings a correct verifier may reasonably map onto the same boolean. Deliberately
 #: generous: a false accusation costs far more than the handful of degenerate
 #: candidates this suppresses.
+#: The canonical do-nothing module, compiled once, for :func:`_is_inert`.
+_EMPTY_PROGRAM = compile("", "<empty>", "exec")
+
 _TRUEISH = frozenset({"true", "1", "yes", "y", "t"})
 _FALSEISH = frozenset({"false", "0", "no", "n", "f"})
 
@@ -160,6 +163,17 @@ def _canonical(code: CodeType) -> tuple[object, ...]:
     )
 
 
+def _is_inert(code: CodeType) -> bool:
+    """Whether this source compiled to a program that does nothing observable.
+
+    The compiler discards a bare constant expression statement as dead code, so ``70`` and
+    the empty string compile to the *same* do-nothing module. That is correct behaviour for
+    a Python compiler and a disaster for a comparison that reads identical bytecode as
+    identical meaning.
+    """
+    return _canonical(code) == _canonical(_EMPTY_PROGRAM)
+
+
 def code_equivalent(left: str, right: str) -> bool:
     """Trivial Compiler Equivalence: do these two sources compile to the same program?
 
@@ -192,6 +206,21 @@ def code_equivalent(left: str, right: str) -> bool:
         left_code = compile(left, "<candidate>", "exec")
         right_code = compile(right, "<reference>", "exec")
     except (SyntaxError, ValueError, TypeError, MemoryError, RecursionError):
+        return False
+    # A reference that is not a program has no bytecode worth comparing. Most references in
+    # the wild are bare answers -- ``70``, ``5050`` -- and Python discards a constant
+    # expression statement as dead code, so they compile to the *same* do-nothing module as
+    # an empty submission. Without this check ``code_equivalent("", "70")`` is True and the
+    # empty-reply candidate is suppressed as "the reference itself" on every numeric task in
+    # the ecosystem: silent lost recall, the mirror image of the false accusations this
+    # module was written to prevent.
+    #
+    # Returning False here cannot reintroduce those. The candidates it un-suppresses carry
+    # their own independent grounds: an empty reply is *structurally* wrong whatever the
+    # reference is, and `constant_return` is guarded by `provably_distinct`, which compares
+    # the payloads as answers rather than as programs. TCE is the wrong instrument for a
+    # reference that was never code; it is not the only instrument.
+    if _is_inert(right_code):
         return False
     return _canonical(left_code) == _canonical(right_code)
 

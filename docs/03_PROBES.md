@@ -135,6 +135,21 @@ Seven are registered today (`pyproject.toml` `[project.entry-points."bohrin.muta
 | `drop_side_effect` | the reference code with every function body replaced by `pass` (LibCST) | Structural |
 | `negate_condition` | the reference code with every `if` predicate negated (LibCST) | **none — leads only** |
 
+**The two code-level operators find nothing on the public corpus, and that is a
+fact about the corpus.** Across every `verifiers` environment, **zero** reference
+solutions contain a function definition or an `if` statement — every one is a bare
+answer such as `5050`, `BAEDDC` or `python`. `drop_side_effect` and
+`negate_condition` require the reference to *be* Python source, so they produce no
+candidates at all: this ecosystem grades replies, not source files.
+
+That is not evidence they are useless, and they are not noisy — `negate_condition`
+carries no ground and `drop_side_effect` is guarded by Trivial Compiler
+Equivalence, so neither can false-accuse. They would fire on a code-generation
+taskset. Retiring tested, benchmarked operators because one corpus does not
+exercise them would remove capability to solve a problem that does not exist.
+They stay registered, and the measurement is recorded here so the decision is not
+re-litigated from memory.
+
 `false_negation` exists for a grader shape nothing else reached. A verifier that
 decides by asking whether the answer appears *somewhere in the reply* cannot
 distinguish an assertion from its denial — the denial contains the answer too.
