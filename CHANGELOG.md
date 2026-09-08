@@ -13,7 +13,39 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Added
+
+- **A `false_negation` mutation operator.** Submits an explicit denial of the taskset's own
+  declared answer — `The answer is not 70.` for a task declaring the answer is `70`. The
+  wrongness is settled by the taskset's ground truth rather than by the reward function
+  under audit, so it carries an **invariant** ground.
+
+  It exists because a verifier that decides by asking whether the answer appears
+  *somewhere in the reply* cannot tell an assertion from its denial — the denial contains
+  the answer too. Substring containment is one of the commonest grader shapes in the
+  ecosystem, and no previous operator constructed a payload for it: `empty_body` and
+  `refusal` submit nothing recognisable, and `constant_return` submits a literal that a
+  substring grader also rejects. This was the measured reason `glossary` scored 0/100 while
+  being plainly exploitable.
+
+  **On the public `verifiers` corpus it takes findings from two environments to four.**
+  `glossary` and `color_codeword` go from 0/100 to 50/100, and `deepwiki` from 25 to 50.
+  Both new findings were confirmed independently, with Bohrin out of the loop: `glossary`
+  grades `answer.lower() in reply.lower()`, so a denial scores full marks; `color_codeword`
+  extracts the longest standalone A–I run and compares it exactly, so
+  `The answer is not ABC.` yields `ABC` and scores full marks. In both cases a reply that
+  explicitly states the answer is wrong is rewarded as though it were right.
+
 ### Fixed
+
+- **A task id containing a space broke the reproduction command it printed.** Task ids come
+  from the taskset and routinely contain spaces — `glossary` names its tasks after people —
+  so `--task Ada Lovelace` split into two arguments and the printed command failed with
+  `unrecognized arguments: Lovelace`. For a tool whose claim is that a finding is evidence,
+  evidence you cannot re-run is the worst defect available. The 1.0.1 fix quoted the target
+  path and a test pinned that; nothing covered the task id, and no environment had exercised
+  it until an operator finally produced a finding on one that did. Task ids and operator
+  names are now shell-quoted in both probes, and a test parses the printed command back.
 
 - **A taskset with no reward function is no longer reported as clean.** A task carrying no
   reward hook has no verifier: every candidate submitted to it scores zero, so every one is

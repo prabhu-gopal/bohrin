@@ -30,7 +30,38 @@ other half of the gap: verifiers that reject answers that are correct.
   its baseline may now be measurable. That means a taskset can move from "not measured" to
   a real score. Measured on real environments, findings are unchanged.
 
+## Added
+
+- **`false_negation` — a new mutation operator that finds a whole grader shape Bohrin
+  previously walked past.** It submits an explicit denial of the taskset's own declared
+  answer: `The answer is not 70.` where the taskset says the answer is `70`. Its wrongness
+  comes from the taskset's ground truth, not from the verifier being audited.
+
+  A verifier that decides by asking whether the answer appears *somewhere in the reply*
+  cannot tell an assertion from its denial — the denial contains the answer too. That is
+  one of the commonest grader shapes in the ecosystem, and nothing in the previous operator
+  set constructed a payload for it.
+
+  **Findings on the public `verifiers` corpus go from two environments to four.**
+  `glossary` and `color_codeword` move from 0/100 to 50/100; `deepwiki` from 25 to 50. If
+  you audited a taskset that grades by containment or by extracting a value from free text,
+  **re-run it** — a clean result from before may not survive.
+
+  Both new findings were confirmed independently with Bohrin out of the loop. `glossary`
+  grades `answer.lower() in reply.lower()`, so a reply denying the answer scores full
+  marks. `color_codeword` extracts the longest standalone A–I run and compares it exactly,
+  so `The answer is not ABC.` yields `ABC` and scores full marks. In both, a reply that
+  explicitly says the answer is wrong is rewarded as if it were right.
+
 ## Fixed
+
+- **A task id with a space broke the reproduction command.** Task ids come from the
+  taskset and often contain spaces — `glossary` names its tasks after people — so
+  `--task Ada Lovelace` split into two arguments and the printed command failed with
+  `unrecognized arguments: Lovelace`. Evidence you cannot re-run is the worst defect a tool
+  like this can have. Task ids and operator names are now shell-quoted, and a test parses
+  the printed command back through the argument parser.
+
 
 - **A taskset with no reward function was reported as clean.** If a task carries no reward
   hook there is no verifier to audit: everything submitted scores zero, everything is

@@ -92,6 +92,7 @@ refusal          = "bohrin.mutate.operators:Refusal"
 constant_return  = "bohrin.mutate.operators:ConstantReturn"
 drop_side_effect = "bohrin.mutate.operators:DropSideEffect"
 negate_condition = "bohrin.mutate.operators:NegateCondition"
+false_negation   = "bohrin.mutate.operators:FalseNegation"
 
 # Certified meaning-preserving rewritings of an answer. Ordering is fixed in
 # `bohrin.relations._BUILTIN_ORDER`, not by this table: adding a third-party relation must
