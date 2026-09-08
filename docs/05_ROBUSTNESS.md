@@ -52,6 +52,31 @@ The reasoning that generalises, twice over:
    a substring matcher that rejected the mutant before the ground was ever consulted.
    A test that cannot fail is not protecting anything.
 
+### A taskset with no reward function was reported as clean
+
+A task carrying no reward hook has no verifier. Everything submitted to it scores zero, so
+everything is "rejected", so no candidate is ever a finding — and the audit reported
+`0 / 100` at `coverage: 2 of 2 probes`. The strongest claim the tool can make, arrived at
+by measuring nothing, and `--fail-on-gap` passed it.
+
+**Five of the eighteen loadable environments in the public `verifiers` repository** —
+`wordle`, `kuhn_poker`, `openenv_wordle`, `proposer_solver`, `wiki_search` — enumerate such
+tasks, because they are judged cross-agent, at the episode level, or by a seat minted only
+once a model has run. All five reported a clean sweep.
+
+**Fixed:** both probes refuse a task with no reward hook and say why. Those environments now
+report `not measured` at `coverage: 0 of 2`, and a CI gate exits 3 rather than 0.
+
+The reasoning that generalises: **check that the thing you are measuring exists before
+reporting the measurement.** Every guard in this codebase asks whether a finding is
+justified; none asked whether a *null* finding was. A null result inherits all the
+authority of the method and none of its checks.
+
+It also changes the corpus arithmetic honestly. Of 19 public environments: 1 fails to load,
+9 cannot be measured, 6 are genuinely clean, and 2 carry real findings. The finding rate is
+therefore **2 of 8 measurable environments (25%)**, not 2 of 19 (10%) — the denominator that
+matters is what could actually be examined.
+
 ### A taskset that failed to load escaped as a traceback
 
 Loading a taskset imports the customer's package and runs its module-level code, so it can

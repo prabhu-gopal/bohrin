@@ -13,6 +13,29 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A taskset with no reward function is no longer reported as clean.** A task carrying no
+  reward hook has no verifier: every candidate submitted to it scores zero, so every one is
+  "rejected", so `weak_oracle` found no accepted wrong solutions and `determinism` observed
+  no variance — and a taskset that was never examined came back as
+  **`0 / 100` at `coverage: 2 of 2 probes`**. That is the strongest claim Bohrin can make,
+  produced by measuring nothing, and `--fail-on-gap` passed it as a green build.
+
+  Not a hypothetical: **five of the eighteen loadable environments in the public
+  `verifiers` repository** — `wordle`, `kuhn_poker`, `openenv_wordle`, `proposer_solver`
+  and `wiki_search` — enumerate tasks with zero reward hooks, because they are judged
+  cross-agent, at the episode level, or by a seat minted only once a model has run. All
+  five reported a clean sweep at full coverage.
+
+  Both probes now refuse such tasks and say why. Those environments report
+  `VERIFICATION GAP: not measured  ·  coverage: 0 of 2 probes`, and a CI gate exits 3
+  ("gate not evaluated") rather than 0. Findings on environments that do have verifiers are
+  unchanged — `scratchpad` 50, `deepwiki` 25.
+
+  This is the same failure as reporting a correct verifier as broken, pointed the other
+  way, and it was found by running the tool across a real corpus rather than by reading it.
+
 ### Added
 
 - **A declared, extensible catalogue of metamorphic relations** (`bohrin.relations`). A

@@ -30,6 +30,23 @@ other half of the gap: verifiers that reject answers that are correct.
   its baseline may now be measurable. That means a taskset can move from "not measured" to
   a real score. Measured on real environments, findings are unchanged.
 
+## Fixed
+
+- **A taskset with no reward function was reported as clean.** If a task carries no reward
+  hook there is no verifier to audit: everything submitted scores zero, everything is
+  "rejected", nothing is ever a finding — and the audit came back `0 / 100` at
+  `coverage: 2 of 2 probes`. The strongest statement Bohrin can make, from measuring
+  nothing, and a `--fail-on-gap` job went green on it.
+
+  **Five of the eighteen loadable public `verifiers` environments do exactly this** —
+  `wordle`, `kuhn_poker`, `openenv_wordle`, `proposer_solver`, `wiki_search` — because they
+  are judged cross-agent, per episode, or by a seat minted once a model has run. All five
+  reported clean.
+
+  Both probes now refuse those tasks and name the reason. They report
+  `not measured · coverage: 0 of 2 probes`, and a CI gate exits 3 instead of 0. If you
+  audited one of these, **its clean result was never a result**; re-run it.
+
 ## Added
 
 - **`bohrin.relations` — a certified catalogue of meaning-preserving rewritings.** A

@@ -252,3 +252,46 @@ async def test_redundant_candidates_are_not_submitted_twice() -> None:
         f"expected {len(set(generated))} distinct mutants + {baseline_calls} baseline, got {source.calls}"
     )
     assert len(reference_renderings("x")) > 1, "the baseline must try more than one presentation"
+
+
+# ------------------------------------------------- a taskset with nothing to audit
+
+
+async def test_a_taskset_with_no_reward_function_is_never_reported_clean() -> None:
+    """The strongest claim Bohrin can make, produced by measuring nothing.
+
+    A task with no reward function has no verifier. Every candidate submitted to it
+    scores zero, so every one is "rejected", so the probe finds no accepted wrong
+    solutions — and a taskset that was never examined came back as ``0 / 100`` at full
+    coverage.
+
+    Found on real data, not by review: five of the eighteen loadable environments in the
+    public `verifiers` repository enumerate such tasks, and all five reported a clean
+    sweep. `--fail-on-gap` would have passed them, turning a false reassurance into a
+    green build.
+    """
+    from _fixtures import unjudged_source
+    from bohrin.scoring.gap import verification_gap
+
+    config = ScanConfig(unsafe_local=True)
+    source = unjudged_source()
+
+    weak = await WeakOracleProbe().run(source, config)
+    determinism = await DeterminismProbe().run(source, config)
+
+    assert weak.status is not ProbeStatus.OK, "an unjudged taskset was reported as measured"
+    assert determinism.status is ProbeStatus.NOT_APPLICABLE
+    assert weak.sub_score is None and determinism.sub_score is None
+    assert "reward function" in (determinism.reason or "")
+
+    gap = verification_gap([weak, determinism], [WeakOracleProbe(), DeterminismProbe()])
+    assert gap.score is None, "an unjudged taskset must score `not measured`, never 0"
+    assert gap.coverage.measured == ()
+
+
+async def test_a_judged_taskset_is_still_measured() -> None:
+    """The counterweight: the refusal must key on the missing reward, not fire generally."""
+    result = await WeakOracleProbe().run(_fixtures.weak_source(), ScanConfig(unsafe_local=True))
+
+    assert result.status is ProbeStatus.OK
+    assert result.findings, "the guard silenced a taskset that does have a verifier"

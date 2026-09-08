@@ -42,6 +42,30 @@ def _tasks(n: int = 3, *, reference: str | None = REFERENCE) -> list[Task]:
     ]
 
 
+def unjudged_source(n: int = 3) -> MemorySource:
+    """A taskset whose tasks carry **no reward function at all**.
+
+    Not a contrivance: five of the eighteen loadable environments in the public `verifiers`
+    repository enumerate exactly this — `wordle`, `kuhn_poker`, `openenv_wordle`,
+    `proposer_solver` and `wiki_search` are judged cross-agent, per episode, or by a seat
+    minted only once a model has run.
+
+    The reward returns zero for everything, which is what an unjudged task does: nothing is
+    ever accepted, so nothing is ever a finding, so the audit comes back clean. The danger
+    is entirely in what that clean result appears to say.
+    """
+    tasks = [
+        Task(
+            id=f"task-{i}",
+            prompt=f"Play the game (round {i}).",
+            reference=None,
+            reward_fns=(),
+        )
+        for i in range(n)
+    ]
+    return MemorySource(tasks, lambda _task, _payload: 0.0)
+
+
 def weak_source(n: int = 3) -> MemorySource:
     """A verifier that accepts anything non-empty — the classic weak oracle.
 
@@ -214,5 +238,6 @@ __all__ = [
     "no_reference_source",
     "strict_source",
     "substring_source",
+    "unjudged_source",
     "weak_source",
 ]
