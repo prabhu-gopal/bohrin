@@ -361,3 +361,46 @@ Mirroring the previous codebase's discipline, and enforced in CI:
    the reference. These must be filtered before submission, never reported.
 4. **A registry test** that fails the build if any registered probe lacks a
    fixture in (1) and (2).
+
+
+---
+
+## Probe 3 — Ground Truth Rejected
+
+> Will this verifier reject the taskset's own declared answer?
+
+The rejection half of the gap. `weak_oracle` asks whether a verifier accepts work
+that is wrong; this asks whether it rejects work that is right. Both are the same
+failure of a reward signal, and the second is not the lesser one — a verifier that
+rejects correct answers trains a model *away* from correct behaviour, because the
+gradient says the right answer was wrong.
+
+It submits the task's declared answer, rendered every way
+[`bohrin.relations`](../src/bohrin/relations/) certifies as meaning-preserving, and
+reports tasks where the verifier accepted none of them.
+
+### Why it carries no weight in the Verification Gap
+
+Its `weight` is `0.0`. That is a soundness argument, not caution: **three
+situations produce an identical result**, and only the first is a defect.
+
+| What happened | Example | Defect? |
+|---|---|---|
+| The comparison is broken and correct answers are discarded | — | **yes** |
+| The verifier enforces an output contract the prompt documents | `reverse_text` requires `<reversed_text>` tags and stores the bare reversal | no |
+| The reward never reads the reply | `code_golf` scores `trace.metrics.get("passed")`, set elsewhere in the episode | no |
+
+Both confounds were found by running this probe over the public `verifiers`
+corpus, not predicted in advance. A score pooling all three would report a
+correct verifier as defective, which the governing rule forbids outright. So the
+finding is reported for a human to judge and the number stays out of it. When the
+gap is split into acceptance and rejection sides, a rejection-side score can carry
+this without contaminating the acceptance-side one.
+
+### Wording discipline
+
+Findings report a **search budget**, never a verdict: *"no rendering of the
+declared answer was accepted (8 tried)"*. Not *"this verifier rejects correct
+answers"* — the catalogue is finite, and the ninth rendering might have passed.
+This is the same discipline `determinism` follows when it quotes detection power
+instead of claiming determinism.

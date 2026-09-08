@@ -80,6 +80,7 @@ verifiers_v1 = "bohrin.adapters.verifiers_v1:VerifiersV1Adapter"
 [project.entry-points."bohrin.probes"]
 weak_oracle = "bohrin.probes.weak_oracle:WeakOracleProbe"
 determinism = "bohrin.probes.determinism:DeterminismProbe"
+ground_truth_rejected = "bohrin.probes.ground_truth_rejected:GroundTruthRejectedProbe"
 
 # Only operators that can establish a wrongness ground are registered. `off_by_one` and
 # `swap_operator` are deliberately absent until the differential comparator lands: without

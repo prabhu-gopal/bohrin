@@ -32,6 +32,35 @@ other half of the gap: verifiers that reject answers that are correct.
 
 ## Added
 
+- **`ground_truth_rejected` — Bohrin now measures the other direction of the gap.** Until
+  now every probe asked one question: *does this verifier accept work that is wrong?* This
+  one asks *does it reject work that is right?* — by submitting the taskset's **own
+  declared answer**, rendered every way the relation catalogue certifies as
+  meaning-preserving, and reporting tasks where none was accepted.
+
+  It matters as much as the acceptance side. A verifier that rejects correct answers trains
+  a model *away* from correct behaviour, because the gradient says the right answer was
+  wrong. Across 307,420 verdicts on four widely used verifiers, self-validation — a
+  verifier accepting certified-equivalent renderings of **its own ground truth** — ranges
+  from **53.8% to 95.2%**; separately, **over 38%** of model responses in one RL training
+  set were false negatives.
+
+  **It does not move your Verification Gap, on purpose.** Three situations look identical
+  from outside, and only the first is a defect: the comparison is genuinely broken; the
+  verifier enforces an output format the prompt documents (`reverse_text` wants
+  `<reversed_text>` tags but stores the bare reversal, so refusing it is *correct*); or the
+  reward never reads the reply at all (`code_golf` scores a metric set elsewhere in the
+  episode, so nothing submitted offline can ever pass). Both confounds turned up by running
+  the probe over the public corpus. Scoring all three together would report correct
+  verifiers as broken, so the finding is reported for you to judge and the number stays out
+  of it.
+
+  Findings read as a **search budget**, never a verdict — *"no rendering of the declared
+  answer was accepted (8 tried)"* — the same discipline `determinism` uses when it quotes
+  detection power instead of claiming determinism. On the public corpus it is quiet: 2 of
+  19 environments, silent on every clean one, and no environment's gap changed.
+
+
 - **`false_negation` — a new mutation operator that finds a whole grader shape Bohrin
   previously walked past.** It submits an explicit denial of the taskset's own declared
   answer: `The answer is not 70.` where the taskset says the answer is `70`. Its wrongness
