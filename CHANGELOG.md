@@ -13,6 +13,32 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Fixed
+
+- **An empty reply was silently suppressed on any task whose answer is a bare number.**
+  Python's compiler discards a bare constant expression statement as dead code, so
+  `compile("70")` produces bytecode byte-identical to `compile("")`. The Trivial Compiler
+  Equivalence guard added in 1.0.2 therefore judged an empty submission to be "the same
+  program as the reference" and dropped it before it ever reached the verifier — along
+  with `constant_return`'s literals on the same tasks.
+
+  Numeric answers are the commonest task shape in the ecosystem, so this cost recall
+  exactly where it is most expensive, and it cost it **silently**: nothing failed, nothing
+  was reported, the candidate simply never ran. It is the mirror image of the false
+  accusations that guard was written to prevent, and it was introduced by the fix for them.
+
+  TCE now declines to apply when the reference does not compile to a program that does
+  anything — a bare answer is not code, and bytecode comparison has nothing to say about
+  it. This cannot reintroduce a false accusation: the candidates it un-suppresses carry
+  their own independent grounds. An empty reply is *structurally* wrong whatever the
+  reference is, and `constant_return` is guarded by `provably_distinct`, which compares
+  payloads as answers rather than as programs. The guard still catches what it was built
+  for — emptying a body that was already `pass` remains suppressed.
+
+  No score changes on the public corpus, because the two environments with numeric answers
+  (`code_golf`, `gsm8k`) are unmeasurable for unrelated reasons. The defect is real for any
+  taskset that grades a numeric answer, which is what most customers audit.
+
 ### Added
 
 - **A verifier that crashes on a well-formed submission is now a finding, not noise.** A

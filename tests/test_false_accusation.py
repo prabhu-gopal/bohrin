@@ -218,3 +218,55 @@ def test_equivalence_descends_into_nested_code_objects() -> None:
 
     assert compile(one, "<a>", "exec").co_code == compile(two, "<b>", "exec").co_code
     assert not code_equivalent(one, two)
+
+
+@pytest.mark.parametrize("reference", ["70", "5050", "0", "1", "3.14", "True", "None"])
+def test_a_bare_answer_is_not_a_program_and_suppresses_nothing(reference: str) -> None:
+    """The recall bug this pins, and why it was invisible.
+
+    Python discards a bare constant expression statement as dead code, so ``compile("70")``
+    is byte-identical to ``compile("")``. Trivial Compiler Equivalence therefore called an
+    empty reply "the same program as the reference" and suppressed it — on every taskset
+    whose answer is a bare number, which is the commonest shape in the ecosystem.
+
+    Nothing failed and nothing was reported; the candidate simply never reached the
+    verifier. Silent lost recall is the mirror image of the false accusations this module
+    exists to prevent, and it was introduced by the fix for them.
+    """
+    assert not code_equivalent("", reference)
+    assert not code_equivalent("0", reference) or reference == "0"
+    assert not code_equivalent("I cannot complete this task.", reference)
+
+
+def test_the_equivalence_check_still_catches_a_real_equivalent_mutant() -> None:
+    """The counterweight: the fix must not switch TCE off.
+
+    Emptying a body that was already ``pass`` produces a mutant byte-identical to its
+    reference. Reporting that accuses a verifier of accepting its own known-good answer,
+    and it must stay suppressed.
+    """
+    trivial = "def solve(x):\n    pass\n"
+
+    assert code_equivalent(trivial, trivial)
+    assert code_equivalent(trivial, "def solve(x):\n    # unchanged\n    pass\n")
+    assert not code_equivalent("def solve(x):\n    return 1\n", trivial)
+
+
+async def test_an_empty_reply_is_still_found_on_a_numeric_answer() -> None:
+    """End to end: the suppressed candidate reaches the verifier again.
+
+    A verifier accepting an empty reply is weak whatever its answer looks like, and the
+    numeric-answer case is the commonest one in the ecosystem — so this is exactly where
+    the probe must not go quiet.
+    """
+    from bohrin.adapters.memory import MemorySource
+    from bohrin.ir.task import Task
+
+    tasks = [Task(id="t0", prompt="p", reference="70", reward_fns=("r",))]
+    source = MemorySource(tasks, lambda _t, _p: 1.0)  # accepts literally anything
+
+    result = await WeakOracleProbe().run(source, CONFIG)
+
+    operators = {f.candidate.provenance.operator for f in _exploits(result)}
+    assert "empty_body" in operators, "an empty reply was suppressed against a numeric answer"
+    assert result.detail.get("equivalent_suppressed") == 0
