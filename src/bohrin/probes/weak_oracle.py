@@ -113,9 +113,10 @@ class WeakOracleProbe(Probe):
                 status=ProbeStatus.ERROR,
                 tasks_probed=len(tasks),
                 reason=(
-                    "no task could be measured offline: every task either needs a runtime to score, "
-                    "or its reference solution fails its own verifier — in which case an accepted "
-                    "mutant would be indistinguishable from a submission-format problem"
+                    "no task could be measured offline: every task has no reward function at all, "
+                    "or needs a runtime to score, or its reference solution fails its own verifier "
+                    "— in which case an accepted mutant would be indistinguishable from a "
+                    "submission-format problem"
                 ),
                 detail={"baseline_failures": baseline_detail, "baseline_errors": baseline_errors},
             )
@@ -200,16 +201,42 @@ class WeakOracleProbe(Probe):
     def _partition_scoreable(tasks: Sequence[Task]) -> tuple[list[Task], list[BaselineFailure]]:
         """Split tasks the adapter can score offline from ones it has refused.
 
+        Two reasons a task is refused, and the second is the more dangerous one.
+
         A task whose reward function needs a runtime cannot be scored honestly without one
         (scoring it offline would award full marks on a partial rubric). The adapter marks
         those; excluding them here means the user is told once, clearly, rather than through
         a wall of per-candidate errors.
+
+        A task with **no reward function at all** has no verifier to audit. Every candidate
+        submitted to it scores zero, so every one is "rejected", so the probe reports no
+        accepted wrong solutions — and a taskset that was never examined comes back as
+        ``0 / 100`` at full coverage. That is the strongest possible statement Bohrin can
+        make, produced by measuring nothing.
+
+        It is not a hypothetical. Five of the eighteen loadable environments in the public
+        `verifiers` repository — ``wordle``, ``kuhn_poker``, ``openenv_wordle``,
+        ``proposer_solver``, ``wiki_search`` — enumerate tasks carrying zero reward hooks,
+        because they are judged cross-agent, at the episode level, or by a seat that is
+        minted only once a model has run. All five reported a clean sweep.
         """
         offline: list[Task] = []
         refused: list[BaselineFailure] = []
         for task in tasks:
             needs = task.metadata.get("requires_runtime") or ()
-            if needs:
+            if not task.reward_fns:
+                refused.append(
+                    BaselineFailure(
+                        task_id=task.id,
+                        reward=0.0,
+                        reason=(
+                            "no reward function is attached to this task, so there is no verifier "
+                            "to audit; it is judged elsewhere (cross-agent, per episode, or by a "
+                            "task minted at runtime)"
+                        ),
+                    )
+                )
+            elif needs:
                 refused.append(
                     BaselineFailure(
                         task_id=task.id,

@@ -107,7 +107,24 @@ class DeterminismProbe(Probe):
                 reason=f"repeats={config.repeats}; at least 2 are needed to observe disagreement",
             )
 
-        work = [(task, self._probe_candidate(task)) for task in tasks for _ in range(config.repeats)]
+        # A task with no reward function has no verdict to be consistent about. Repeating a
+        # submission against it returns the same zero every time, which reads as "no variance
+        # observed" — a determinism result for a verifier that was never consulted. Five of
+        # the eighteen loadable public `verifiers` environments enumerate such tasks.
+        scoreable = [t for t in tasks if t.reward_fns]
+        if not scoreable:
+            return ProbeResult(
+                probe_id=self.id,
+                status=ProbeStatus.NOT_APPLICABLE,
+                tasks_probed=len(tasks),
+                reason=(
+                    "no task has a reward function attached, so there is no verdict whose "
+                    "consistency could be measured; these tasks are judged elsewhere "
+                    "(cross-agent, per episode, or by a task minted at runtime)"
+                ),
+            )
+
+        work = [(task, self._probe_candidate(task)) for task in scoreable for _ in range(config.repeats)]
         outcomes = await score_many(source, work, config)
 
         rewards: dict[str, list[float]] = {task.id: [] for task in tasks}
