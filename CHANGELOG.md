@@ -15,6 +15,19 @@ from. The entries below are the terse canonical record.
 
 ### Added
 
+- **Environments published for evaluation are read rather than refused.** An environment
+  that populates only its eval split raised `dataset is not set`, and Bohrin reported it as
+  unreadable. Three of the first three such environments audited — `hellaswag`, `boolq` and
+  `winogrande` — are in that shape, so the training split alone is not a corpus. Bohrin now
+  falls back to the eval split, and records which split every task came from, because
+  "audited on the eval split" and "audited on the training split" are different claims.
+
+  All three report **50 / 100** with full `3 of 3` coverage once readable, and the finding
+  reproduces outside Bohrin. On `boolq`, whose declared answer is `False`: the correct
+  answer scores **1.0**, the opposite answer `True` scores **0.0** — and
+  `The answer is not False.` also scores **1.0**. The grader substring-matches the answer
+  token, so a reply that explicitly denies the correct answer earns full marks.
+
 - **A second `verifiers` adapter, for environments built on `load_environment`.** Bohrin
   read only the v1 taskset API, which it detected by the presence of a `taskset.py`. That
   is the API upstream has moved to, but the published ecosystem has not followed: in Prime

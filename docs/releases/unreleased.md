@@ -42,6 +42,19 @@ nothing changes for environments that already worked.
 
 ## Added
 
+- **The eval split is read when an environment has no training split.** An environment
+  published for evaluation populates only its eval split, and asking for the training one
+  raises `dataset is not set` — which Bohrin reported as an unreadable environment.
+  `hellaswag`, `boolq` and `winogrande` are all in that shape. Every task now records the
+  split it came from, and the report states it: auditing the eval split and auditing the
+  training split are different claims, and the report may not blur them.
+
+  All three score **50 / 100** at full `3 of 3` coverage. On `boolq` the finding is stark —
+  the declared answer is `False`, the opposite answer `True` correctly scores 0.0, and
+  `The answer is not False.` scores **1.0**. The grader matches the answer token as a
+  substring, so a reply that explicitly denies the correct answer is rewarded as if it were
+  correct. It was caught by the `false_negation` operator added in 1.1.0.
+
 - **The `verifiers_legacy` adapter**, for environments exposing `load_environment()`. It
   yields to `verifiers_v1` on any path containing a `taskset.py`, so an environment that has
   migrated is still read through the API it migrated to, and no path is ever contended.
