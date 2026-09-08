@@ -1,0 +1,46 @@
+name: Security
+
+# Deliberately a separate workflow from `ci.yml`, and deliberately not in the required
+# checks. Two reasons:
+#
+#   * a newly published CVE in a transitive dependency would otherwise turn every open
+#     pull request red for a reason unrelated to the change under review;
+#   * `ci.yml`'s job names are pinned by branch protection, so adding jobs there risks
+#     the failure mode where a renamed check sits pending forever and blocks every merge.
+#
+# It still runs on every push and pull request, and on a schedule so a CVE disclosed
+# after a quiet week is not discovered at release time.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: dependency and static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Known vulnerabilities in dependencies
+        # `--skip-editable` skips bohrin itself, which is installed from this checkout and
+        # is not resolvable on PyPI at an unreleased version. Deliberately *not* `--strict`:
+        # that turns any skip into an error, so the self-skip would fail the job on every
+        # run. Without it pip-audit still exits non-zero when a real vulnerability is found
+        # — verified against a known-vulnerable pin before this was committed.
+        run: uv run --with pip-audit pip-audit --skip-editable
+
+      - name: Static analysis
+        # `try/except/continue` is reported as B112 and is load-bearing here: a third-party
+        # probe, adapter, operator or relation that raises must never take down an audit.
+        # Skipped by id rather than by suppressing the whole run, so a genuinely new
+        # finding still fails this job.
+        run: uv run --with bandit bandit -r src/bohrin --severity-level medium --skip B112

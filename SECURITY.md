@@ -2,12 +2,13 @@
 
 ## Supported versions
 
-Bohrin is pre-1.0. Security fixes land on the latest released version only.
+Security fixes land on the latest released version only.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.1.x   | ✅        |
-| < 0.1   | ❌        |
+| 1.1.x   | ✅        |
+| 1.0.x   | ❌ — upgrade |
+| 0.x     | ❌ — yanked; that line was a different tool, now published as [`adduct`](https://pypi.org/project/adduct/) |
 
 ## Reporting a vulnerability
 
@@ -44,12 +45,44 @@ than that, we will say so publicly and explain why.
 
 ## Scope notes
 
-Two properties are load-bearing for bohrin's threat model, and a break in either is a
-security bug worth reporting:
+**Auditing a taskset runs that taskset's own code.** Scoring a candidate invokes the
+environment's reward functions, and loading a taskset imports its Python package, which
+executes module-level code. That is inherent to what Bohrin does, not a defect: a verifier
+cannot be audited without being run. Treat any taskset you did not write as untrusted.
 
-- **Bohrin makes no network calls except an explicit Hugging Face Hub fetch**, which
-  happens only when you pass a `owner/name` repo id. There is no telemetry, and no scanned
-  data is ever uploaded.
-- **Bohrin never unpickles a checkpoint.** `--policy` reads safetensors, ONNX, and JSON
-  config only. If you find an input that causes arbitrary code execution — through a
-  checkpoint, an environment file, or a `bohrin.yaml` — that is a vulnerability.
+Three properties are load-bearing for the threat model, and a break in any of them is a
+security bug worth reporting.
+
+- **Bohrin refuses to execute verifier code with no isolation boundary.** Running without
+  one requires the explicit `--unsafe-local` flag. Executing third-party code without
+  either a boundary or that flag is a vulnerability.
+- **The isolation level used is recorded in every report and never overstated.** A result
+  produced in-process must not be presentable as one produced inside a container. A report
+  that claims a stronger boundary than the one that actually ran is a vulnerability, and a
+  more serious one than a crash, because the whole point of the record is that a third
+  party can rely on it.
+- **No telemetry.** Bohrin uploads nothing. It makes no network call of its own; a taskset
+  may make its own, and that is the taskset's behaviour, not Bohrin's.
+
+### Out of scope
+
+- **Anything `--unsafe-local` enables.** The flag exists to make the risk an explicit,
+  documented choice for a taskset you trust. That a hostile taskset can then do hostile
+  things is the stated consequence of passing it, not a vulnerability.
+- **The `subprocess` isolation level is not a sandbox.** It is described as blast-radius
+  containment throughout: process limits bound resource exhaustion, not escape. An escape
+  from `subprocess` is expected; an escape from a level documented as stronger is not.
+
+## Verifying what you installed
+
+Releases are published from tagged CI through PyPI Trusted Publishing, with no stored API
+token, and carry [PEP 740](https://peps.python.org/pep-0740/) digital attestations. You can
+confirm a wheel was built by this repository's workflow from the tag it claims, rather than
+trusting that PyPI served it:
+
+```bash
+pip install pypi-attestations
+pypi-attestations verify pypi bohrin
+```
+
+A tool selling verifiable attestation should be able to produce one for itself.

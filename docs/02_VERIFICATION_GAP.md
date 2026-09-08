@@ -78,7 +78,7 @@ Each probe defines its own normalisation, documented with it in
 Both are proportions of tasks, not counts, so a 40-task and a 400-task
 environment produce comparable numbers.
 
-The two probes deliberately measure different failure modes — `weak_oracle`
+The scoring probes deliberately measure different failure modes — `weak_oracle`
 measures *correctness* of acceptance, `determinism` measures *reliability* of
 scoring. A verifier can fail either independently, so neither subsumes the
 other and the pair gives real coverage rather than two views of one defect.

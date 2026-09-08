@@ -1,6 +1,6 @@
 # The open probes
 
-Two probes ship in the open core. This document is their design, including the
+Three probes ship in the open core. This document is their design, including the
 parts that are hard and the parts we deliberately refuse to do.
 
 ---

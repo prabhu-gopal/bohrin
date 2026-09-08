@@ -122,7 +122,7 @@ have caught it.
 Not "we built a tool" — **"we measured the public ecosystem, here is what we
 found."**
 
-Run the two open probes across a large sample of public environments on the
+Run the open probes across a large sample of public environments on the
 Environments Hub and publish the **Verification Gap Index**: per-environment
 scores, method, raw data, reproducible by anyone.
 
