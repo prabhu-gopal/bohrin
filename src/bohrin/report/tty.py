@@ -9,7 +9,7 @@ from __future__ import annotations
 from rich.console import Console
 from rich.markup import escape
 
-from bohrin.ir.evidence import Exploit, Finding, Flake
+from bohrin.ir.evidence import Exploit, Finding, Flake, GroundTruthRejected
 from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.report.model import Report
 
@@ -50,6 +50,15 @@ def _headline(result: ProbeResult) -> str:
         repeats = result.detail.get("repeats")
         # "no variance observed in N runs" is what was measured. "deterministic" is not.
         return f"no variance observed in {repeats} runs" if repeats else "no variance observed"
+    if result.probe_id == "ground_truth_rejected":
+        # Must never borrow the acceptance wording. This probe reports the opposite
+        # failure, and rendering "N tasks accept known-wrong solutions" over a rejection
+        # result states the reverse of what happened -- as an accusation, in the line a
+        # reader skims first.
+        if not n:
+            return "the declared answer was accepted on every task"
+        noun = "task" if n == 1 else "tasks"
+        return f"the declared answer was refused on {n} {noun} (not scored)"
     if not n:
         return "no accepted wrong solutions"
     if n == 1:
@@ -69,6 +78,8 @@ def _grouped(report: Report) -> dict[tuple[str, str], list[Finding]]:
         for finding in result.findings:
             if isinstance(finding, Exploit):
                 key = ("exploit", finding.candidate.provenance.operator)
+            elif isinstance(finding, GroundTruthRejected):
+                key = ("rejected", result.probe_id)
             else:
                 key = ("flake", result.probe_id)
             groups.setdefault(key, []).append(finding)
@@ -119,6 +130,10 @@ def render(report: Report, console: Console) -> None:
 
     for result in report.results:
         fraction = result.sub_score if result.sub_score is not None else 0.0
+        # A probe kept out of the Verification Gap must not draw a full bar: the bar reads
+        # as severity, and severity is exactly the claim this probe declines to make.
+        if result.detail.get("scored_out_of_gap"):
+            fraction = 0.0
         colour = "yellow" if result.status is ProbeStatus.OK else "dim"
         console.print(
             f"  [{colour}]{result.probe_id:<14}[/{colour}] {_bar(fraction)}  {escape(_headline(result))}",
@@ -160,6 +175,30 @@ def render(report: Report, console: Console) -> None:
             first = line if len(line) <= _PAYLOAD_CHARS else line[: _PAYLOAD_CHARS - 1].rstrip() + "…"
             prefix = "submitted" if tasks == 1 else f"example (task {escape(first_finding.task_id)})"
             console.print(f"           {prefix}: [cyan]{escape(first)}[/cyan]", highlight=False)
+        elif isinstance(first_finding, GroundTruthRejected):
+            # Worded as a search budget, never as a verdict. This finding is reported
+            # outside the Verification Gap because a rejection can also be a documented
+            # output contract being enforced correctly, and the line has to say so or a
+            # reader will take it as an accusation.
+            tried = len(first_finding.relations_tried)
+            noun = "task" if tasks == 1 else "tasks"
+            console.print(
+                f"  [yellow]REJECTED[/yellow] ▸ the declared answer was refused on "
+                f"{tasks} {noun} [dim](not scored)[/dim]",
+                highlight=False,
+            )
+            console.print(
+                f"           [dim]{tried} certified meaning-preserving renderings tried; none "
+                f"accepted. This is a lead, not a verdict: a verifier enforcing an output "
+                f"format the prompt documents, and one whose reward never reads the reply at "
+                f"all, both look exactly like this.[/dim]",
+                highlight=False,
+            )
+            console.print(
+                f"           example (task {escape(first_finding.task_id)}): "
+                f"[cyan]{escape(first_finding.reference[:_PAYLOAD_CHARS])}[/cyan]",
+                highlight=False,
+            )
         elif isinstance(first_finding, Flake):
             if tasks == 1:
                 console.print(f"  [yellow]FLAKE[/yellow]   ▸ {escape(first_finding.summary)}", highlight=False)

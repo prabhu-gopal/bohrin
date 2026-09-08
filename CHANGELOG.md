@@ -15,6 +15,38 @@ from. The entries below are the terse canonical record.
 
 ### Added
 
+- **A `ground_truth_rejected` probe — the rejection half of the Verification Gap.** Every
+  probe so far asked whether a verifier accepts work that is wrong. This asks whether it
+  rejects work that is right, by submitting the taskset's **own declared answer**, rendered
+  every way the metamorphic-relation catalogue certifies as meaning-preserving, and
+  reporting tasks where none was accepted.
+
+  It matters as much as the acceptance side and for the same reason: a verifier that
+  rejects correct answers trains a model *away* from correct behaviour, because the
+  gradient says the right answer was wrong. Published measurement puts the scale beyond
+  argument — across 307,420 verdicts on four widely used verifiers, self-validation (a
+  verifier accepting certified-equivalent renderings of its own ground truth) ranges from
+  **53.8% to 95.2%**, and separately **over 38%** of model responses in one RL training set
+  were false negatives.
+
+  **It deliberately contributes nothing to the Verification Gap.** Its weight is zero, and
+  that is a soundness argument rather than caution: three situations produce an identical
+  result and Bohrin cannot yet tell them apart. The comparison may genuinely be broken; or
+  the verifier may enforce an **output contract the prompt documents** — `reverse_text`
+  wants the answer inside `<reversed_text>` tags while storing the bare reversal, so
+  refusing it is that verifier working correctly; or the reward may **never read the reply
+  at all** — `code_golf` scores `trace.metrics.get("passed")`, set elsewhere in the
+  episode, so nothing submitted offline can pass and nothing was truly refused. Both
+  confounds were found by running the probe over the public corpus, not predicted. Only the
+  first is a defect, and a score pooling all three would report correct verifiers as
+  broken.
+
+  Findings are therefore worded as a **search budget**, never a verdict: *"no rendering of
+  the declared answer was accepted (8 tried)"* — the same discipline `determinism` follows
+  when it quotes detection power instead of claiming determinism. On the public corpus the
+  probe is quiet, firing on 2 of 19 environments and staying silent on every clean one, and
+  no environment's gap changed.
+
 - **A `false_negation` mutation operator.** Submits an explicit denial of the taskset's own
   declared answer — `The answer is not 70.` for a task declaring the answer is `70`. The
   wrongness is settled by the taskset's ground truth rather than by the reward function
@@ -35,40 +67,6 @@ from. The entries below are the terse canonical record.
   extracts the longest standalone A–I run and compares it exactly, so
   `The answer is not ABC.` yields `ABC` and scores full marks. In both cases a reply that
   explicitly states the answer is wrong is rewarded as though it were right.
-
-### Fixed
-
-- **A task id containing a space broke the reproduction command it printed.** Task ids come
-  from the taskset and routinely contain spaces — `glossary` names its tasks after people —
-  so `--task Ada Lovelace` split into two arguments and the printed command failed with
-  `unrecognized arguments: Lovelace`. For a tool whose claim is that a finding is evidence,
-  evidence you cannot re-run is the worst defect available. The 1.0.1 fix quoted the target
-  path and a test pinned that; nothing covered the task id, and no environment had exercised
-  it until an operator finally produced a finding on one that did. Task ids and operator
-  names are now shell-quoted in both probes, and a test parses the printed command back.
-
-- **A taskset with no reward function is no longer reported as clean.** A task carrying no
-  reward hook has no verifier: every candidate submitted to it scores zero, so every one is
-  "rejected", so `weak_oracle` found no accepted wrong solutions and `determinism` observed
-  no variance — and a taskset that was never examined came back as
-  **`0 / 100` at `coverage: 2 of 2 probes`**. That is the strongest claim Bohrin can make,
-  produced by measuring nothing, and `--fail-on-gap` passed it as a green build.
-
-  Not a hypothetical: **five of the eighteen loadable environments in the public
-  `verifiers` repository** — `wordle`, `kuhn_poker`, `openenv_wordle`, `proposer_solver`
-  and `wiki_search` — enumerate tasks with zero reward hooks, because they are judged
-  cross-agent, at the episode level, or by a seat minted only once a model has run. All
-  five reported a clean sweep at full coverage.
-
-  Both probes now refuse such tasks and say why. Those environments report
-  `VERIFICATION GAP: not measured  ·  coverage: 0 of 2 probes`, and a CI gate exits 3
-  ("gate not evaluated") rather than 0. Findings on environments that do have verifiers are
-  unchanged — `scratchpad` 50, `deepwiki` 25.
-
-  This is the same failure as reporting a correct verifier as broken, pointed the other
-  way, and it was found by running the tool across a real corpus rather than by reading it.
-
-### Added
 
 - **A declared, extensible catalogue of metamorphic relations** (`bohrin.relations`). A
   metamorphic relation states how a verifier's verdict must change — or must not change —
@@ -107,6 +105,38 @@ from. The entries below are the terse canonical record.
 
   `reference_renderings` keeps its signature and is now a view onto the catalogue, so the
   adapter and every existing caller are unchanged.
+
+### Fixed
+
+- **A task id containing a space broke the reproduction command it printed.** Task ids come
+  from the taskset and routinely contain spaces — `glossary` names its tasks after people —
+  so `--task Ada Lovelace` split into two arguments and the printed command failed with
+  `unrecognized arguments: Lovelace`. For a tool whose claim is that a finding is evidence,
+  evidence you cannot re-run is the worst defect available. The 1.0.1 fix quoted the target
+  path and a test pinned that; nothing covered the task id, and no environment had exercised
+  it until an operator finally produced a finding on one that did. Task ids and operator
+  names are now shell-quoted in both probes, and a test parses the printed command back.
+
+- **A taskset with no reward function is no longer reported as clean.** A task carrying no
+  reward hook has no verifier: every candidate submitted to it scores zero, so every one is
+  "rejected", so `weak_oracle` found no accepted wrong solutions and `determinism` observed
+  no variance — and a taskset that was never examined came back as
+  **`0 / 100` at `coverage: 2 of 2 probes`**. That is the strongest claim Bohrin can make,
+  produced by measuring nothing, and `--fail-on-gap` passed it as a green build.
+
+  Not a hypothetical: **five of the eighteen loadable environments in the public
+  `verifiers` repository** — `wordle`, `kuhn_poker`, `openenv_wordle`, `proposer_solver`
+  and `wiki_search` — enumerate tasks with zero reward hooks, because they are judged
+  cross-agent, at the episode level, or by a seat minted only once a model has run. All
+  five reported a clean sweep at full coverage.
+
+  Both probes now refuse such tasks and say why. Those environments report
+  `VERIFICATION GAP: not measured  ·  coverage: 0 of 2 probes`, and a CI gate exits 3
+  ("gate not evaluated") rather than 0. Findings on environments that do have verifiers are
+  unchanged — `scratchpad` 50, `deepwiki` 25.
+
+  This is the same failure as reporting a correct verifier as broken, pointed the other
+  way, and it was found by running the tool across a real corpus rather than by reading it.
 
 ## [1.0.2] — 2026-09-07
 

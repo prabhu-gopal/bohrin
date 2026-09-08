@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from bohrin.execute.isolation import Assessment, Isolation
-from bohrin.ir.evidence import Exploit, Flake
+from bohrin.ir.evidence import Exploit, Finding, GroundTruthRejected
 from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.scoring.gap import GapScore
 from bohrin.version import REPORT_SCHEMA_VERSION, __version__
@@ -27,7 +27,7 @@ class Report:
     #: no boundary must never be mistaken for one produced inside a container.
     isolation: Assessment | None = None
 
-    def command_for(self, finding: Exploit | Flake) -> str:
+    def command_for(self, finding: Finding) -> str:
         """The command that re-runs exactly this finding.
 
         A finding is evidence only if the reader can re-run it, so this must be
@@ -69,7 +69,7 @@ class Report:
         }
 
 
-def _probe_to_dict(result: ProbeResult, command_for: Callable[[Exploit | Flake], str]) -> dict[str, Any]:
+def _probe_to_dict(result: ProbeResult, command_for: Callable[[Finding], str]) -> dict[str, Any]:
     out: dict[str, Any] = {
         "id": result.probe_id,
         "status": result.status.value,
@@ -92,7 +92,7 @@ def _probe_to_dict(result: ProbeResult, command_for: Callable[[Exploit | Flake],
     return out
 
 
-def _finding_to_dict(finding: Exploit | Flake, command_for: Callable[[Exploit | Flake], str]) -> dict[str, Any]:
+def _finding_to_dict(finding: Finding, command_for: Callable[[Finding], str]) -> dict[str, Any]:
     if isinstance(finding, Exploit):
         return {
             "kind": "exploit",
@@ -102,6 +102,17 @@ def _finding_to_dict(finding: Exploit | Flake, command_for: Callable[[Exploit | 
             "detail": finding.candidate.provenance.detail,
             "payload": finding.candidate.payload,
             "reward": finding.verdict.reward,
+            "repro": command_for(finding),
+        }
+    if isinstance(finding, GroundTruthRejected):
+        return {
+            "kind": "ground_truth_rejected",
+            "task_id": finding.task_id,
+            "reference": finding.reference,
+            "relations_tried": list(finding.relations_tried),
+            # Named in the record itself, so a consumer aggregating findings cannot roll
+            # this into a gap contribution by mistake.
+            "scored": False,
             "repro": command_for(finding),
         }
     return {

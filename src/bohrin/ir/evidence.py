@@ -82,6 +82,48 @@ class Flake:
         return f"{self.task_id}: identical submission scored {seen}"
 
 
-Finding = Exploit | Flake
+@dataclass(frozen=True, slots=True)
+class GroundTruthRejected:
+    """The verifier refused every certified rendering of the taskset's own answer.
 
-__all__ = ["BaselineFailure", "Exploit", "Finding", "Flake", "Unverified"]
+    The rejection half of the gap. A verifier that rejects correct work trains a model
+    away from it — the gradient says the right answer was wrong — which is the same defect
+    as accepting wrong work with the sign reversed.
+
+    **What this does and does not establish.** It reports a *search budget*: N certified
+    meaning-preserving renderings were submitted and none passed. It does not claim the
+    verifier is broken, because three different situations produce an identical result and
+    Bohrin cannot yet tell them apart:
+
+    * the comparison really is broken, and correct answers are being thrown away;
+    * the verifier enforces an **output contract the prompt documents** — ``reverse_text``
+      wants the answer inside ``<reversed_text>`` tags and stores the bare reversal, so
+      refusing the stored value is that verifier working correctly;
+    * the reward **never reads the reply at all** — ``code_golf`` scores
+      ``trace.metrics.get("passed")``, a value set elsewhere in the episode, so nothing
+      submitted offline can ever pass and nothing was really "refused".
+
+    Only the first is a defect. That is why the probe emitting this carries a weight of
+    zero and contributes nothing to the Verification Gap: a number that pooled all three
+    would report correct verifiers as broken.
+
+    ``summary`` is worded to survive being quoted out of context, since a finding that
+    reads as an accusation will be repeated as one.
+    """
+
+    task_id: str
+    #: The declared answer, as stored by the taskset.
+    reference: str
+    #: Ids of the relations whose renderings were submitted, in the order tried.
+    relations_tried: tuple[str, ...] = ()
+    repro_args: str = ""
+
+    @property
+    def summary(self) -> str:
+        n = len(self.relations_tried)
+        return f"{self.task_id}: no rendering of the declared answer was accepted ({n} tried)"
+
+
+Finding = Exploit | Flake | GroundTruthRejected
+
+__all__ = ["BaselineFailure", "Exploit", "Finding", "Flake", "GroundTruthRejected", "Unverified"]
