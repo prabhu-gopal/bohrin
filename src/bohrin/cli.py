@@ -212,11 +212,17 @@ def _gate(args: argparse.Namespace, report: Report, err: Console) -> int:
             highlight=False,
         )
         return EXIT_UNDECIDED
-    if len(gap.coverage.measured) < gap.coverage.total:
+    # Only a probe that *failed* leaves the verdict undecided. A probe that does not
+    # **apply** -- `ground_truth_rejected` on a taskset with no declared answer, or
+    # `weak_oracle` when --operator selected none -- has nothing to measure rather than an
+    # unmeasured gap, and blocking on it would fail a CI job for a clean environment. That
+    # regression was real: adding a third probe made four clean public environments exit 3.
+    failed = [r.probe_id for r in report.results if r.status is ProbeStatus.ERROR]
+    if failed:
         err.print(
-            f"[red]gate not evaluated[/red] only {gap.coverage} completed, so a passing "
-            f"score would understate the gap — rerun once every probe can measure, or "
-            f"drop the gate.",
+            f"[red]gate not evaluated[/red] {', '.join(sorted(failed))} could not measure "
+            f"this taskset ({gap.coverage} completed), so a passing score would understate "
+            f"the gap — fix the cause, or drop the gate.",
             highlight=False,
         )
         return EXIT_UNDECIDED

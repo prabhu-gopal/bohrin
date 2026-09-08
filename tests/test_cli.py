@@ -11,6 +11,7 @@ import pytest
 
 from bohrin.cli import EXIT_CLEAN, EXIT_FINDINGS, EXIT_UNDECIDED, EXIT_USER_ERROR, main
 from bohrin.ir.task import Ground
+from bohrin.probes.base import ProbeStatus
 
 
 def test_version_and_help_exit_zero(capsys: pytest.CaptureFixture[str]) -> None:
@@ -214,14 +215,52 @@ def test_an_unmeasured_audit_is_undecided_and_never_passes_a_gate() -> None:
     assert _gate_on(blind, fail_on_finding=True) == EXIT_UNDECIDED
 
 
-def test_partial_coverage_is_undecided_because_a_passing_score_would_understate() -> None:
+def test_a_probe_that_failed_leaves_the_gate_undecided() -> None:
     """A gap computed from one of two probes is a different quantity, not a lenient one."""
+    from bohrin.probes.base import ProbeResult
     from bohrin.scoring.gap import Coverage, GapScore
 
     report = _report_with_one_exploit("./t", isolation_none=True)
-    partial = replace(report, gap=GapScore(score=0.0, coverage=Coverage(("weak_oracle",), 2)))
+    partial = replace(
+        report,
+        gap=GapScore(score=0.0, coverage=Coverage(("weak_oracle",), 2)),
+        results=(
+            report.results[0],
+            ProbeResult(probe_id="determinism", status=ProbeStatus.ERROR, reason="every call failed"),
+        ),
+    )
 
     assert _gate_on(partial, fail_on_gap=10.0) == EXIT_UNDECIDED
+
+
+def test_a_probe_that_did_not_apply_does_not_block_the_gate() -> None:
+    """The distinction the gate turns on, and a regression that actually happened.
+
+    A probe that *failed* leaves the verdict undecided. A probe that does not **apply** —
+    `ground_truth_rejected` against a taskset with no declared answer — has nothing to
+    measure rather than an unmeasured gap. Conflating them made four clean public
+    environments start failing CI the moment a third probe was registered, which is a
+    worse failure than the one the exit code exists to prevent.
+    """
+    from bohrin.probes.base import ProbeResult
+    from bohrin.scoring.gap import Coverage, GapScore
+
+    report = _report_with_one_exploit("./t", isolation_none=True)
+    clean = replace(
+        report,
+        gap=GapScore(score=0.0, coverage=Coverage(("weak_oracle",), 2)),
+        results=(
+            replace(report.results[0], sub_score=0.0, findings=()),
+            ProbeResult(
+                probe_id="ground_truth_rejected",
+                status=ProbeStatus.NOT_APPLICABLE,
+                reason="no task has a declared answer",
+            ),
+        ),
+    )
+
+    assert _gate_on(clean, fail_on_gap=10.0) == EXIT_CLEAN
+    assert _gate_on(clean, fail_on_finding=True) == EXIT_CLEAN
 
 
 def test_a_clean_fully_covered_audit_passes_the_gate() -> None:

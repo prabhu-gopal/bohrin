@@ -15,6 +15,17 @@ from. The entries below are the terse canonical record.
 
 ### Fixed
 
+- **A CI gate no longer fails a clean taskset because a probe did not apply.** The gate
+  treated any probe short of full coverage as leaving the verdict undecided, so registering
+  a third probe made four clean public environments start exiting `3` — a probe that
+  *cannot* apply was being read as an unmeasured gap.
+
+  Those are different things. `ground_truth_rejected` on a taskset with no declared answer,
+  or `weak_oracle` when `--operator` selected none, has **nothing to measure** rather than
+  something it failed to measure. Only a probe that reports `error` now leaves the gate
+  undecided, and the message names which probe and why. Genuinely unmeasurable tasksets
+  still exit `3`, and the message is more useful than the coverage fraction it replaced.
+
 - **An empty reply was silently suppressed on any task whose answer is a bare number.**
   Python's compiler discards a bare constant expression statement as dead code, so
   `compile("70")` produces bytecode byte-identical to `compile("")`. The Trivial Compiler
