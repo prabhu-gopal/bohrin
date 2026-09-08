@@ -21,7 +21,9 @@ bohrin/
 │   ├── adapters/             # bind to an environment format
 │   │   ├── base.py           # Adapter ABC, MissingExtraError
 │   │   ├── registry.py       # detect() → best adapter
-│   │   └── verifiers_v1.py   # the one that matters at launch
+│   │   ├── _package.py       # distribution name from a pyproject
+│   │   ├── verifiers_v1.py   # the taskset API upstream is moving to
+│   │   └── verifiers_legacy.py  # the load_environment API almost everything still ships
 │   │
 │   ├── probes/
 │   │   ├── base.py           # Probe ABC, ProbeResult
@@ -125,15 +127,32 @@ Consequences, all deliberate:
 
 The same mechanism carries `bohrin.adapters` and `bohrin.mutators`.
 
-## Adapters: `verifiers` v1
+## Adapters: `verifiers`, both APIs
 
 The target is Prime Intellect's `verifiers`, because environments there are
 installable Python modules, which makes a large installed base addressable
 through one adapter.
 
-**The v0 API (`import verifiers as vf`, `vf.load_environment()`) has been
-removed.** v1 is `import verifiers.v1 as vf`, built on tasksets, harnesses and
-traces:
+Two APIs are in circulation at once, and Bohrin reads both — one adapter each,
+selected by `detect()`. `verifiers_legacy` yields to `verifiers_v1` on any path
+holding a `taskset.py`, so the two never contend and a migrated environment is
+read through the API it migrated to.
+
+**Supporting only v1 would mean auditing almost nothing that is published.**
+Upstream has moved to v1 and files the older API under `verifiers.legacy`, but
+the ecosystem has not followed: in Prime Intellect's environments repository,
+111 modules define `load_environment` and none defines a v1 taskset. Bohrin
+recognised 0 of its 109 environments until `verifiers_legacy` existed.
+
+The **legacy** API is `import verifiers as vf`, `vf.load_environment(id)`,
+returning an `Environment` that carries a dataset and a rubric; a rubric is a
+tree of weighted reward functions, and Bohrin scores a candidate by building the
+rollout state upstream would have built and invoking the rubric on it. Zero-weight
+entries are metrics, not rewards, and a reward function that raises is reported
+rather than silently recorded as zero — a partial rubric scored as if it were
+complete manufactures findings in both directions.
+
+**v1** is `import verifiers.v1 as vf`, built on tasksets, harnesses and traces:
 
 - a **Taskset** loads **Task** objects via `load()`
 - a **Task** carries scoring as `@vf.reward`-decorated async methods
