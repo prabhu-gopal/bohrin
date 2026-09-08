@@ -27,13 +27,21 @@ $ pip install ./environments/scratchpad      # a taskset is an installed package
 $ bohrin audit ./environments/scratchpad --max-tasks 8 --unsafe-local
 
 Bohrin  ·  environments/scratchpad
-verifiers_v1 · 8 tasks · 2 probes · isolation: none
+verifiers_v1 · 8 tasks · 3 probes · isolation: none
   note verifier code ran in-process with no isolation boundary
 
   determinism    ░░░░░░░░░░░░░░░  no variance observed in 5 runs
+  ground_truth_rejected ░░░░░░░░░░░░░░░  the declared answer was accepted on
+every task
   weak_oracle    ███████████████  8 tasks accept known-wrong solutions
 
-  VERIFICATION GAP: 50 / 100   coverage: 2 of 2 probes
+  VERIFICATION GAP: 50 / 100   coverage: 3 of 3 probes
+
+  EXPLOIT ▸ false_negation accepted on 8 tasks (reward 1)
+           explicitly denies the declared answer 'alpha'
+           example (task 0): The answer is not alpha.
+           bohrin audit environments/scratchpad --task 0 --operator
+false_negation --unsafe-local
 
   EXPLOIT ▸ identity_return accepted on 8 tasks (reward 1)
            echoes the prompt verbatim instead of answering
@@ -108,11 +116,22 @@ is recorded in the report. A task whose reward function needs a runtime is
 refused rather than scored on a partial rubric, because a partial rubric awards
 full marks to a submission that does nothing.
 
-## The two open probes
+## The three open probes
+
+Two directions of the same failure, and one check on the signal itself.
 
 **Weak oracle** — will the verifier accept work that is provably incorrect?
 This is mutation testing with the roles relabelled: your verifier is the test
 suite, and a surviving mutant is a wrong solution it accepted.
+
+**Ground truth rejected** — will the verifier reject work that is right? It
+submits the taskset's *own declared answer*, rendered every way the relation
+catalogue certifies as meaning-preserving, and reports tasks where none was
+accepted. A verifier that rejects correct answers trains a model away from
+correct behaviour: the gradient says the right answer was wrong. This probe
+reports findings but deliberately does **not** contribute to the Verification
+Gap — a verifier enforcing an output format its prompt documents looks identical
+to a broken one, and scoring them together would accuse the wrong party.
 
 **Determinism** — does the verifier return the same reward for the same
 submission? A grader that disagrees with itself injects noise straight into the

@@ -49,18 +49,23 @@ jobs:
       name: testpypi
       url: https://test.pypi.org/p/bohrin
     permissions:
-      # Required for Trusted Publishing: this is what lets uv mint a short-lived OIDC
-      # token instead of us storing a long-lived PyPI API token in GitHub Secrets.
+      # Required for Trusted Publishing *and* for PEP 740 attestations: it mints a
+      # short-lived OIDC token instead of storing a long-lived PyPI API token in GitHub
+      # Secrets, and it is what the attestation is signed against.
       id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      # The PyPA action rather than `uv publish`, for one reason: it generates PEP 740
+      # digital attestations by default under Trusted Publishing, and `uv publish` does
+      # not. Without them an installer can confirm only that PyPI served the file, not
+      # that this repository's CI built it from this tag.
       - name: Publish
-        run: uv publish --trusted-publishing always --publish-url https://test.pypi.org/legacy/
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
     name: Publish to PyPI
@@ -77,10 +82,10 @@ jobs:
         with:
           name: dist
           path: dist/
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      # Attestations on by default here — see the note on the TestPyPI job. A tool whose
+      # product is a verifiable attestation cannot ship its own artifacts unsigned.
       - name: Publish
-        run: uv publish --trusted-publishing always
+        uses: pypa/gh-action-pypi-publish@release/v1
 
   github-release:
     name: Attach distributions to the GitHub release

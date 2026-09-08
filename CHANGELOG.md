@@ -13,7 +13,47 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Added
+
+- **Releases now carry PEP 740 digital attestations.** Publishing moved from `uv publish`
+  to `pypa/gh-action-pypi-publish`, which generates and uploads attestations by default
+  under Trusted Publishing; `uv publish` does not, and needs a separate action to do it.
+  Without them an installer can confirm only that PyPI served a file, not that this
+  repository's CI built it from the tag it claims. A tool selling verifiable attestation
+  should be able to produce one for its own artifacts. `SECURITY.md` documents how to
+  check: `pypi-attestations verify pypi bohrin`.
+
+- **Dependency and static analysis run in CI**, as a separate `Security` workflow:
+  `pip-audit` for known vulnerabilities in the dependency tree and `bandit` for static
+  analysis, on every push and pull request plus a weekly schedule so a CVE disclosed during
+  a quiet week is not discovered at release time. Deliberately **not** one of the required
+  checks — a newly published CVE in a transitive dependency would otherwise turn every open
+  pull request red for a reason unrelated to the change under review, and `ci.yml`'s job
+  names are pinned by branch protection.
+
+- **Dependabot** watches both `pip` dependencies and the GitHub Actions used by the
+  workflows. The actions are a supply chain too: a compromised one runs with the release
+  job's `id-token: write`, which is the credential that publishes to PyPI.
+
 ### Fixed
+
+- **`SECURITY.md` described a different program.** Its scope notes promised that Bohrin
+  "never unpickles a checkpoint" and that `--policy` reads safetensors, ONNX and JSON only
+  — properties of the robot-dataset analyzer this repository used to hold, none of which
+  exist in the verifier auditor. The supported-versions table still listed `0.1.x`, a line
+  that is yanked and belongs to `adduct`.
+
+  Worse than being stale, it **omitted the property that actually matters**: auditing a
+  taskset runs that taskset's own code, because a verifier cannot be audited without being
+  run. The policy now states that plainly, names the three load-bearing guarantees (refusal
+  to execute without an isolation boundary, never overstating the boundary that ran, no
+  telemetry), and says what is explicitly out of scope — anything `--unsafe-local` enables,
+  and escape from `subprocess`, which is documented as blast-radius containment rather than
+  a sandbox.
+
+- **The README and design docs still described two probes.** The sample output showed
+  `2 probes` and `coverage: 2 of 2`; `docs/03_PROBES.md` opened by saying two ship. Three
+  do. The README output is regenerated from a real run.
 
 - **A CI gate no longer fails a clean taskset because a probe did not apply.** The gate
   treated any probe short of full coverage as leaving the verdict undecided, so registering
