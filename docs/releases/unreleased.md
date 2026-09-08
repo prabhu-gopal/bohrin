@@ -32,6 +32,20 @@ other half of the gap: verifiers that reject answers that are correct.
 
 ## Added
 
+- **A verifier that crashes on an ordinary submission is now reported.** A reward function
+  that raises on a plain string reply is broken, and Bohrin used to count that as noise and
+  say nothing. It now reports it as a `CRASH` finding with the payload that triggered it.
+
+  Guarded so it cannot blame the wrong party: a crash is only reported when **some other
+  submission to the same task scored fine**, which isolates the payload as the cause. If
+  everything failed, that is a setup or network problem and is reported as an unmeasurable
+  task instead. It is also kept out of the Verification Gap — nothing was accepted, so a
+  crash must not read as the verifier rewarding wrong work.
+
+  On the public corpus no verifier crashes on a well-formed payload, so this finds nothing
+  there today. It is included because a taskset you wrote is not a taskset we tested.
+
+
 - **Bohrin finds a reference solution in more tasksets.** It used to look for the answer
   under six names it knew about. Any taskset that named the field after its own domain was
   probed with no reference at all — `scratchpad` calls it `word` and grades with

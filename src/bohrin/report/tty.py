@@ -9,7 +9,7 @@ from __future__ import annotations
 from rich.console import Console
 from rich.markup import escape
 
-from bohrin.ir.evidence import Exploit, Finding, Flake, GroundTruthRejected
+from bohrin.ir.evidence import Exploit, Finding, Flake, GroundTruthRejected, HarnessDisruption
 from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.report.model import Report
 
@@ -80,6 +80,8 @@ def _grouped(report: Report) -> dict[tuple[str, str], list[Finding]]:
                 key = ("exploit", finding.candidate.provenance.operator)
             elif isinstance(finding, GroundTruthRejected):
                 key = ("rejected", result.probe_id)
+            elif isinstance(finding, HarnessDisruption):
+                key = ("disruption", finding.operator)
             else:
                 key = ("flake", result.probe_id)
             groups.setdefault(key, []).append(finding)
@@ -175,6 +177,17 @@ def render(report: Report, console: Console) -> None:
             first = line if len(line) <= _PAYLOAD_CHARS else line[: _PAYLOAD_CHARS - 1].rstrip() + "…"
             prefix = "submitted" if tasks == 1 else f"example (task {escape(first_finding.task_id)})"
             console.print(f"           {prefix}: [cyan]{escape(first)}[/cyan]", highlight=False)
+        elif isinstance(first_finding, HarnessDisruption):
+            noun = "task" if tasks == 1 else "tasks"
+            console.print(
+                f"  [red]CRASH[/red]   ▸ the verifier failed on a well-formed submission ({tasks} {noun})",
+                highlight=False,
+            )
+            console.print(f"           [dim]{escape(first_finding.error[:160])}[/dim]", highlight=False)
+            shown_payload = first_finding.payload.strip() or "(empty)"
+            head = shown_payload.splitlines()[0] if shown_payload.splitlines() else shown_payload
+            head = head if len(head) <= _PAYLOAD_CHARS else head[: _PAYLOAD_CHARS - 1].rstrip() + "…"
+            console.print(f"           submitted: [cyan]{escape(head)}[/cyan]", highlight=False)
         elif isinstance(first_finding, GroundTruthRejected):
             # Worded as a search budget, never as a verdict. This finding is reported
             # outside the Verification Gap because a rejection can also be a documented

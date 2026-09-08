@@ -295,3 +295,67 @@ async def test_a_judged_taskset_is_still_measured() -> None:
 
     assert result.status is ProbeStatus.OK
     assert result.findings, "the guard silenced a taskset that does have a verifier"
+
+
+# ------------------------------------------------------------- harness disruption
+
+
+async def test_a_verifier_that_crashes_on_a_well_formed_payload_is_reported() -> None:
+    """A reward function is a program, and one that raises on an ordinary string reply is
+    broken in a way its author would want to know about. Bohrin previously counted the
+    crash as noise and reported nothing."""
+    from bohrin.adapters.memory import MemorySource
+    from bohrin.ir.evidence import HarnessDisruption
+    from bohrin.ir.task import Task
+
+    def reward(_task: Task, payload: str) -> float:
+        if payload.strip() == "":
+            raise ValueError("cannot parse empty reply")
+        # Accepts its own answer, so the baseline is green and the mutants actually run.
+        return 1.0 if payload.strip() == "alpha" else 0.0
+
+    tasks = [Task(id="t0", prompt="p", reference="alpha", reward_fns=("r",))]
+    result = await WeakOracleProbe().run(MemorySource(tasks, reward), ScanConfig(unsafe_local=True))
+
+    crashes = [f for f in result.findings if isinstance(f, HarnessDisruption)]
+    assert crashes, "a verifier that raised on a plain string was reported as noise"
+    assert "cannot parse empty reply" in crashes[0].error
+    assert crashes[0].payload == "", "the trigger must be quoted so the reader can judge it"
+
+
+async def test_a_crash_does_not_raise_the_verification_gap() -> None:
+    """Nothing was accepted. Counting a crash in the acceptance sub-score would report a
+    verifier as rewarding wrong work when it did the opposite — it refused to answer."""
+    from bohrin.adapters.memory import MemorySource
+    from bohrin.ir.evidence import Exploit
+    from bohrin.ir.task import Task
+
+    def reward(_task: Task, payload: str) -> float:
+        if payload.strip() == "":
+            raise ValueError("boom")
+        return 1.0 if payload.strip() == "alpha" else 0.0
+
+    tasks = [Task(id=f"t{i}", prompt="p", reference="alpha", reward_fns=("r",)) for i in range(2)]
+    result = await WeakOracleProbe().run(MemorySource(tasks, reward), ScanConfig(unsafe_local=True))
+
+    assert result.sub_score == 0.0, "a crash inflated the acceptance score"
+    assert not [f for f in result.findings if isinstance(f, Exploit)]
+
+
+async def test_a_task_where_everything_fails_is_not_blamed_on_the_grader() -> None:
+    """The soundness guard. A task where *every* attempt errored is a setup, network or
+    environment problem — including one of ours. Reporting it as a verifier defect would
+    be a false accusation, so a disruption needs at least one successful score on the same
+    task to isolate the payload as the trigger."""
+    from bohrin.adapters.memory import MemorySource
+    from bohrin.ir.evidence import HarnessDisruption
+    from bohrin.ir.task import Task
+
+    def always_raises(_task: Task, _payload: str) -> float:
+        raise ConnectionError("the environment's server is unreachable")
+
+    tasks = [Task(id="t0", prompt="p", reference="70", reward_fns=("r",))]
+    result = await WeakOracleProbe().run(MemorySource(tasks, always_raises), ScanConfig(unsafe_local=True))
+
+    assert not [f for f in result.findings if isinstance(f, HarnessDisruption)]
+    assert result.status is ProbeStatus.ERROR, "it must still be reported, as an unmeasurable task"

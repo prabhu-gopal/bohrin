@@ -17,7 +17,7 @@ from bohrin.adapters.base import TaskSource
 from bohrin.adapters.verifiers_v1 import reference_renderings
 from bohrin.config import ScanConfig
 from bohrin.execute.runner import ScoreOutcome, score_many
-from bohrin.ir.evidence import BaselineFailure, Exploit, Finding, Unverified
+from bohrin.ir.evidence import BaselineFailure, Exploit, Finding, HarnessDisruption, Unverified
 from bohrin.ir.task import Candidate, Provenance, Task
 from bohrin.mutate import discover as discover_operators
 from bohrin.mutate.equivalence import code_equivalent
@@ -172,7 +172,11 @@ class WeakOracleProbe(Probe):
                 detail={"baseline_failures": baseline_detail, "errors": errors, "candidates_submitted": len(work)},
             )
 
-        compromised = {f.task_id for f in findings}
+        # Exploits only. A harness disruption is a robustness defect, not an acceptance:
+        # nothing was accepted, so counting it here would raise the Verification Gap as
+        # though the verifier had rewarded wrong work. It is reported alongside, and scored
+        # separately from, the thing this sub-score measures.
+        compromised = {f.task_id for f in findings if isinstance(f, Exploit)}
         unbaselined = sum(1 for t in measurable if t.reference is None)
         return ProbeResult(
             probe_id=self.id,
@@ -327,9 +331,31 @@ class WeakOracleProbe(Probe):
         # different defects off the end of the report.
         seen: set[tuple[str, str]] = set()
 
+        # A crash is only the verifier's defect if the *payload* triggered it. A task where
+        # every attempt failed is a setup, network or environment problem, and blaming the
+        # grader for it would be a false accusation. Requiring at least one successful score
+        # on the same task isolates the payload as the trigger -- and the burden of
+        # well-formedness stays ours, which is why every payload is a plain string.
+        scored_ok = {out.task.id for out in outcomes if out.error is None and out.verdict is not None}
+        crashed: set[str] = set()
+
         for out in outcomes:
             if out.error is not None:
                 errors += 1
+                if out.task.id in scored_ok and out.task.id not in crashed:
+                    crashed.add(out.task.id)
+                    findings.append(
+                        HarnessDisruption(
+                            task_id=out.task.id,
+                            error=out.error,
+                            payload=out.candidate.payload,
+                            operator=out.candidate.provenance.operator,
+                            repro_args=(
+                                f"--task {shlex.quote(out.task.id)} "
+                                f"--operator {shlex.quote(out.candidate.provenance.operator)}"
+                            ),
+                        )
+                    )
                 continue
             verdict = out.verdict
             if verdict is None or not verdict.passed:
