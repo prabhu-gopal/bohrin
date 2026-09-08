@@ -32,6 +32,22 @@ other half of the gap: verifiers that reject answers that are correct.
 
 ## Added
 
+- **Bohrin finds a reference solution in more tasksets.** It used to look for the answer
+  under six names it knew about. Any taskset that named the field after its own domain was
+  probed with no reference at all — `scratchpad` calls it `word` and grades with
+  `self.data.word in answer`, so none of its tasks had a baseline.
+
+  Bohrin now also reads **which field the reward function itself consults**. A field the
+  grader compares against is the grader's own notion of the right answer. The familiar
+  names are still tried first, so nothing about your existing audits changes; this only
+  reaches tasksets that were getting nothing.
+
+  It is conservative on purpose, because a wrong reference is worse than none: standard
+  fields are excluded, two candidate fields yield nothing rather than a coin-flip, and an
+  unreadable reward yields nothing rather than a guess. On the public corpus `scratchpad`
+  gains its reference and no environment gains a false finding.
+
+
 - **`ground_truth_rejected` — Bohrin now measures the other direction of the gap.** Until
   now every probe asked one question: *does this verifier accept work that is wrong?* This
   one asks *does it reject work that is right?* — by submitting the taskset's **own
