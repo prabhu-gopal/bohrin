@@ -76,6 +76,7 @@ bohrin = "bohrin.cli:_run"
 
 [project.entry-points."bohrin.adapters"]
 verifiers_v1 = "bohrin.adapters.verifiers_v1:VerifiersV1Adapter"
+verifiers_legacy = "bohrin.adapters.verifiers_legacy:VerifiersLegacyAdapter"
 
 [project.entry-points."bohrin.probes"]
 weak_oracle = "bohrin.probes.weak_oracle:WeakOracleProbe"

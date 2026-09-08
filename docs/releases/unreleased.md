@@ -5,207 +5,87 @@ date: "unreleased"
 # tag: "vX.Y.Z"        # add at release time
 breaking: false
 summary: >
-  Bohrin's answer renderings become a declared, extensible catalogue of metamorphic
-  relations — each one carrying the argument for why it preserves meaning, and each one
-  silent on answers it does not apply to.
+  Bohrin can now audit environments built on the load_environment API, which is what
+  almost every published environment still uses, and refuses to score a rubric whose
+  reward functions failed instead of reporting it clean.
 ---
 
 ## TL;DR
 
-The eight hard-coded ways Bohrin re-renders an answer when looking for one its verifier
-accepts are now a **declared catalogue of metamorphic relations** — twelve of them, each
-stating why its rewriting preserves meaning, each staying silent on answers it does not
-apply to, and all of them extensible by a third party without patching Bohrin.
-
-Nothing changes about how an audit runs today. This is the groundwork for reporting the
-other half of the gap: verifiers that reject answers that are correct.
+Bohrin previously read only one of the two `verifiers` APIs in circulation — and it was the
+one almost nothing published uses yet. It recognised **0 of the 109 environments** in Prime
+Intellect's environments repository. This release adds a second adapter for the other API,
+and fixes a case where an environment Bohrin could not actually measure was reported as
+scoring a clean `0 / 100`. Upgrade with `pip install --upgrade 'bohrin[verifiers]'`;
+nothing changes for environments that already worked.
 
 ## Upgrade impact
 
 - **Breaking changes:** none
 - **Action required:** none — `pip install --upgrade 'bohrin[verifiers]'`
-- **New minimums:** none
-- **Baselines try four more renderings than before** (`inline_math`, `decimal_point`,
-  `trailing_zeros_dropped`, `latex_fraction`), so a task whose reference previously failed
-  its baseline may now be measurable. That means a taskset can move from "not measured" to
-  a real score. Measured on real environments, findings are unchanged.
+- **New minimums:** none. Note that many published environments pin `python <3.13`; that
+  is their constraint, not Bohrin's, but it is what you will hit installing one.
+
+## Highlights
+
+- **Bohrin can read the environments people actually publish.** The v1 taskset API is where
+  upstream is going, and Bohrin supported it exclusively — detecting it by the presence of a
+  `taskset.py`. The published ecosystem has not migrated: 111 modules in Prime Intellect's
+  environments repository define `load_environment`, and none defines a v1 taskset. Every
+  one of those 109 environments was answered with "no adapter recognised" — an error that
+  also, unhelpfully, suggested installing an extra that was already installed. Both APIs are
+  now supported side by side.
+
+- **An environment Bohrin cannot measure no longer looks clean.** A verification gap of
+  `0 / 100` is a strong claim, and Bohrin was making it in a case where it had measured
+  nothing at all. That is now reported as `not measured`.
 
 ## Added
 
-- **A verifier that crashes on an ordinary submission is now reported.** A reward function
-  that raises on a plain string reply is broken, and Bohrin used to count that as noise and
-  say nothing. It now reports it as a `CRASH` finding with the payload that triggered it.
+- **The eval split is read when an environment has no training split.** An environment
+  published for evaluation populates only its eval split, and asking for the training one
+  raises `dataset is not set` — which Bohrin reported as an unreadable environment.
+  `hellaswag`, `boolq` and `winogrande` are all in that shape. Every task now records the
+  split it came from, and the report states it: auditing the eval split and auditing the
+  training split are different claims, and the report may not blur them.
 
-  Guarded so it cannot blame the wrong party: a crash is only reported when **some other
-  submission to the same task scored fine**, which isolates the payload as the cause. If
-  everything failed, that is a setup or network problem and is reported as an unmeasurable
-  task instead. It is also kept out of the Verification Gap — nothing was accepted, so a
-  crash must not read as the verifier rewarding wrong work.
+  All three score **50 / 100** at full `3 of 3` coverage. On `boolq` the finding is stark —
+  the declared answer is `False`, the opposite answer `True` correctly scores 0.0, and
+  `The answer is not False.` scores **1.0**. The grader matches the answer token as a
+  substring, so a reply that explicitly denies the correct answer is rewarded as if it were
+  correct. It was caught by the `false_negation` operator added in 1.1.0.
 
-  On the public corpus no verifier crashes on a well-formed payload, so this finds nothing
-  there today. It is included because a taskset you wrote is not a taskset we tested.
+- **The `verifiers_legacy` adapter**, for environments exposing `load_environment()`. It
+  yields to `verifiers_v1` on any path containing a `taskset.py`, so an environment that has
+  migrated is still read through the API it migrated to, and no path is ever contended.
 
-
-- **Bohrin finds a reference solution in more tasksets.** It used to look for the answer
-  under six names it knew about. Any taskset that named the field after its own domain was
-  probed with no reference at all — `scratchpad` calls it `word` and grades with
-  `self.data.word in answer`, so none of its tasks had a baseline.
-
-  Bohrin now also reads **which field the reward function itself consults**. A field the
-  grader compares against is the grader's own notion of the right answer. The familiar
-  names are still tried first, so nothing about your existing audits changes; this only
-  reaches tasksets that were getting nothing.
-
-  It is conservative on purpose, because a wrong reference is worse than none: standard
-  fields are excluded, two candidate fields yield nothing rather than a coin-flip, and an
-  unreadable reward yields nothing rather than a guess. On the public corpus `scratchpad`
-  gains its reference and no environment gains a false finding.
-
-
-- **`ground_truth_rejected` — Bohrin now measures the other direction of the gap.** Until
-  now every probe asked one question: *does this verifier accept work that is wrong?* This
-  one asks *does it reject work that is right?* — by submitting the taskset's **own
-  declared answer**, rendered every way the relation catalogue certifies as
-  meaning-preserving, and reporting tasks where none was accepted.
-
-  It matters as much as the acceptance side. A verifier that rejects correct answers trains
-  a model *away* from correct behaviour, because the gradient says the right answer was
-  wrong. Across 307,420 verdicts on four widely used verifiers, self-validation — a
-  verifier accepting certified-equivalent renderings of **its own ground truth** — ranges
-  from **53.8% to 95.2%**; separately, **over 38%** of model responses in one RL training
-  set were false negatives.
-
-  **It does not move your Verification Gap, on purpose.** Three situations look identical
-  from outside, and only the first is a defect: the comparison is genuinely broken; the
-  verifier enforces an output format the prompt documents (`reverse_text` wants
-  `<reversed_text>` tags but stores the bare reversal, so refusing it is *correct*); or the
-  reward never reads the reply at all (`code_golf` scores a metric set elsewhere in the
-  episode, so nothing submitted offline can ever pass). Both confounds turned up by running
-  the probe over the public corpus. Scoring all three together would report correct
-  verifiers as broken, so the finding is reported for you to judge and the number stays out
-  of it.
-
-  Findings read as a **search budget**, never a verdict — *"no rendering of the declared
-  answer was accepted (8 tried)"* — the same discipline `determinism` uses when it quotes
-  detection power instead of claiming determinism. On the public corpus it is quiet: 2 of
-  19 environments, silent on every clean one, and no environment's gap changed.
-
-
-- **`false_negation` — a new mutation operator that finds a whole grader shape Bohrin
-  previously walked past.** It submits an explicit denial of the taskset's own declared
-  answer: `The answer is not 70.` where the taskset says the answer is `70`. Its wrongness
-  comes from the taskset's ground truth, not from the verifier being audited.
-
-  A verifier that decides by asking whether the answer appears *somewhere in the reply*
-  cannot tell an assertion from its denial — the denial contains the answer too. That is
-  one of the commonest grader shapes in the ecosystem, and nothing in the previous operator
-  set constructed a payload for it.
-
-  **Findings on the public `verifiers` corpus go from two environments to four.**
-  `glossary` and `color_codeword` move from 0/100 to 50/100; `deepwiki` from 25 to 50. If
-  you audited a taskset that grades by containment or by extracting a value from free text,
-  **re-run it** — a clean result from before may not survive.
-
-  Both new findings were confirmed independently with Bohrin out of the loop. `glossary`
-  grades `answer.lower() in reply.lower()`, so a reply denying the answer scores full
-  marks. `color_codeword` extracts the longest standalone A–I run and compares it exactly,
-  so `The answer is not ABC.` yields `ABC` and scores full marks. In both, a reply that
-  explicitly says the answer is wrong is rewarded as if it were right.
+  The first environments this unlocks already produce findings that reproduce outside
+  Bohrin. On `allenai_ifeval` (**50 / 100**), the `validate_json_format` task scores the
+  literal string `0` at **reward 1.0** and a well-formed English answer at **0.0** — `0`
+  parses as JSON, so it satisfies the check. A policy trained on that task is rewarded for
+  emitting `0` and penalised for answering the question.
 
 ## Fixed
 
-- **A CI gate no longer fails a clean taskset because a probe did not apply.** Registering
-  a third probe made four clean public environments start exiting `3`, because the gate
-  read "not every probe reported a score" as "we could not tell". A probe that *cannot*
-  apply — `ground_truth_rejected` where the taskset declares no answer — has nothing to
-  measure, which is not the same as failing to measure. Only a probe that errors now blocks
-  the gate, and the message names it.
+- **A rubric whose reward functions raise is refused rather than scored.** Upstream catches
+  a raising reward function, logs it, and records zero for that function, so the total that
+  comes back is a partial rubric wearing a complete rubric's number. It is wrong in both
+  directions at once: nothing can reach full marks, so no exploit is ever reported, and the
+  known-good answer fails too, which reads as a verifier that rejects its own ground truth.
+  Bohrin now detects this and declines to score, naming the cause.
 
+  On `mastermind`, where four of five reward functions read rollout state that only a live
+  multi-turn rollout produces, the audit previously reported `VERIFICATION GAP: 0 / 100`.
+  It now reports `not measured`, with `coverage: 0 of 3 probes`.
 
-- **An empty reply was silently dropped on tasks whose answer is a bare number.** Python
-  discards a bare constant expression as dead code, so `70` compiles to exactly the same
-  bytecode as an empty string. The equivalence guard added in 1.0.2 therefore treated an
-  empty submission as "the reference itself" and never sent it — along with
-  `constant_return`'s literals on the same tasks.
+- **Upstream's reward-function error logging no longer buries the report.** It is emitted
+  once per reward function per scored candidate, so a single broken rubric turned a 15-task
+  audit into hundreds of identical stderr lines. The messages are captured and reported
+  once, as the refusal above.
 
-  Numeric answers are the commonest task shape there is, so this cost recall where it
-  matters most, and it did so **without any sign**: nothing failed, nothing was reported,
-  the candidate just never ran. **If you audited a taskset with numeric answers, re-run
-  it** — findings may appear that were previously suppressed.
+## Known limitations
 
-  Equivalence now declines to apply when the reference is not a program. It still catches
-  what it was built for, and it cannot reintroduce a false accusation: an empty reply is
-  structurally wrong whatever the answer is, and `constant_return` is separately guarded by
-  a comparison of the payloads *as answers*.
-
-
-- **A task id with a space broke the reproduction command.** Task ids come from the
-  taskset and often contain spaces — `glossary` names its tasks after people — so
-  `--task Ada Lovelace` split into two arguments and the printed command failed with
-  `unrecognized arguments: Lovelace`. Evidence you cannot re-run is the worst defect a tool
-  like this can have. Task ids and operator names are now shell-quoted, and a test parses
-  the printed command back through the argument parser.
-
-
-- **A taskset with no reward function was reported as clean.** If a task carries no reward
-  hook there is no verifier to audit: everything submitted scores zero, everything is
-  "rejected", nothing is ever a finding — and the audit came back `0 / 100` at
-  `coverage: 2 of 2 probes`. The strongest statement Bohrin can make, from measuring
-  nothing, and a `--fail-on-gap` job went green on it.
-
-  **Five of the eighteen loadable public `verifiers` environments do exactly this** —
-  `wordle`, `kuhn_poker`, `openenv_wordle`, `proposer_solver`, `wiki_search` — because they
-  are judged cross-agent, per episode, or by a seat minted once a model has run. All five
-  reported clean.
-
-  Both probes now refuse those tasks and name the reason. They report
-  `not measured · coverage: 0 of 2 probes`, and a CI gate exits 3 instead of 0. If you
-  audited one of these, **its clean result was never a result**; re-run it.
-
-## Added
-
-- **`bohrin.relations` — a certified catalogue of meaning-preserving rewritings.** A
-  metamorphic relation says how a verdict must change, or must not change, when the input
-  is transformed in a known way — the standard answer to the oracle problem, and what
-  Bohrin was already doing informally without saying so.
-
-  Every relation now carries a **certification**: one sentence giving the reason its
-  rewriting preserves meaning *by construction*. And every relation is **partial** — one
-  that does not apply returns nothing rather than guessing. That partiality is the
-  soundness mechanism. A relation that over-claims would let Bohrin report a verifier for
-  rejecting an answer that was never equivalent to begin with, which is a false accusation
-  reached from the other direction.
-
-  The four new relations were picked from measured evidence. Across 307,420 verdicts on
-  four widely-used verifiers, self-validation — a verifier accepting certified-equivalent
-  renderings of **its own ground truth** — ranges from **53.8% to 95.2%**, and
-  whitespace and punctuation alone account for **93.0%** of in-contract failures on one of
-  them. Presentational rewritings are therefore tried first, because those are what
-  verifiers actually reject.
-
-  A thousands separator is deliberately **not** included: the comma is a decimal separator
-  in much of the world, so that rewriting is only meaning-preserving under an assumption
-  about locale, and a certification may not contain an assumption.
-
-- **A `bohrin.relations` entry-point group.** Relations are discovered exactly like probes,
-  adapters and operators, with no privileged path for the built-ins — so a domain's own
-  notation or a house answer format is a package you publish, not a patch. Built-in
-  ordering lives in code rather than in the entry-point table, so installing a plugin
-  cannot reorder an existing audit's baseline search.
-
-## Verified
-
-- `ruff check` · `ruff format --check` · `mypy --strict` · `pytest` — clean, **136 tests**,
-  on Python 3.11, 3.12 and 3.13.
-- **A real bug caught by testing rather than review.** `Decimal("70.0").normalize()` is
-  `7E+1`, so the first implementation of `trailing_zeros_dropped` submitted `"7E+1"` —
-  numerically equal, but a *different* rewriting from the one certified, meaning a
-  rejection would have been reported against a promise never made. Fixed-point formatting
-  keeps the claim; a test pins it and was confirmed load-bearing by reintroducing the bug.
-- **No regression on real environments** (upstream `verifiers`, cloned fresh):
-  `scratchpad` 50, `deepwiki` 25, `glossary` 0, `proposer_solver` 0, `alphabet_sort` 0,
-  `wordle` 0 — all unchanged, and each audit still completes in seconds.
-
-## Links
-
-- Full changelog entry: [CHANGELOG.md → Unreleased](../../CHANGELOG.md)
+- Roughly 47 of the 109 published environments score with an LLM judge, which needs a live
+  model. Bohrin refuses those tasks rather than scoring them on a partial rubric, so they
+  are reported as unmeasured. The honest coverage figure for that corpus is therefore well
+  below 109, and every report states which probes were measured.
