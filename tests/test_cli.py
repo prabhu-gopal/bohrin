@@ -378,3 +378,29 @@ def test_a_zero_score_says_what_it_does_not_prove() -> None:
 def test_a_nonzero_score_carries_no_caveat() -> None:
     """It applies to a clean result only; on a real finding it would be noise."""
     assert "not a proof" not in _render(_exploits_across(3))
+
+
+def test_a_task_id_with_spaces_survives_the_repro_command() -> None:
+    """Task ids are taskset-supplied and routinely contain spaces.
+
+    `glossary` names its tasks after people — "Ada Lovelace" — so an unquoted
+    `--task Ada Lovelace` splits into two arguments and the printed command fails with
+    `unrecognized arguments: Lovelace`. The 1.0.1 fix quoted the *target path* and a test
+    pinned that; nothing covered the task id, and no environment had exercised it until
+    an operator finally produced a finding on one that did.
+    """
+    from dataclasses import replace as dc_replace
+
+    from bohrin.cli import _parser
+
+    report = _report_with_one_exploit("./envs/t", isolation_none=False)
+    exploit = report.results[0].findings[0]
+    spaced = dc_replace(
+        exploit,
+        task_id="Ada Lovelace",
+        repro_args=f"--task {shlex.quote('Ada Lovelace')} --operator empty_body",
+    )
+    printed = report.command_for(spaced)
+
+    args = _parser().parse_args(shlex.split(printed)[1:])
+    assert args.task == ["Ada Lovelace"], "an unquoted task id splits into two arguments"

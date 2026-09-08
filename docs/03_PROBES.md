@@ -123,7 +123,7 @@ a separate advisory section of the report.
 Deterministic, no model inference, therefore fast and reproducible. Each is
 tagged with the wrongness ground it can establish.
 
-Six are registered today (`pyproject.toml` `[project.entry-points."bohrin.mutators"]`):
+Seven are registered today (`pyproject.toml` `[project.entry-points."bohrin.mutators"]`):
 
 | Operator | Submission it produces | Ground |
 |---|---|---|
@@ -131,8 +131,24 @@ Six are registered today (`pyproject.toml` `[project.entry-points."bohrin.mutato
 | `identity_return` | the task prompt, echoed back verbatim | Structural |
 | `refusal` | `"I cannot complete this task."` | Structural |
 | `constant_return` | a fixed literal (`0`, `1`, `True`, `None`, `[]`, `""`), skipping any that is not *provably distinct* from the reference | Differential |
+| `false_negation` | an explicit denial of the declared answer (`"The answer is not X."`) | Invariant |
 | `drop_side_effect` | the reference code with every function body replaced by `pass` (LibCST) | Structural |
 | `negate_condition` | the reference code with every `if` predicate negated (LibCST) | **none — leads only** |
+
+`false_negation` exists for a grader shape nothing else reached. A verifier that
+decides by asking whether the answer appears *somewhere in the reply* cannot
+distinguish an assertion from its denial — the denial contains the answer too.
+`empty_body` and `refusal` submit nothing a containment check recognises, and
+`constant_return` submits a literal such a check also rejects, so a substring
+grader looked clean to every operator. Its ground is **invariant**: the taskset
+declares the answer, and a submission denying that answer contradicts the
+taskset's own ground truth, independently of what the reward function says.
+
+Adding it took findings on the public `verifiers` corpus from two environments to
+four. `glossary` grades `answer.lower() in reply.lower()`; `color_codeword`
+extracts the longest standalone A–I run and compares it exactly, so
+`"The answer is not ABC."` yields `ABC`. Both reward a reply that explicitly
+states the answer is wrong.
 
 `negate_condition` carries **no ground**. Negating a predicate changes the source
 but not necessarily the behaviour: a branch whose two arms do the same thing is

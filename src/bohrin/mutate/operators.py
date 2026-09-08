@@ -110,6 +110,58 @@ class ConstantReturn(MutationOperator):
             )
 
 
+class FalseNegation(MutationOperator):
+    """Submit an explicit denial of the taskset's own declared answer.
+
+    ``The answer is not 70.`` contradicts a taskset that declares the answer is ``70``.
+    The wrongness is settled by the taskset's own ground truth, not by the reward function
+    being audited, which makes this an **invariant** ground: it holds whatever the verifier
+    says. That independence is the whole requirement for reporting an exploit.
+
+    **What it catches, and why it is worth having.** A verifier that decides by asking
+    whether the answer appears *somewhere in the reply* cannot tell an assertion from its
+    denial — the denial contains the answer too. Substring containment is one of the
+    commonest grader shapes in the ecosystem, and no existing operator constructs a payload
+    for it: `empty_body` and `refusal` submit nothing recognisable, and `constant_return`
+    submits a literal that a substring grader also rejects. Measured on the public
+    `verifiers` corpus, this payload scores **full reward** on ``glossary``, ``deepwiki``
+    and ``color_codeword``.
+
+    **Where it must stay silent.** Denying an answer only contradicts the taskset when
+    there *is* a declared answer, so no reference means no candidate. And the denial must
+    be distinguishable from the answer itself: a reference that already reads as a denial
+    of itself would make the payload agree rather than contradict, which is the one way
+    this operator could accuse a verifier that is behaving correctly.
+    """
+
+    id = "false_negation"
+    rationale = "Explicitly denying the declared answer contradicts the taskset's own ground truth."
+
+    #: Two phrasings, because a grader may key on a marker word rather than the sentence.
+    #: Both are unambiguous denials; neither is a hedge like "probably not".
+    _FORMS = ("The answer is not {ref}.", "The answer is definitely not {ref}. That is incorrect.")
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        ref = (task.reference or "").strip()
+        if not ref:
+            return
+        for form in self._FORMS:
+            payload = form.format(ref=ref)
+            # A payload that collides with the reference under some normalisation is not a
+            # contradiction of it, and submitting one would be the constant_return bug in a
+            # new costume. In practice a denial never collides -- it is strictly longer --
+            # but the check is cheap and the invariant is the point.
+            if collides_under(payload, ref) is not None:
+                continue
+            yield _cand(
+                self.id,
+                "negation",
+                f"explicitly denies the declared answer {ref[:40]!r}",
+                payload,
+                Ground.INVARIANT,
+            )
+
+
 # --------------------------------------------------------------------------- code-level
 
 
