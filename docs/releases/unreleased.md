@@ -67,6 +67,14 @@ nothing changes for environments that already worked.
 
 ## Fixed
 
+- **A `verifiers` silently resolved below the required version is reported clearly.** A
+  taskset is an installed package with its own pins, and installing one alongside Bohrin can
+  resolve `verifiers` downwards — one published environment pins `verifiers==0.1.5`, enough
+  to take a working 0.3.1 down to a version with no `verifiers.legacy` module. `verifiers`
+  still imported, so the audit began and then failed once per task with a raw
+  `ModuleNotFoundError` that looked like a broken taskset. Bohrin now checks for the API it
+  actually needs and names the installed version, the required version, and the fix.
+
 - **A rubric whose reward functions raise is refused rather than scored.** Upstream catches
   a raising reward function, logs it, and records zero for that function, so the total that
   comes back is a partial rubric wearing a complete rubric's number. It is wrong in both

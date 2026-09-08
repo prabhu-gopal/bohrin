@@ -303,3 +303,34 @@ def test_an_environment_with_no_readable_split_names_both_failures() -> None:
 
     with pytest.raises(TasksetLoadError, match=r"train:.*eval:"):
         _LegacySource._read_dataset(_Env(None, None), "e", None)
+
+
+# --------------------------------------------------------------------------- requirements
+
+
+def test_a_downgraded_verifiers_is_named_rather_than_failing_once_per_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A taskset's own pins can resolve `verifiers` below the version holding this API.
+
+    The package is then present and importable while `verifiers.legacy` is not. Without an
+    explicit check the audit starts and dies once per task with a raw ModuleNotFoundError,
+    which reads as a broken taskset rather than a version conflict the user can resolve.
+    """
+    from bohrin.adapters import verifiers_legacy as mod
+    from bohrin.adapters.base import MissingExtraError
+
+    monkeypatch.setattr(mod, "_available", lambda: False)
+    monkeypatch.setattr(mod, "_installed_version", lambda: "0.2.0")
+    with pytest.raises(MissingExtraError, match=r"0\.2\.0.*verifiers\.legacy"):
+        VerifiersLegacyAdapter().check_requirements()
+
+
+def test_an_absent_verifiers_still_says_to_install_the_extra(monkeypatch: pytest.MonkeyPatch) -> None:
+    from bohrin.adapters import verifiers_legacy as mod
+    from bohrin.adapters.base import MissingExtraError
+
+    monkeypatch.setattr(mod, "_available", lambda: False)
+    monkeypatch.setattr(mod, "_installed_version", lambda: None)
+    with pytest.raises(MissingExtraError, match="pip install 'bohrin\\[verifiers\\]'"):
+        VerifiersLegacyAdapter().check_requirements()
