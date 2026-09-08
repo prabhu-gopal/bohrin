@@ -13,6 +13,41 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Added
+
+- **A second `verifiers` adapter, for environments built on `load_environment`.** Bohrin
+  read only the v1 taskset API, which it detected by the presence of a `taskset.py`. That
+  is the API upstream has moved to, but the published ecosystem has not followed: in Prime
+  Intellect's environments repository, 111 modules define `load_environment` and **none**
+  defines a v1 taskset, so Bohrin recognised **0 of its 109 environments** and answered
+  every one of them with "no adapter recognised". The new `verifiers_legacy` adapter reads
+  that API. The two never contend for a path — `verifiers_legacy` yields to `verifiers_v1`
+  wherever a `taskset.py` is present, so a migrated environment is still read as v1.
+
+  Measured on the environments this unlocks: `allenai_ifeval` scores **50/100**, and the
+  finding reproduces outside Bohrin — on its `validate_json_format` task, submitting the
+  literal string `0` scores **reward 1.0** while a well-formed English answer scores
+  **0.0**, because `0` parses as JSON. A policy trained on that task is rewarded for
+  emitting `0` and penalised for answering.
+
+### Fixed
+
+- **A rubric whose reward functions raise is now refused, not scored.** Upstream catches a
+  reward function that raises, logs it, and records zero for that function. The total that
+  comes back is a partial rubric wearing a complete rubric's number, and it is wrong in
+  both directions: nothing can reach full marks, so no exploit is ever reported, and the
+  known-good answer fails too, which reads as a verifier that rejects its own ground truth.
+  Bohrin now detects this and declines to score the task, naming the cause. On `mastermind`,
+  where four of five reward functions need live multi-turn rollout state, the audit
+  previously reported `VERIFICATION GAP: 0 / 100` — a clean bill of health for an
+  environment it had not measured at all — and now reports `not measured` with
+  `coverage: 0 of 3 probes`.
+
+- **Upstream's per-reward-function error logging no longer floods the terminal.** It is
+  emitted once per reward function per scored candidate, so one broken rubric turned a
+  15-task audit into hundreds of identical stderr lines that buried the report. The
+  messages are captured and reported once, as the refusal above.
+
 ## [1.1.0] — 2026-09-08
 
 ### Added

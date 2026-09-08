@@ -35,11 +35,11 @@ from __future__ import annotations
 import ast
 import inspect
 import textwrap
-import tomllib
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from bohrin.adapters._package import distribution_name
 from bohrin.adapters.base import Adapter, MissingExtraError, TasksetLoadError, TaskSource
 from bohrin.ir.task import Candidate, Task, Verdict
 from bohrin.relations import renderings as relation_renderings
@@ -47,9 +47,8 @@ from bohrin.relations import renderings as relation_renderings
 if TYPE_CHECKING:
     from bohrin.config import ScanConfig
 
-#: Files that mark a verifiers taskset package on disk.
+#: The file that marks a verifiers taskset package on disk.
 _TASKSET_FILE = "taskset.py"
-_PYPROJECT = "pyproject.toml"
 
 #: Fields a taskset commonly uses for a known-good answer. `TaskData` standardises `prompt`
 #: and `description` but not the reference, so this is a documented best effort: when none
@@ -239,17 +238,7 @@ def _taskset_id(path: Path) -> str | None:
     Upstream resolves an id (`owner/name`, or a bare `name`) to an *installed* module, so
     the id is the distribution name from the package's own pyproject.
     """
-    for candidate in (path / _PYPROJECT, *(p / _PYPROJECT for p in sorted(path.glob("*")) if p.is_dir())):
-        if not candidate.is_file():
-            continue
-        try:
-            meta = tomllib.loads(candidate.read_text(encoding="utf-8"))
-        except (OSError, tomllib.TOMLDecodeError):
-            continue
-        name = meta.get("project", {}).get("name")
-        if isinstance(name, str) and name:
-            return name
-    return None
+    return distribution_name(path)
 
 
 def _require_bounded(taskset: Any, taskset_id: str) -> None:
