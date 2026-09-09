@@ -27,6 +27,13 @@ from bohrin.relations.base import Relation
 #: elaborate is not confidently a fraction, and a wrong guess here is unsound.
 _FRACTION = re.compile(r"^(-?\d+)\s*/\s*(\d+)$")
 
+#: ``\sqrt`` applied to a single unbraced token, e.g. ``\sqrt2``. LaTeX takes exactly one
+#: token as the argument, so bracing that token is a pure notational change. Deliberately
+#: narrow: for a multi-character argument the unbraced form means something *different*
+#: (``\sqrt12`` is the square root of 1, followed by a 2), so rewriting it would not be
+#: meaning-preserving and this relation must not fire.
+_SQRT_TOKEN = re.compile(r"\\sqrt(?![a-zA-Z{])\s*([0-9a-zA-Z])")
+
 
 def _number(answer: str) -> Decimal | None:
     """The answer as an exact decimal, or ``None`` if it is not plainly a number.
@@ -153,17 +160,97 @@ class LatexFraction(Relation):
         return f"\\frac{{{match.group(1)}}}{{{match.group(2)}}}" if match else None
 
 
+class TrailingPeriod(Relation):
+    id = "trailing_period"
+    certification = "a sentence-final period is punctuation; it does not alter the answer"
+
+    def render(self, answer: str) -> str | None:
+        """The answer with a full stop after it.
+
+        This is the single highest-yield rendering in the catalogue. A category-level audit
+        of four widely-used verifiers found whitespace and punctuation responsible for 93.0%
+        of in-contract failures on one configuration, with a trailing period or newline the
+        dominant individual cause -- a correct answer rejected for the punctuation a model
+        naturally writes at the end of a sentence.
+
+        Not applied to an answer that already ends in punctuation: appending to ``42.`` or
+        ``Paris!`` produces a string no one writes, which tests nothing a real submission
+        would exercise.
+        """
+        text = answer.strip()
+        if not text or text[-1] in ".!?,;:":
+            return None
+        return f"{text}."
+
+
+class TrailingNewline(Relation):
+    id = "trailing_newline"
+    certification = "a line break after the answer is layout; it does not alter the answer"
+
+    def render(self, answer: str) -> str | None:
+        """The answer followed by a newline.
+
+        Distinct from `stripped`, which removes surrounding whitespace from an answer that
+        has it. This *adds* the trailing newline a model emits at the end of a reply, which
+        the same audit names alongside the trailing period as a dominant cause of correct
+        answers being refused. A verifier that strips before comparing is unaffected; one
+        that compares raw strings is not, and that is the difference being measured.
+        """
+        text = answer.strip()
+        return f"{text}\n" if text else None
+
+
+class DisplayFraction(Relation):
+    id = "display_fraction"
+    certification = "\\dfrac selects display style for a fraction; \\frac and \\dfrac render the same value"
+
+    def render(self, answer: str) -> str | None:
+        """``\\frac`` rewritten as ``\\dfrac``.
+
+        Math-mode formatting is the stratum with the highest measured false-negative rate
+        after whitespace -- 48.8% on one verifier -- and the display-style variant is the
+        commonest way a model writes the same fraction differently.
+        """
+        text = answer.strip()
+        if "\\frac" not in text or "\\dfrac" in text:
+            return None
+        return text.replace("\\frac", "\\dfrac")
+
+
+class BracedSqrtArgument(Relation):
+    id = "braced_sqrt_argument"
+    certification = "\\sqrt takes one token as its argument; bracing that token is notation, not value"
+
+    def render(self, answer: str) -> str | None:
+        """``\\sqrt2`` rewritten as ``\\sqrt{2}``.
+
+        Square-root notation is a measured stratum in its own right, at 35.1% on one
+        verifier. Only a single-token argument is rewritten, because that is the only case
+        where the two forms are equivalent: ``\\sqrt12`` is *not* the square root of twelve,
+        so a broader rewriting would change the meaning it claims to preserve.
+        """
+        text = answer.strip()
+        if not text:
+            return None
+        rendered = _SQRT_TOKEN.sub(r"\\sqrt{\1}", text)
+        return rendered if rendered != text else None
+
+
 __all__ = [
     "Boxed",
     "BoxedMath",
     "BoxedText",
+    "BracedSqrtArgument",
     "DecimalPoint",
+    "DisplayFraction",
     "Emphasis",
     "InlineMath",
     "LatexFraction",
     "Prose",
     "ProseBoxed",
     "Stripped",
+    "TrailingNewline",
+    "TrailingPeriod",
     "TrailingZerosDropped",
     "Verbatim",
 ]

@@ -16,6 +16,11 @@ from bohrin.relations.base import Relation
 _BUILTIN_ORDER = (
     "verbatim",
     "stripped",
+    # Punctuation and layout lead the presentational group: a category-level audit of four
+    # verifiers attributes 93.0% of in-contract failures on one configuration to whitespace
+    # and punctuation, with a trailing period or newline the dominant individual cause.
+    "trailing_period",
+    "trailing_newline",
     "boxed",
     "boxed_math",
     "prose",
@@ -26,6 +31,8 @@ _BUILTIN_ORDER = (
     "decimal_point",
     "trailing_zeros_dropped",
     "latex_fraction",
+    "display_fraction",
+    "braced_sqrt_argument",
 )
 
 

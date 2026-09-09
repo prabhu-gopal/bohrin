@@ -15,6 +15,30 @@ from. The entries below are the terse canonical record.
 
 ### Added
 
+- **Four metamorphic relations, chosen by published failure rates rather than by what was
+  convenient to write.** A category-level audit of four widely-used verifiers over 307,420
+  verdicts attributes **93.0%** of in-contract false negatives on one configuration to
+  whitespace and punctuation, naming *a trailing period or newline* as the dominant single
+  cause — and Bohrin's catalogue handled surrounding whitespace but neither of those. The
+  new relations are `trailing_period`, `trailing_newline`, `display_fraction`
+  (`\frac` → `\dfrac`, math-mode formatting, 48.8% on one verifier) and
+  `braced_sqrt_argument` (`\sqrt2` → `\sqrt{2}`, square-root notation, 35.1%).
+
+  Punctuation and layout now sit directly behind the identity relation in the catalogue
+  order, because that is where the evidence puts them. This widens the search
+  `ground_truth_rejected` performs before reporting that a verifier refused its own answer,
+  so a refusal survives more ways of writing the same thing before it is reported.
+
+  Two of these are narrower than they first appear, deliberately. `trailing_period` does
+  not fire on an answer already ending in punctuation, because `42..` is a string no
+  submission contains and a verifier refusing it would be reported for rejecting something
+  it was never going to see. `braced_sqrt_argument` braces a **single token only**: LaTeX
+  takes one token as the argument, so `\sqrt12` is the square root of 1 followed by a 2 —
+  rewriting it to `\sqrt{12}` would change the value while claiming to preserve it, which
+  is the precise error a certification exists to prevent.
+
+### Added
+
 - **Environments published for evaluation are read rather than refused.** An environment
   that populates only its eval split raised `dataset is not set`, and Bohrin reported it as
   unreadable. Three of the first three such environments audited — `hellaswag`, `boolq` and
