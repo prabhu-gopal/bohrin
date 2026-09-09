@@ -169,6 +169,9 @@ def _cmd_audit(args: argparse.Namespace, console: Console, err: Console) -> int:
         gap=verification_gap(results, probes),
         results=tuple(results),
         tasks_total=max((r.tasks_probed for r in results), default=0),
+        # getattr, not an attribute access: `corpus_total` is an optional part of the
+        # adapter contract, and an adapter written against the previous one must keep working.
+        corpus_total=getattr(source, "corpus_total", None),
         isolation=isolation,
     )
 

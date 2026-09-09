@@ -42,6 +42,16 @@ nothing changes for environments that already worked.
 
 ## Added
 
+- **A bounded audit says what it was bounded from.** `--max-tasks N` audits the *first* N
+  tasks, not a sample of them, and the report showed `10 tasks` whether that was the whole
+  taskset or a thin slice of it. That made a clean result over a prefix look exactly like a
+  clean result over a corpus. On one published environment a 10-task bound scored 0 and a
+  20-task bound scored 50 — the defect was at tasks 11 and 12.
+
+  The header now reads `10 of 541 tasks`, and a clean score says plainly that a defect in
+  the tasks after the bound could not have appeared. `--json` gains `corpus_total` and
+  `truncated` (`schema_version` 1.2).
+
 - **Four new metamorphic relations, picked by measured failure rates.** Bohrin renders a
   taskset's own known-good answer several certified-equivalent ways before it will report
   that a verifier rejected its own ground truth. That catalogue now leads with punctuation

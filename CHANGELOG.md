@@ -15,6 +15,22 @@ from. The entries below are the terse canonical record.
 
 ### Added
 
+- **The report says how many tasks a `--max-tasks` bound truncated from.** `--max-tasks N`
+  takes a *prefix*, not a sample, and the report said `10 tasks` whether that was the whole
+  taskset or the first 2% of it. Measured on a published environment: a 10-task bound scored
+  **0** while a 20-task bound scored **50** on the same verifier, because the tasks carrying
+  the defect sat at positions 11 and 12. The header now reads `10 of 541 tasks` when the
+  audit was bounded, and a clean score adds that a defect in the tasks after the bound
+  cannot appear in the result. `--json` gains `corpus_total` and `truncated`, so
+  `REPORT_SCHEMA_VERSION` moves to **1.2**.
+
+  `corpus_total` is an *optional* part of the adapter contract, read with `getattr`, so a
+  third-party adapter written against the previous contract keeps working and simply reports
+  no corpus size. `None` means "cannot say", and is never rendered as "not truncated". The
+  v1 adapter reports `None` today because a v1 taskset is an iterable with no `__len__`, and
+  counting by iteration would construct every task on exactly the runs that passed
+  `--max-tasks` because the taskset was large.
+
 - **Four metamorphic relations, chosen by published failure rates rather than by what was
   convenient to write.** A category-level audit of four widely-used verifiers over 307,420
   verdicts attributes **93.0%** of in-contract false negatives on one configuration to
@@ -36,8 +52,6 @@ from. The entries below are the terse canonical record.
   takes one token as the argument, so `\sqrt12` is the square root of 1 followed by a 2 —
   rewriting it to `\sqrt{12}` would change the value while claiming to preserve it, which
   is the precise error a certification exists to prevent.
-
-### Added
 
 - **Environments published for evaluation are read rather than refused.** An environment
   that populates only its eval split raised `dataset is not set`, and Bohrin reported it as

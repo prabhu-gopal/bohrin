@@ -108,10 +108,21 @@ def _zero_score_caveat(report: Report) -> str | None:
     operators = sorted({op for result in report.results for op in (result.detail.get("operators") or ())})
     count = len(operators) if operators else None
     which = f"the {count} model-free operators" if count else "the model-free operators"
+    prefix = ""
+    if report.truncated:
+        # Measured, not hypothetical: on a published environment a 10-task bound scored 0
+        # while a 20-task bound scored 50 on the same verifier, because the tasks carrying
+        # the defect sat at positions 11 and 12. --max-tasks takes a prefix, not a sample,
+        # so a clean score over one says nothing whatever about the tasks after it.
+        prefix = (
+            f"only the first {report.tasks_total} of {report.corpus_total} tasks were "
+            f"audited, and a bound takes a prefix rather than a sample — a defect in the "
+            f"tasks after it cannot appear here. Beyond that, "
+        )
     return (
-        f"a clean result bounds what {which} could construct — it is not a proof that the "
-        f"verifier is sound. Graders that accept by substring or by the last number in a "
-        f"reply score 0 here and are still exploitable."
+        f"{prefix}a clean result bounds what {which} could construct — it is not a proof "
+        f"that the verifier is sound. Graders that accept by substring or by the last "
+        f"number in a reply score 0 here and are still exploitable."
     )
 
 
@@ -119,7 +130,14 @@ def render(report: Report, console: Console) -> None:
     """Print the audit."""
     console.print()
     console.print(f"[bold]Bohrin[/bold]  ·  {escape(report.target)}")
-    line = f"{report.adapter} · {_plural(report.tasks_total, 'task')} · {_plural(len(report.results), 'probe')}"
+    # "8 tasks" and "8 of 541 tasks" are different claims about what was audited, and the
+    # difference carries the whole weight of a clean result.
+    task_span = (
+        f"{report.tasks_total} of {report.corpus_total} tasks"
+        if report.truncated
+        else _plural(report.tasks_total, "task")
+    )
+    line = f"{report.adapter} · {task_span} · {_plural(len(report.results), 'probe')}"
     if report.isolation is not None:
         line += f" · isolation: {report.isolation.effective.name.lower()}"
     console.print(f"[dim]{escape(line)}[/dim]")
