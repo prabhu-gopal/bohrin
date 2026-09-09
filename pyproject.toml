@@ -112,6 +112,10 @@ emphasis               = "bohrin.relations.builtin:Emphasis"
 decimal_point          = "bohrin.relations.builtin:DecimalPoint"
 trailing_zeros_dropped = "bohrin.relations.builtin:TrailingZerosDropped"
 latex_fraction         = "bohrin.relations.builtin:LatexFraction"
+trailing_period        = "bohrin.relations.builtin:TrailingPeriod"
+trailing_newline       = "bohrin.relations.builtin:TrailingNewline"
+display_fraction       = "bohrin.relations.builtin:DisplayFraction"
+braced_sqrt_argument   = "bohrin.relations.builtin:BracedSqrtArgument"
 
 [tool.hatch.version]
 path = "src/bohrin/version.py"

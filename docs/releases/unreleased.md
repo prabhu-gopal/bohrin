@@ -42,6 +42,20 @@ nothing changes for environments that already worked.
 
 ## Added
 
+- **Four new metamorphic relations, picked by measured failure rates.** Bohrin renders a
+  taskset's own known-good answer several certified-equivalent ways before it will report
+  that a verifier rejected its own ground truth. That catalogue now leads with punctuation
+  and layout, because that is what the published evidence says verifiers actually refuse: a
+  category-level audit of four widely-used verifiers attributes 93.0% of in-contract false
+  negatives on one configuration to whitespace and punctuation, with a trailing period or
+  newline the dominant cause. Bohrin covered surrounding whitespace and neither of those.
+
+  Added: `trailing_period`, `trailing_newline`, `display_fraction` (`\frac` → `\dfrac`)
+  and `braced_sqrt_argument` (`\sqrt2` → `\sqrt{2}`). Sixteen relations, from twelve.
+
+  The practical effect is fewer false leads: a `ground_truth_rejected` finding now survives
+  more ways of writing the same answer before it is reported.
+
 - **The eval split is read when an environment has no training split.** An environment
   published for evaluation populates only its eval split, and asking for the training one
   raises `dataset is not set` — which Bohrin reported as an unreadable environment.

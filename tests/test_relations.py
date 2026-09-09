@@ -11,16 +11,27 @@ from __future__ import annotations
 import pytest
 
 from bohrin.relations import Relation, discover, renderings
-from bohrin.relations.builtin import DecimalPoint, LatexFraction, TrailingZerosDropped, Verbatim
+from bohrin.relations.builtin import (
+    BracedSqrtArgument,
+    DecimalPoint,
+    DisplayFraction,
+    LatexFraction,
+    TrailingNewline,
+    TrailingPeriod,
+    TrailingZerosDropped,
+    Verbatim,
+)
 
 
 def test_the_catalogue_is_discovered_through_the_entry_point_seam() -> None:
     """Built-ins take the same route a third party does — Gate 1 requires no patching."""
     found = discover()
 
-    assert [r.id for r in found][:3] == ["verbatim", "stripped", "boxed"]
+    # Punctuation and layout sit directly behind the identity relation because the
+    # published category-level evidence puts them at the top of the false-negative budget.
+    assert [r.id for r in found][:4] == ["verbatim", "stripped", "trailing_period", "trailing_newline"]
     assert all(isinstance(r, Relation) for r in found)
-    assert len(found) >= 12
+    assert len(found) >= 16
 
 
 def test_every_relation_states_why_it_preserves_meaning() -> None:
@@ -122,3 +133,77 @@ def test_a_broken_third_party_relation_cannot_take_down_an_audit() -> None:
         assert renderings("70") == [("verbatim", "70")]
     finally:
         module.discover = original
+
+
+# --------------------------------------------------------- punctuation, layout, math mode
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [("42", "42."), ("Paris", "Paris."), ("\\frac{1}{2}", "\\frac{1}{2}."), ("  42  ", "42.")],
+)
+def test_a_trailing_period_is_offered(answer: str, expected: str) -> None:
+    """The highest-yield rendering in the catalogue, by published measurement.
+
+    Whitespace and punctuation account for 93.0% of in-contract failures on one audited
+    verifier configuration, with a trailing period or newline the dominant single cause.
+    """
+    assert TrailingPeriod().render(answer) == expected
+
+
+@pytest.mark.parametrize("answer", ["42.", "Paris!", "why?", "a,", "b;", "c:", "", "   "])
+def test_an_answer_already_ending_in_punctuation_is_left_alone(answer: str) -> None:
+    """Appending to `42.` yields `42..`, a string no submission contains.
+
+    A rendering nobody writes tests nothing, and a verifier refusing it would be reported
+    for rejecting an answer it was never going to see.
+    """
+    assert TrailingPeriod().render(answer) is None
+
+
+def test_a_trailing_newline_is_offered_and_is_not_the_stripped_relation() -> None:
+    assert TrailingNewline().render("42") == "42\n"
+    assert TrailingNewline().render("  42  ") == "42\n"
+    assert TrailingNewline().render("   ") is None
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        ("\\frac{1}{2}", "\\dfrac{1}{2}"),
+        ("\\frac{1}{2} + \\frac{3}{4}", "\\dfrac{1}{2} + \\dfrac{3}{4}"),
+    ],
+)
+def test_frac_is_rewritten_to_display_style(answer: str, expected: str) -> None:
+    assert DisplayFraction().render(answer) == expected
+
+
+@pytest.mark.parametrize("answer", ["\\dfrac{1}{2}", "42", "Paris", ""])
+def test_display_fraction_stays_silent_without_a_frac(answer: str) -> None:
+    assert DisplayFraction().render(answer) is None
+
+
+def test_a_single_token_sqrt_argument_is_braced() -> None:
+    assert BracedSqrtArgument().render("\\sqrt2") == "\\sqrt{2}"
+    assert BracedSqrtArgument().render("\\sqrt x") == "\\sqrt{x}"
+
+
+def test_bracing_a_sqrt_takes_one_token_because_that_is_what_latex_takes() -> None:
+    """`\\sqrt12` is the square root of 1 followed by a 2, not the square root of twelve.
+
+    Bracing the single token it actually applies to preserves the meaning; rewriting it to
+    `\\sqrt{12}` would change the value while claiming to preserve it — the exact error a
+    certification exists to prevent.
+    """
+    assert BracedSqrtArgument().render("\\sqrt12") == "\\sqrt{1}2"
+
+
+@pytest.mark.parametrize("answer", ["\\sqrt{2}", "42", "", "sqrt2"])
+def test_braced_sqrt_stays_silent_when_there_is_nothing_to_brace(answer: str) -> None:
+    assert BracedSqrtArgument().render(answer) is None
+
+
+def test_every_new_rendering_round_trips_through_the_catalogue() -> None:
+    """The new relations must actually reach `renderings()`, not just exist as classes."""
+    ids = {rid for rid, _ in renderings("\\frac{1}{2}")}
+    assert {"trailing_period", "trailing_newline", "display_fraction"} <= ids
