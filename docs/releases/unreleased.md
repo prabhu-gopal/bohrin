@@ -91,6 +91,11 @@ nothing changes for environments that already worked.
 
 ## Fixed
 
+- **Carrier-sentence renderings no longer double punctuation.** An answer that already ends
+  in a full stop or a question mark rendered as `The answer is 42..` or `The answer is
+  why?.`. Those are not strings a model writes, so testing a verifier against them measured
+  nothing while risking a refusal being counted against the verifier.
+
 - **A `verifiers` silently resolved below the required version is reported clearly.** A
   taskset is an installed package with its own pins, and installing one alongside Bohrin can
   resolve `verifiers` downwards — one published environment pins `verifiers==0.1.5`, enough
