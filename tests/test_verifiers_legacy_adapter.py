@@ -267,19 +267,19 @@ class _Env:
         self._train = train
         self._eval = evaluation
 
-    def get_dataset(self, n: int | None = None) -> Any:
+    def get_dataset(self) -> Any:
         if self._train is None:
             raise ValueError("dataset is not set")
-        return self._train[:n] if n else self._train
+        return self._train
 
-    def get_eval_dataset(self, n: int | None = None) -> Any:
+    def get_eval_dataset(self) -> Any:
         if self._eval is None:
             raise ValueError("eval dataset is not set")
-        return self._eval[:n] if n else self._eval
+        return self._eval
 
 
 def test_the_training_split_is_preferred_when_there_is_one() -> None:
-    split, rows = _LegacySource._read_dataset(_Env([{"a": 1}], [{"b": 2}]), "e", None)
+    split, rows = _LegacySource._read_dataset(_Env([{"a": 1}], [{"b": 2}]), "e")
     assert (split, list(rows)) == ("train", [{"a": 1}])
 
 
@@ -289,12 +289,12 @@ def test_an_evaluation_only_environment_is_read_rather_than_refused() -> None:
     `hellaswag`, `boolq` and `winogrande` are all in this shape, so treating the training
     split as the only corpus would refuse a large class of published environments outright.
     """
-    split, rows = _LegacySource._read_dataset(_Env(None, [{"b": 2}]), "e", None)
+    split, rows = _LegacySource._read_dataset(_Env(None, [{"b": 2}]), "e")
     assert (split, list(rows)) == ("eval", [{"b": 2}])
 
 
 def test_an_empty_split_falls_through_rather_than_being_audited_as_zero_tasks() -> None:
-    split, _rows = _LegacySource._read_dataset(_Env([], [{"b": 2}]), "e", None)
+    split, _rows = _LegacySource._read_dataset(_Env([], [{"b": 2}]), "e")
     assert split == "eval"
 
 
@@ -302,7 +302,7 @@ def test_an_environment_with_no_readable_split_names_both_failures() -> None:
     from bohrin.adapters.base import TasksetLoadError
 
     with pytest.raises(TasksetLoadError, match=r"train:.*eval:"):
-        _LegacySource._read_dataset(_Env(None, None), "e", None)
+        _LegacySource._read_dataset(_Env(None, None), "e")
 
 
 # --------------------------------------------------------------------------- requirements
@@ -334,3 +334,29 @@ def test_an_absent_verifiers_still_says_to_install_the_extra(monkeypatch: pytest
     monkeypatch.setattr(mod, "_installed_version", lambda: None)
     with pytest.raises(MissingExtraError, match="pip install 'bohrin\\[verifiers\\]'"):
         VerifiersLegacyAdapter().check_requirements()
+
+
+def test_the_corpus_size_is_read_before_a_bound_is_applied() -> None:
+    """`--max-tasks` takes a prefix, so the size it truncated from has to be read first.
+
+    Measured on a published environment: a 10-task bound scored 0 while a 20-task bound
+    scored 50 on the same verifier, because the tasks carrying the defect sat at positions
+    11 and 12. A report that says "10 tasks" without saying "of 541" invites the reader to
+    treat a prefix as the taskset.
+    """
+    rows = [{"answer": str(i), "example_id": i} for i in range(50)]
+    split, dataset = _LegacySource._read_dataset(_Env(rows, None), "e")
+    assert (split, len(dataset)) == ("train", 50)
+
+
+def test_a_split_that_will_not_give_a_length_reports_no_corpus_size() -> None:
+    """A streaming dataset has no length, and inventing one would put a number behind a
+    claim about coverage that nothing supports."""
+    from bohrin.adapters.verifiers_legacy import _length_of
+
+    class _NoLength:
+        def __iter__(self) -> Any:
+            return iter(())
+
+    assert _length_of(_NoLength()) is None
+    assert _length_of([1, 2, 3]) == 3

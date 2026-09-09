@@ -53,6 +53,13 @@ class TaskSource(Protocol):
         """Yield every task in the taskset."""
         ...
 
+    # Optional: ``corpus_total``, an ``int`` naming how many tasks the taskset holds before
+    # any ``--max-tasks`` bound was applied, or ``None`` where that cannot be known (an
+    # infinite taskset, a stream). It is read with ``getattr`` rather than declared here, so
+    # that a third-party adapter written against the previous contract keeps working — the
+    # entry-point seam is public API. An adapter that omits it simply reports no corpus size,
+    # and the audit is unaffected in every other respect.
+
     async def score(self, task: Task, candidate: Candidate) -> Verdict:
         """Submit ``candidate`` to ``task``'s verifier and return what it said.
 

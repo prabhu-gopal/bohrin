@@ -130,3 +130,69 @@ async def test_report_serializes_the_gap_with_its_coverage() -> None:
     assert set(blob["verification_gap"]["coverage"]) == {"measured", "total"}
     assert len(blob["probes"]) == 2
     assert blob["probes"][0]["findings"], "the weak fixture must produce findings in the JSON"
+
+
+# ------------------------------------------------------- reporting what a bound truncated
+
+
+def _clean_report(tasks_total: int, corpus_total: int | None) -> Report:
+    from bohrin.probes.base import ProbeResult, ProbeStatus
+
+    results = [
+        ProbeResult(
+            probe_id="weak_oracle",
+            status=ProbeStatus.OK,
+            sub_score=0.0,
+            tasks_probed=tasks_total,
+            findings=(),
+            detail={"operators": ("identity_return",)},
+        )
+    ]
+    return Report(
+        target="./fixture",
+        adapter="memory",
+        gap=verification_gap(results, [p for p in PROBES if p.id == "weak_oracle"]),
+        results=tuple(results),
+        tasks_total=tasks_total,
+        corpus_total=corpus_total,
+    )
+
+
+def test_an_audit_that_saw_the_whole_taskset_is_not_marked_truncated() -> None:
+    assert _clean_report(10, 10).truncated is False
+    # An adapter that cannot say how big the corpus is must not imply the audit was partial.
+    assert _clean_report(10, None).truncated is False
+
+
+def test_an_audit_bounded_below_the_corpus_is_marked_truncated() -> None:
+    assert _clean_report(10, 541).truncated is True
+
+
+def test_the_corpus_size_and_truncation_are_serialised() -> None:
+    blob = json.loads(json.dumps(_clean_report(10, 541).to_dict()))
+    assert blob["tasks_total"] == 10
+    assert blob["corpus_total"] == 541
+    assert blob["truncated"] is True
+
+
+def test_a_clean_score_over_a_prefix_says_so() -> None:
+    """The failure this prevents was measured, not imagined.
+
+    On a published environment a 10-task bound scored 0 while a 20-task bound scored 50 on
+    the same verifier, because the tasks carrying the defect sat at positions 11 and 12.
+    A clean score printed without naming the bound invites exactly the wrong conclusion.
+    """
+    from bohrin.report.tty import _zero_score_caveat
+
+    caveat = _zero_score_caveat(_clean_report(10, 541))
+    assert caveat is not None
+    assert "first 10 of 541 tasks" in caveat
+    assert "prefix rather than a sample" in caveat
+
+
+def test_a_clean_score_over_the_whole_taskset_does_not_claim_truncation() -> None:
+    from bohrin.report.tty import _zero_score_caveat
+
+    caveat = _zero_score_caveat(_clean_report(10, 10))
+    assert caveat is not None
+    assert "were audited" not in caveat

@@ -23,6 +23,10 @@ class Report:
     gap: GapScore
     results: tuple[ProbeResult, ...]
     tasks_total: int
+    #: How many tasks the taskset holds before ``--max-tasks`` bounded it, when the adapter
+    #: can say. Reported because a clean result over a prefix is a far weaker claim than a
+    #: clean result over a corpus, and the two are indistinguishable without this number.
+    corpus_total: int | None = None
     #: How the verifier's code was executed. Part of the evidence: a result produced with
     #: no boundary must never be mistaken for one produced inside a container.
     isolation: Assessment | None = None
@@ -42,6 +46,11 @@ class Report:
         return " ".join(parts)
 
     @property
+    def truncated(self) -> bool:
+        """Whether the audit saw only part of the taskset."""
+        return self.corpus_total is not None and self.corpus_total > self.tasks_total
+
+    @property
     def findings(self) -> int:
         return sum(len(r.findings) for r in self.results)
 
@@ -57,6 +66,8 @@ class Report:
             "target": self.target,
             "adapter": self.adapter,
             "tasks_total": self.tasks_total,
+            "corpus_total": self.corpus_total,
+            "truncated": self.truncated,
             "isolation": self.isolation.to_dict() if self.isolation else None,
             "verification_gap": {
                 "score": self.gap.score,

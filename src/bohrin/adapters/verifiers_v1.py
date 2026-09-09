@@ -323,6 +323,21 @@ class _VerifiersSource:
                 f"`verifiers` version, not inside Bohrin — the audit never started. Check "
                 f"that the taskset imports on its own (python -c 'import {taskset_id}')."
             ) from exc
+        #: Tasks before --max-tasks bounded them, when the taskset can say so cheaply.
+        #:
+        #: A v1 taskset is an iterable and upstream does not currently give it a ``__len__``,
+        #: so this is usually ``None`` and the report simply omits the corpus size. Counting
+        #: by iteration is deliberately not done: it would construct every task in the
+        #: taskset on every run, including the runs that passed ``--max-tasks`` precisely
+        #: because the taskset is large. Paying an unbounded cost to print a coverage number
+        #: is a worse trade than not printing it, and ``None`` is read as "cannot say"
+        #: rather than "not truncated".
+        self.corpus_total: int | None = None
+        if not getattr(taskset, "INFINITE", False):
+            try:
+                self.corpus_total = len(taskset)
+            except (TypeError, AttributeError):
+                self.corpus_total = None
         if config.max_tasks is not None:
             taskset = taskset.head(config.max_tasks)
         _require_bounded(taskset, taskset_id)

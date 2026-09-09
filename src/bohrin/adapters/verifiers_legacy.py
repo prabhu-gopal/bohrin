@@ -173,6 +173,18 @@ def _scoring_funcs(rubric: Any) -> list[tuple[Callable[..., Any], float]]:
     return out
 
 
+def _length_of(dataset: Any) -> int | None:
+    """How many tasks a split holds, or None when it will not say.
+
+    A dataset that only streams has no length, and guessing one would put a number behind a
+    claim about coverage that nothing supports.
+    """
+    try:
+        return len(dataset)
+    except (TypeError, AttributeError):
+        return None
+
+
 def _prompt_text(row: dict[str, Any]) -> str:
     """The question as a probe can read it.
 
@@ -284,8 +296,14 @@ class _LegacySource:
         self._scoring = _scoring_funcs(env.rubric)
         # Full marks, for deciding acceptance. Summed once: a rubric is fixed for the run.
         self._attainable = sum(weight for _, weight in self._scoring)
-        self._split, dataset = self._read_dataset(env, env_id, config.max_tasks)
-        self._rows: list[dict[str, Any]] = [dict(row) for row in dataset]
+        self._split, dataset = self._read_dataset(env, env_id)
+        #: Tasks in the split before --max-tasks bounded it. Reported so that a clean result
+        #: over a prefix is not mistaken for a clean result over the taskset.
+        self.corpus_total: int | None = _length_of(dataset)
+        bound = config.max_tasks
+        self._rows: list[dict[str, Any]] = [
+            dict(row) for index, row in enumerate(dataset) if bound is None or index < bound
+        ]
         #: Bohrin task id -> its row, populated by tasks().
         self._by_id: dict[str, dict[str, Any]] = {}
 
@@ -312,7 +330,7 @@ class _LegacySource:
             )
 
     @staticmethod
-    def _read_dataset(env: Any, env_id: str, max_tasks: int | None) -> tuple[str, Any]:
+    def _read_dataset(env: Any, env_id: str) -> tuple[str, Any]:
         """The environment's tasks, and which split they came from.
 
         An environment published for evaluation rather than training populates only its
@@ -325,7 +343,7 @@ class _LegacySource:
         failures: list[str] = []
         for split, reader in (("train", env.get_dataset), ("eval", env.get_eval_dataset)):
             try:
-                dataset = reader(n=max_tasks) if max_tasks is not None else reader()
+                dataset = reader()
             except Exception as exc:
                 failures.append(f"{split}: {type(exc).__name__}: {exc}")
                 continue
