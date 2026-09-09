@@ -23,6 +23,13 @@ from decimal import Decimal, InvalidOperation
 
 from bohrin.relations.base import Relation
 
+#: Characters that already close an answer. A carrier sentence does not add a full stop
+#: after one of these, and `trailing_period` does not fire on one: `42..` and `why?.` are
+#: strings no submission contains, and a rendering nobody writes tests nothing. A verifier
+#: refusing one would be counted as refusing its own answer, which it never had the chance
+#: to accept.
+_SENTENCE_END = ".!?,;:"
+
 #: A bare fraction, e.g. ``3/4`` or ``-3 / 4``. Deliberately strict: anything more
 #: elaborate is not confidently a fraction, and a wrong guess here is unsound.
 _FRACTION = re.compile(r"^(-?\d+)\s*/\s*(\d+)$")
@@ -105,7 +112,11 @@ class Prose(Relation):
     certification = "a natural-language carrier sentence; the answer it announces is unchanged"
 
     def render(self, answer: str) -> str | None:
-        return f"The answer is {answer.strip()}." if answer.strip() else None
+        text = answer.strip()
+        if not text:
+            return None
+        stop = "" if text[-1] in _SENTENCE_END else "."
+        return f"The answer is {text}{stop}"
 
 
 class ProseBoxed(Relation):
@@ -113,7 +124,11 @@ class ProseBoxed(Relation):
     certification = "a carrier sentence around a boxed answer; both are presentational"
 
     def render(self, answer: str) -> str | None:
-        return f"The answer is \\boxed{{{answer.strip()}}}." if answer.strip() else None
+        text = answer.strip()
+        if not text:
+            return None
+        stop = "" if text[-1] in _SENTENCE_END else "."
+        return f"The answer is \\boxed{{{text}}}{stop}"
 
 
 class Emphasis(Relation):
@@ -178,7 +193,7 @@ class TrailingPeriod(Relation):
         would exercise.
         """
         text = answer.strip()
-        if not text or text[-1] in ".!?,;:":
+        if not text or text[-1] in _SENTENCE_END:
             return None
         return f"{text}."
 

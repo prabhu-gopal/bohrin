@@ -207,3 +207,32 @@ def test_every_new_rendering_round_trips_through_the_catalogue() -> None:
     """The new relations must actually reach `renderings()`, not just exist as classes."""
     ids = {rid for rid, _ in renderings("\\frac{1}{2}")}
     assert {"trailing_period", "trailing_newline", "display_fraction"} <= ids
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        ("42", "The answer is 42."),
+        ("42.", "The answer is 42."),
+        ("Paris.", "The answer is Paris."),
+        ("why?", "The answer is why?"),
+        ("wow!", "The answer is wow!"),
+    ],
+)
+def test_a_carrier_sentence_does_not_double_the_punctuation(answer: str, expected: str) -> None:
+    """`The answer is 42..` is a string no submission contains.
+
+    Same standard the trailing-period relation is held to: a rendering nobody writes tests
+    nothing, and a verifier refusing it would be counted as refusing its own answer when it
+    was never given the chance to accept it.
+    """
+    from bohrin.relations.builtin import Prose
+
+    assert Prose().render(answer) == expected
+
+
+def test_a_boxed_carrier_sentence_does_not_double_the_punctuation() -> None:
+    from bohrin.relations.builtin import ProseBoxed
+
+    assert ProseBoxed().render("42") == "The answer is \\boxed{42}."
+    assert ProseBoxed().render("why?") == "The answer is \\boxed{why?}"

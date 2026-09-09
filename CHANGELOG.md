@@ -83,6 +83,14 @@ from. The entries below are the terse canonical record.
 
 ### Fixed
 
+- **A carrier sentence no longer doubles the answer's punctuation.** `prose` and
+  `prose_boxed` appended a full stop unconditionally, so an answer already ending in
+  punctuation rendered as `The answer is 42..` or `The answer is why?.` — strings no
+  submission contains. A rendering nobody writes tests nothing, and a verifier refusing one
+  was counted as refusing its own answer when it never had the chance to accept it. This is
+  the same standard `trailing_period` is held to; the rule now lives in one place and both
+  relations use it.
+
 - **A `verifiers` resolved below the version holding the API is named, not hit once per
   task.** A taskset is an installed Python package carrying its own pins, so installing one
   into the same environment as Bohrin can resolve `verifiers` *downwards* — one published
