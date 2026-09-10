@@ -105,6 +105,19 @@ nothing changes for environments that already worked.
   that protects against third-party operators now compares *answers* as well as programs:
   before, a plugin submitting `70.0` against a reference of `70` could still accuse a
   correct numeric grader — the same class of defect as the 1.0.1 launch blocker.
+- **`--timeout` actually applies to ordinary reward functions.** Most published reward
+  functions are plain synchronous Python, and they ran straight past the timeout: a 0.5 s
+  limit around a grader that slept for 3 s returned after 3 s and counted the result as a
+  normal score. A grader that hung would have hung the whole audit. Bohrin now interrupts a
+  grader that holds up the audit past `--timeout` and records the call as timed out. Where
+  other submissions to the same task scored normally, that is reported as a harness
+  disruption — a grader a particular reply can stall will stall a rollout worker in
+  training too.
+
+  *Upgrade note:* if you ran slow synchronous graders relying on `--timeout` being ignored,
+  raise it. The default is 30 s. Enforcement uses a POSIX real-time alarm on the main
+  thread; on Windows, off the main thread, or when `SIGALRM` is already in use, behaviour is
+  as before.
 
 - **Carrier-sentence renderings no longer double punctuation.** An answer that already ends
   in a full stop or a question mark rendered as `The answer is 42..` or `The answer is

@@ -85,7 +85,13 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run verifier code in-process with no isolation; only for a taskset you trust",
     )
-    audit.add_argument("--timeout", type=float, default=30.0, metavar="SEC", help="per-call timeout")
+    audit.add_argument(
+        "--timeout",
+        type=float,
+        default=30.0,
+        metavar="SEC",
+        help="seconds before one scoring call is abandoned, including a synchronous reward function",
+    )
     audit.add_argument(
         "--fail-on-finding",
         action="store_true",

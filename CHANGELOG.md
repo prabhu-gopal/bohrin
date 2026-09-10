@@ -99,6 +99,16 @@ from. The entries below are the terse canonical record.
     programs only, so a third-party operator submitting `70.0` against a reference of `70`
     reached a correct numeric grader as an exploit — 1.0.1's launch blocker, through the one
     seam with no review. It now also compares answers under the full equivalence ladder.
+- **`--timeout` now stops a reward function written as a plain `def`.** Upstream calls
+  reward functions directly on the event-loop thread, and `asyncio.wait_for` can only cancel
+  at an `await` — so a synchronous grader, which is most of the published ecosystem, ran
+  straight past the timeout. Measured: a 0.5 s timeout around a grader sleeping 3 s returned
+  after 3.0 s and was **recorded as a successful score**; a grader that never returned would
+  have hung the audit, and a whole sweep behind it. A heartbeat on the loop now re-arms a
+  real-time alarm, and when the loop stalls the alarm interrupts the stuck grader. It raises
+  a `BaseException`, because upstream and graders alike wrap reward code in
+  `except Exception`. POSIX main thread only; elsewhere, or when `SIGALRM` is already in
+  use, behaviour is unchanged.
 
 - **A carrier sentence no longer doubles the answer's punctuation.** `prose` and
   `prose_boxed` appended a full stop unconditionally, so an answer already ending in
