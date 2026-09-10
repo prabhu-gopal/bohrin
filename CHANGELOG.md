@@ -13,6 +13,8 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-09-10
+
 ### Added
 
 - **Every rate in the report carries its sample size and a 95% Wilson interval.** A
@@ -66,16 +68,15 @@ from. The entries below are the terse canonical record.
 
 - **Environments published for evaluation are read rather than refused.** An environment
   that populates only its eval split raised `dataset is not set`, and Bohrin reported it as
-  unreadable. Three of the first three such environments audited — `hellaswag`, `boolq` and
-  `winogrande` — are in that shape, so the training split alone is not a corpus. Bohrin now
+  unreadable. Three of the first three such environments audited are in that shape, so the training split alone is not a corpus. Bohrin now
   falls back to the eval split, and records which split every task came from, because
   "audited on the eval split" and "audited on the training split" are different claims.
 
-  All three report **50 / 100** with full `3 of 3` coverage once readable, and the finding
-  reproduces outside Bohrin. On `boolq`, whose declared answer is `False`: the correct
-  answer scores **1.0**, the opposite answer `True` scores **0.0** — and
-  `The answer is not False.` also scores **1.0**. The grader substring-matches the answer
-  token, so a reply that explicitly denies the correct answer earns full marks.
+  Once readable, environments of this shape produce findings that reproduce outside Bohrin.
+  On one, a reply that explicitly denies the declared answer — `The answer is not X.` —
+  scores **full reward**, while the opposite answer correctly scores zero: the grader
+  matches the answer token as a substring, so it cannot tell an assertion from its denial.
+  It was caught by the `false_negation` operator added in 1.1.0. (Characterised by defect class rather than by environment until maintainers have been contacted — see `docs/04_RELEASE.md`.)
 
 - **A second `verifiers` adapter, for environments built on `load_environment`.** Bohrin
   read only the v1 taskset API, which it detected by the presence of a `taskset.py`. That
@@ -86,11 +87,10 @@ from. The entries below are the terse canonical record.
   that API. The two never contend for a path — `verifiers_legacy` yields to `verifiers_v1`
   wherever a `taskset.py` is present, so a migrated environment is still read as v1.
 
-  Measured on the environments this unlocks: `allenai_ifeval` scores **50/100**, and the
-  finding reproduces outside Bohrin — on its `validate_json_format` task, submitting the
-  literal string `0` scores **reward 1.0** while a well-formed English answer scores
-  **0.0**, because `0` parses as JSON. A policy trained on that task is rewarded for
-  emitting `0` and penalised for answering.
+  The first environments this unlocks already produce findings that reproduce outside
+  Bohrin. On one, a format-validation task scores the literal string `0` at **reward 1.0**
+  and a well-formed answer at **0.0**, because `0` satisfies the format check — a policy
+  trained on it is rewarded for emitting `0` and penalised for answering. (Characterised by defect class rather than by environment until maintainers have been contacted — see `docs/04_RELEASE.md`.)
 
 ### Fixed
 
@@ -676,7 +676,8 @@ sweep measures one. No accuracy claim is made in the meantime.
   yanked and point users at `adduct`; the verifier auditor starts at 1.0.0, so that the
   discontinuity reads as a break rather than an upgrade.
 
-[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/prabhu-gopal/bohrin/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/prabhu-gopal/bohrin/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/prabhu-gopal/bohrin/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/prabhu-gopal/bohrin/compare/v1.0.0...v1.0.1
