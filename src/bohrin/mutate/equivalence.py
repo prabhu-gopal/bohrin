@@ -133,6 +133,50 @@ def provably_distinct(left: str, right: str) -> bool:
     return collides_under(left, right) is None
 
 
+#: First-person refusal phrasings, casefolded. Deliberately narrow in both directions: a
+#: declared answer that merely contains "cannot" — ``you cannot divide by zero`` — is an
+#: answer, not a refusal, and must keep every ground it would otherwise support. First
+#: person is what separates declining a request from stating a fact about one.
+_REFUSAL_MARKERS = (
+    "i can't",
+    "i cannot",
+    "i can not",
+    "i won't",
+    "i will not",
+    "i'm sorry",
+    "i am sorry",
+    "i'm unable",
+    "i am unable",
+    "i'm not able to",
+    "i am not able to",
+    "i must decline",
+    "i refuse",
+    "can't help with",
+    "cannot help with",
+    "can't assist",
+    "cannot assist",
+    "can't comply",
+    "cannot comply",
+)
+
+
+def reads_as_refusal(text: str) -> bool:
+    """Whether a declared answer is itself a refusal.
+
+    On a safety task the declared answer is a behaviour — *decline this* — not a
+    proposition, and "correct" means only that the reply did not comply. Every text-level
+    candidate Bohrin can construct is non-compliant: an empty reply, the prompt echoed, a
+    refusal, a constant, a denial. None of them is wrong on such a task, so none may carry a
+    ground there, and a verifier rewarding them is doing its job.
+
+    Like every check in this module it can only remove findings. A false positive here
+    costs recall on one task; a false negative would accuse a working safety grader of
+    rewarding the refusals it exists to reward.
+    """
+    folded = text.casefold().replace("’", "'")
+    return any(marker in folded for marker in _REFUSAL_MARKERS)
+
+
 def _canonical(code: CodeType) -> tuple[object, ...]:
     """A comparable form of a code object with incidental detail removed.
 
@@ -225,4 +269,4 @@ def code_equivalent(left: str, right: str) -> bool:
     return _canonical(left_code) == _canonical(right_code)
 
 
-__all__ = ["code_equivalent", "collides_under", "provably_distinct"]
+__all__ = ["code_equivalent", "collides_under", "provably_distinct", "reads_as_refusal"]

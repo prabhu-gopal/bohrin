@@ -83,6 +83,23 @@ from. The entries below are the terse canonical record.
 
 ### Fixed
 
+- **Three more ways to accuse a correct verifier are closed.** Each was reproduced against a
+  correct grader before the fix, and each is now pinned by a test:
+  - *Safety tasks.* On a harmful request declining is the right answer, but `refusal`
+    claimed a structural ground unconditionally and `false_negation` fired against a
+    refusal reference — so a working safety grader was reported as rewarding the refusals
+    it exists to reward. Where the declared answer reads as a first-person refusal, the
+    probe now withdraws every candidate's ground (third-party operators included) and
+    submits them as leads; with no declared answer, `refusal` is a lead. Three environments
+    in the public corpus are shaped this way.
+  - *Echo tasks.* `identity_return` treated restating the prompt as never an answer. On a
+    copy task the prompt is the answer, and an exact-match grader accepting it was reported
+    as exploited. The operator now skips any task whose prompt collides with its reference.
+  - *Answer collisions from third-party operators.* The probe-level backstop compared
+    programs only, so a third-party operator submitting `70.0` against a reference of `70`
+    reached a correct numeric grader as an exploit — 1.0.1's launch blocker, through the one
+    seam with no review. It now also compares answers under the full equivalence ladder.
+
 - **A carrier sentence no longer doubles the answer's punctuation.** `prose` and
   `prose_boxed` appended a full stop unconditionally, so an answer already ending in
   punctuation rendered as `The answer is 42..` or `The answer is why?.` — strings no

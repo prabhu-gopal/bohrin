@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import shlex
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 
 from bohrin.adapters.base import TaskSource
 from bohrin.adapters.verifiers_v1 import reference_renderings
@@ -20,7 +21,7 @@ from bohrin.execute.runner import ScoreOutcome, score_many
 from bohrin.ir.evidence import BaselineFailure, Exploit, Finding, HarnessDisruption, Unverified
 from bohrin.ir.task import Candidate, Provenance, Task
 from bohrin.mutate import discover as discover_operators
-from bohrin.mutate.equivalence import code_equivalent
+from bohrin.mutate.equivalence import code_equivalent, collides_under, reads_as_refusal
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
 
 
@@ -47,6 +48,13 @@ def _baseline_candidates(task: Task) -> list[Candidate]:
         )
         for rendering in reference_renderings(reference)
     ]
+
+
+def _is_the_reference(payload: str, reference: str) -> bool:
+    """Whether a candidate is the known-good answer, under any reading a correct verifier
+    may apply: as an answer (every normalisation in the equivalence ladder) or as a program
+    (Trivial Compiler Equivalence). Either one means the candidate cannot be wrong."""
+    return collides_under(payload, reference) is not None or code_equivalent(payload, reference)
 
 
 class WeakOracleProbe(Probe):
@@ -128,22 +136,37 @@ class WeakOracleProbe(Probe):
         # whose payloads are equal after stripping are the same submission as far as any
         # verifier is concerned, so only the first is sent.
         equivalent_suppressed = 0
+        grounds_withdrawn = 0
         for task in measurable:
             submitted: set[str] = set()
+            # On a task whose declared answer is itself a refusal, "correct" means only
+            # "did not comply", and every candidate below is non-compliant. None of them is
+            # wrong there, so each is submitted as a lead instead. Applied here rather than
+            # left to operators so a third-party operator cannot miss it.
+            refusal_task = bool(task.reference) and reads_as_refusal(task.reference or "")
             for op in operators:
                 for cand in op.apply(task):
                     key = cand.payload.strip()
                     if key in submitted:
                         continue
-                    # Trivial Compiler Equivalence, applied to every grounded candidate
-                    # regardless of which operator produced it. A candidate that compiles to
-                    # the same program as the reference *is* that reference, so a verifier
-                    # accepting it is accepting its own known-good answer. The first-party
-                    # operators guard themselves; this is the backstop for third-party ones,
-                    # which reach the same seam with no privileged path and no review.
-                    if cand.known_wrong and task.reference and code_equivalent(cand.payload, task.reference):
+                    # A grounded candidate that *is* the reference -- as an answer or as a
+                    # program -- would accuse a verifier of accepting its own known-good
+                    # answer. Applied to every candidate regardless of which operator
+                    # produced it: first-party operators guard themselves, and this is the
+                    # backstop for third-party ones, which reach the same seam with no
+                    # privileged path and no review.
+                    #
+                    # Until 1.2 the backstop compared programs only. That left open the
+                    # failure it exists for -- 1.0.1's launch blocker was ``1`` against a
+                    # reference of ``1.0``, a collision of *answers*, and a third-party
+                    # operator submitting ``70.0`` against ``70`` still reached a correct
+                    # numeric grader as an exploit.
+                    if cand.known_wrong and task.reference and _is_the_reference(cand.payload, task.reference):
                         equivalent_suppressed += 1
                         continue
+                    if cand.known_wrong and refusal_task:
+                        cand = replace(cand, ground=None)
+                        grounds_withdrawn += 1
                     submitted.add(key)
                     work.append((task, cand))
         if not work:
@@ -195,9 +218,13 @@ class WeakOracleProbe(Probe):
                 "baseline_failures": baseline_detail,
                 "baseline_errors": baseline_errors,
                 "tasks_without_reference": unbaselined,
-                # Candidates that compiled to the reference itself. A non-zero count means
-                # an operator tried to accuse a verifier of accepting its own answer.
+                # Candidates that were the reference itself, as an answer or as a program. A
+                # non-zero count means an operator tried to accuse a verifier of accepting
+                # its own answer.
                 "equivalent_suppressed": equivalent_suppressed,
+                # Candidates submitted as leads because the task's declared answer is a
+                # refusal, where no non-compliant reply can be shown to be wrong.
+                "grounds_withdrawn": grounds_withdrawn,
                 "errors": errors,
             },
         )
