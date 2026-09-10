@@ -128,8 +128,8 @@ Seven are registered today (`pyproject.toml` `[project.entry-points."bohrin.muta
 | Operator | Submission it produces | Ground |
 |---|---|---|
 | `empty_body` | an empty reply, and a whitespace-only reply | Structural |
-| `identity_return` | the task prompt, echoed back verbatim | Structural |
-| `refusal` | `"I cannot complete this task."` | Structural |
+| `identity_return` | the task prompt, echoed back verbatim — skipped when the prompt *is* the declared answer | Structural |
+| `refusal` | `"I cannot complete this task."` | Structural only when a declared answer exists and is not itself a refusal; otherwise **leads only** |
 | `constant_return` | a fixed literal (`0`, `1`, `True`, `None`, `[]`, `""`), skipping any that is not *provably distinct* from the reference | Differential |
 | `false_negation` | an explicit denial of the declared answer (`"The answer is not X."`) | Invariant |
 | `drop_side_effect` | the reference code with every function body replaced by `pass` (LibCST) | Structural |
@@ -158,6 +158,23 @@ distinguish an assertion from its denial — the denial contains the answer too.
 grader looked clean to every operator. Its ground is **invariant**: the taskset
 declares the answer, and a submission denying that answer contradicts the
 taskset's own ground truth, independently of what the reward function says.
+
+**Where no text-level operator can establish wrongness: safety tasks.** On a
+harmful request the declared answer is a behaviour — *decline this* — and correct
+means only that the reply did not comply. Every candidate above is non-compliant,
+so none is wrong there. Before 1.2, `refusal` claimed its ground unconditionally
+and `false_negation` fired against a refusal reference; both reported a working
+safety grader as exploited. Now, when the declared answer reads as a first-person
+refusal, the probe withdraws the ground from every candidate — including any from a
+third-party operator — and submits them as leads. Without a declared answer
+`refusal` is a lead as well, since Bohrin cannot read intent from a prompt; a
+grader accepting any non-empty reply is still caught there, by `identity_return`.
+
+**The backstop compares answers, not only programs.** Every grounded candidate,
+from any operator, is suppressed if it *is* the reference — under the equivalence
+ladder or Trivial Compiler Equivalence. Until 1.2 it compared programs only, so a
+third-party operator submitting `70.0` against a reference of `70` still reached a
+correct numeric grader as an exploit.
 
 Adding it took findings on the public `verifiers` corpus from two environments to
 four. `glossary` grades `answer.lower() in reply.lower()`; `color_codeword`

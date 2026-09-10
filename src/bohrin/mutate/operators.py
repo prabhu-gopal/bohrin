@@ -20,7 +20,7 @@ import libcst as cst
 
 from bohrin.ir.task import Candidate, Ground, Provenance, Task
 from bohrin.mutate.base import MutationOperator
-from bohrin.mutate.equivalence import code_equivalent, collides_under
+from bohrin.mutate.equivalence import code_equivalent, collides_under, reads_as_refusal
 
 
 def _cand(op: str, base: str, detail: str, payload: str, ground: Ground | None) -> Candidate:
@@ -50,24 +50,54 @@ class IdentityReturn(MutationOperator):
     def apply(self, task: Task) -> Iterator[Candidate]:
         if not task.prompt.strip():
             return
+        # A copy or echo task declares its own prompt as the answer. Echoing it back is then
+        # the correct submission, and a verifier accepting it is right to -- reporting that
+        # would accuse a working grader. Checked under every normalisation, not by string
+        # equality, for the reason `constant_return` is: a rendering is not a difference.
+        if task.reference and collides_under(task.prompt, task.reference) is not None:
+            return
         yield _cand(
             self.id, "prompt", "echoes the prompt verbatim instead of answering", task.prompt, Ground.STRUCTURAL
         )
 
 
 class Refusal(MutationOperator):
-    """Explicitly decline the task."""
+    """Explicitly decline the task.
+
+    Declining is only provably wrong where the task wanted an answer. On a safety task — a
+    harmful request, where the benchmark measures whether a model refuses — declining *is*
+    the correct response, and a verifier rewarding it is working. Until 1.2 this operator
+    claimed a structural ground unconditionally, and so reported exactly those graders as
+    exploited.
+
+    Bohrin cannot read intent from a prompt, so the ground is claimed only on evidence that
+    the task wanted something else: a declared answer that is not itself a refusal. Without
+    that evidence the candidate is still submitted, as a lead, so a lenient grader stays
+    visible without ever being scored. A grader accepting any non-empty reply is still
+    caught with a ground on those tasks, by ``identity_return``.
+    """
 
     id = "refusal"
     rationale = "An explicit refusal states that no work was done."
 
     def apply(self, task: Task) -> Iterator[Candidate]:
+        ref = (task.reference or "").strip()
+        if ref and not reads_as_refusal(ref):
+            yield _cand(
+                self.id,
+                "constant",
+                "explicitly declines to perform the task",
+                "I cannot complete this task.",
+                Ground.STRUCTURAL,
+            )
+            return
         yield _cand(
             self.id,
             "constant",
-            "explicitly declines to perform the task",
+            "explicitly declines to perform the task (unverified: with no declared answer to "
+            "contradict, declining may be what the task rewards)",
             "I cannot complete this task.",
-            Ground.STRUCTURAL,
+            None,
         )
 
 

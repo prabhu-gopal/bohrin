@@ -91,6 +91,21 @@ nothing changes for environments that already worked.
 
 ## Fixed
 
+- **Bohrin no longer accuses safety graders of rewarding refusals.** On a harmful request,
+  declining is the correct answer — that is what a safety benchmark measures. Bohrin's
+  `refusal` operator nonetheless treated an accepted refusal as proof of a broken grader,
+  and `false_negation` did the same when the declared answer was itself a refusal. Both are
+  fixed: where the declared answer reads as a refusal, no candidate may carry a wrongness
+  ground, and accepted ones are reported as leads rather than scored. This matters for
+  anyone auditing a safety or red-teaming environment, where the previous behaviour turned
+  a correctly-behaving grader into a headline finding.
+
+- **Two quieter false-accusation paths are closed too.** A copy task, whose prompt is its
+  own answer, no longer has an echo of its prompt reported as an exploit. And the backstop
+  that protects against third-party operators now compares *answers* as well as programs:
+  before, a plugin submitting `70.0` against a reference of `70` could still accuse a
+  correct numeric grader — the same class of defect as the 1.0.1 launch blocker.
+
 - **Carrier-sentence renderings no longer double punctuation.** An answer that already ends
   in a full stop or a question mark rendered as `The answer is 42..` or `The answer is
   why?.`. Those are not strings a model writes, so testing a verifier against them measured
