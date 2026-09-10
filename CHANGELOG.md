@@ -15,6 +15,17 @@ from. The entries below are the terse canonical record.
 
 ### Added
 
+- **Every rate in the report carries its sample size and a 95% Wilson interval.** A
+  sub-score is a proportion of tasks, and `2 of 2` and `300 of 300` both read as "every
+  task". Measured on a synthetic environment before this: `weak_oracle` could measure only
+  2 of 20 tasks and the report printed `VERIFICATION GAP: 50 / 100 coverage: 2 of 2
+  probes`, with nothing to show it rested on two tasks. The gap is now followed by the
+  sample it rests on — `rests on: weak_oracle 2 of 2 tasks (95% CI 34–100%)` — the acceptance
+  headline says `(of N measured · 95% CI a–b%)`, and `--json` carries `detail.rate`
+  (`affected`, `measured`, `interval_95`) on every probe that reports a proportion. Wilson
+  rather than the textbook interval, which collapses to `[1, 1]` at `2 of 2`; Brown, Cai and
+  DasGupta (2001) recommend it for small samples. **Report schema 1.3.**
+
 - **The report says how many tasks a `--max-tasks` bound truncated from.** `--max-tasks N`
   takes a *prefix*, not a sample, and the report said `10 tasks` whether that was the whole
   taskset or the first 2% of it. Measured on a published environment: a 10-task bound scored
@@ -82,6 +93,18 @@ from. The entries below are the terse canonical record.
   emitting `0` and penalised for answering.
 
 ### Fixed
+
+- **The acceptance headline no longer counts a crash as an acceptance.** It counted every
+  finding's task, harness disruptions included, so a result whose only finding was a
+  verifier crash printed `1 task accepts a known-wrong solution` beside a sub-score of
+  zero. It now counts acceptances only.
+
+- **The clean-result caveat named a blind spot Bohrin no longer has, and not the one it
+  does.** It said graders deciding by substring or by the last number in a reply "score 0
+  here and are still exploitable". Since `false_negation` (1.1.0) reaches both — measured:
+  substring, first-number and last-number graders are all caught. What still reads clean is
+  a grader that parses one answer format, typically the last `\boxed{}`: no payload is
+  written in it, so every one is rejected on format. The caveat now says so.
 
 - **Three more ways to accuse a correct verifier are closed.** Each was reproduced against a
   correct grader before the fix, and each is now pinned by a test:

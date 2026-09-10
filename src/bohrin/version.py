@@ -15,4 +15,7 @@ __version__ = "1.1.0"
 
 # "1.0" is the first published report contract. From here it is frozen — bump MAJOR on a
 # breaking change to the serialized Report, MINOR on additive fields.
-REPORT_SCHEMA_VERSION = "1.2"
+#
+# 1.3 adds ``detail.rate`` — ``affected``, ``measured``, ``interval_95`` — to every probe
+# that reports a proportion of tasks.
+REPORT_SCHEMA_VERSION = "1.3"

@@ -42,6 +42,18 @@ nothing changes for environments that already worked.
 
 ## Added
 
+- **Every number now says how many tasks it rests on, with a confidence interval.** A
+  verification gap of 50 can mean "half of three hundred tasks are exploitable" or "both of
+  the two tasks Bohrin could measure are". Those are very different claims, and the report
+  used to print them identically. It now shows the sample under the gap — `rests on:
+  weak_oracle 2 of 2 tasks (95% CI 34–100%)` — so a reader can tell a measurement from a
+  lead at a glance. The interval is a Wilson score interval, the one statisticians recommend
+  for small samples; the textbook formula claims certainty from two observations.
+
+  *For `--json` consumers:* report schema **1.3** adds `detail.rate` — `affected`,
+  `measured`, `interval_95` — to each probe that reports a proportion. Additive; nothing
+  existing changed.
+
 - **A bounded audit says what it was bounded from.** `--max-tasks N` audits the *first* N
   tasks, not a sample of them, and the report showed `10 tasks` whether that was the whole
   taskset or a thin slice of it. That made a clean result over a prefix look exactly like a
@@ -90,6 +102,15 @@ nothing changes for environments that already worked.
   emitting `0` and penalised for answering the question.
 
 ## Fixed
+
+- **A crash is no longer counted as an acceptance in the headline.** A verifier that
+  crashed on one submission, and accepted nothing, was headlined "1 task accepts a
+  known-wrong solution" — beside a sub-score of zero.
+
+- **The note under a clean result now names Bohrin's real blind spot.** It used to warn that
+  graders matching by substring or by the last number in a reply are missed. They have not
+  been missed since 1.1.0. What is missed is a grader that only reads one answer format,
+  such as the last `\boxed{}` in a reply — so the note now says that instead.
 
 - **Bohrin no longer accuses safety graders of rewarding refusals.** On a harmful request,
   declining is the correct answer — that is what a safety benchmark measures. Bohrin's

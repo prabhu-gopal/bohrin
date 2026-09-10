@@ -388,9 +388,8 @@ def test_two_different_operators_stay_two_findings() -> None:
 def test_a_zero_score_says_what_it_does_not_prove() -> None:
     """False reassurance is a false accusation pointed the other way.
 
-    `glossary` scores 0 and grades by substring containment, so it is exploitable — just
-    not by any model-free operator here. A reader who takes 0/100 as "sound" has been
-    misled by omission, and the report is what they read.
+    A clean score bounds what the operators could construct. A reader who takes 0/100 as
+    "sound" has been misled by omission, and the report is what they read.
     """
     from bohrin.probes.base import ProbeResult, ProbeStatus
     from bohrin.scoring.gap import Coverage, GapScore
@@ -417,6 +416,69 @@ def test_a_zero_score_says_what_it_does_not_prove() -> None:
 def test_a_nonzero_score_carries_no_caveat() -> None:
     """It applies to a clean result only; on a real finding it would be noise."""
     assert "not a proof" not in _render(_exploits_across(3))
+
+
+def _one_probe_report(result: Any, score: float) -> Any:
+    from bohrin.scoring.gap import Coverage, GapScore
+
+    return replace(
+        _report_with_one_exploit("./t", isolation_none=True),
+        gap=GapScore(score=score, coverage=Coverage((result.probe_id,), 1)),
+        results=(result,),
+    )
+
+
+def test_the_caveat_names_the_blind_spot_that_actually_exists() -> None:
+    """Until 1.2 the caveat warned that substring and last-number graders were missed. They
+    have been caught since `false_negation` in 1.1.0; a grader that reads one answer format
+    is what is missed, and the caveat said nothing about it."""
+    from bohrin.probes.base import ProbeResult, ProbeStatus
+
+    clean = ProbeResult(probe_id="weak_oracle", status=ProbeStatus.OK, sub_score=0.0, tasks_probed=5)
+    out = " ".join(_render(_one_probe_report(clean, 0.0)).split())
+
+    assert "not a proof that the verifier is sound" in out
+    assert "\\boxed{}" in out, "the caveat must name the format-gated blind spot"
+    assert "substring" not in out and "last number" not in out, "it must not claim a gap Bohrin has closed"
+
+
+def test_a_crash_is_not_headlined_as_an_acceptance() -> None:
+    """Before 1.2 the headline counted every finding's task, so a result whose only finding
+    was a crash printed "1 task accepts a known-wrong solution" beside a sub-score of 0."""
+    from bohrin.ir.evidence import HarnessDisruption
+    from bohrin.probes.base import ProbeResult, ProbeStatus
+    from bohrin.scoring.interval import rate
+
+    crash = HarnessDisruption(
+        task_id="0", error="ValueError: boom", payload="x", operator="empty_body", repro_args="--task 0"
+    )
+    result = ProbeResult(
+        probe_id="weak_oracle",
+        status=ProbeStatus.OK,
+        sub_score=0.0,
+        tasks_probed=3,
+        findings=(crash,),
+        detail={"rate": rate(0, 3)},
+    )
+    out = " ".join(_render(_one_probe_report(result, 0.0)).split())
+
+    assert "accepts a known-wrong" not in out
+    assert "no accepted wrong solutions" in out
+
+
+def test_the_gap_says_how_many_tasks_it_rests_on() -> None:
+    """Measured before this existed: a synthetic environment where weak_oracle could measure
+    2 of 20 tasks printed 50/100 at full probe coverage, with nothing to say so."""
+    from bohrin.probes.base import ProbeResult, ProbeStatus
+    from bohrin.scoring.interval import rate
+
+    result = ProbeResult(
+        probe_id="weak_oracle", status=ProbeStatus.OK, sub_score=1.0, tasks_probed=20, detail={"rate": rate(2, 2)}
+    )
+    out = " ".join(_render(_one_probe_report(result, 100.0)).split())
+
+    assert "rests on: weak_oracle 2 of 2 tasks (95% CI 34–100%)" in out
+    assert "(of 2 measured · 95% CI 34–100%)" in out
 
 
 def test_a_task_id_with_spaces_survives_the_repro_command() -> None:

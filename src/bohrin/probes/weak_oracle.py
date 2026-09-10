@@ -23,6 +23,7 @@ from bohrin.ir.task import Candidate, Provenance, Task
 from bohrin.mutate import discover as discover_operators
 from bohrin.mutate.equivalence import code_equivalent, collides_under, reads_as_refusal
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
+from bohrin.scoring.interval import rate
 
 
 def _baseline_candidates(task: Task) -> list[Candidate]:
@@ -215,6 +216,7 @@ class WeakOracleProbe(Probe):
                 "candidates_submitted": len(work),
                 "tasks_measurable": len(measurable),
                 "tasks_compromised": len(compromised),
+                "rate": rate(len(compromised), len(measurable)),
                 "baseline_failures": baseline_detail,
                 "baseline_errors": baseline_errors,
                 "tasks_without_reference": unbaselined,
