@@ -59,11 +59,60 @@ def _headline(result: ProbeResult) -> str:
             return "the declared answer was accepted on every task"
         noun = "task" if n == 1 else "tasks"
         return f"the declared answer was refused on {n} {noun} (not scored)"
-    if not n:
-        return "no accepted wrong solutions"
-    if n == 1:
-        return "1 task accepts a known-wrong solution"
-    return f"{n} tasks accept known-wrong solutions"
+    # Acceptances only. A harness disruption is a finding on the same list, but nothing was
+    # accepted, and counting its task here printed "1 task accepts a known-wrong solution"
+    # beside a sub-score of zero -- an accusation in the line a reader skims first,
+    # contradicted by the number next to it.
+    reported = result.detail.get("rate")
+    accepted = reported.get("affected", n) if isinstance(reported, dict) else n
+    basis = _basis(result)
+    if not accepted:
+        return f"no accepted wrong solutions{basis}"
+    if accepted == 1:
+        return f"1 task accepts a known-wrong solution{basis}"
+    return f"{accepted} tasks accept known-wrong solutions{basis}"
+
+
+def _basis(result: ProbeResult) -> str:
+    """The sample a rate rests on, as `` (of N measured · 95% CI a–b%)``.
+
+    ``2 of 2`` and ``300 of 300`` both read as "every task", and only one is evidence of
+    much. The interval is Wilson's; see :mod:`bohrin.scoring.interval` for why.
+    """
+    reported = result.detail.get("rate")
+    if not isinstance(reported, dict):
+        return ""
+    measured, interval = reported.get("measured"), reported.get("interval_95")
+    if not isinstance(measured, int) or not interval:
+        return ""
+    low, high = interval
+    return f" (of {measured} measured · 95% CI {low * 100:.0f}–{high * 100:.0f}%)"
+
+
+def _gap_basis(report: Report) -> str | None:
+    """What the gap rests on, printed directly beneath it.
+
+    The coverage descriptor says which *probes* contributed; it cannot say how many *tasks*
+    each one could measure, and that is where a large number can be built from almost
+    nothing. Measured on a synthetic environment before this existed: ``weak_oracle``
+    measured 2 of 20 tasks, and the report printed ``VERIFICATION GAP: 50 / 100 coverage:
+    2 of 2 probes`` with nothing to show it rested on two tasks.
+    """
+    if report.gap.score is None:
+        return None
+    parts: list[str] = []
+    for result in report.results:
+        if result.probe_id not in report.gap.coverage.measured or result.detail.get("scored_out_of_gap"):
+            continue
+        reported = result.detail.get("rate")
+        if not isinstance(reported, dict) or not reported.get("interval_95"):
+            continue
+        low, high = reported["interval_95"]
+        parts.append(
+            f"{result.probe_id} {reported['affected']} of {reported['measured']} tasks "
+            f"(95% CI {low * 100:.0f}–{high * 100:.0f}%)"
+        )
+    return "rests on: " + " · ".join(parts) if parts else None
 
 
 def _grouped(report: Report) -> dict[tuple[str, str], list[Finding]]:
@@ -93,15 +142,22 @@ def _zero_score_caveat(report: Report) -> str | None:
 
     A gap of 0 is an *under-approximation*: Bohrin reports only defects its operators can
     construct a payload for, so absence of findings is absence of evidence, not evidence
-    of absence. Two of the environments in this project's own sweep score 0 and are
-    nonetheless exploitable — `glossary` grades by substring containment, `proposer_solver`
-    by the last integer in the reply — and no model-free operator here builds those
-    payloads.
+    of absence. A reader who concludes "my verifier is fine" from a clean run has been
+    misled by omission — the same failure as a false accusation, pointed the other way, and
+    the one a certification product can least afford.
 
-    `docs/05_ROBUSTNESS.md` has always said so. The report did not, and the report is what
-    people read; a reader who concludes "my verifier is fine" from a clean run has been
-    misled by omission. That is the same failure as a false accusation, pointed the other
-    way, and it is the one a certification product can least afford.
+    **The caveat has to name the blind spot that actually exists.** Until 1.2 it named
+    graders that decide by substring or by the last number in a reply. That was true when
+    written and stopped being true in 1.1.0, when ``false_negation`` began reaching both —
+    measured against synthetic graders of each shape: substring, first-number and
+    last-number graders are all caught. So the report was telling users that Bohrin could
+    not do something it could, while staying silent about something it cannot.
+
+    What does still read clean is a grader that parses **one answer format** — typically the
+    last ``\\boxed{}`` in a reply. Bohrin's payloads are not written in it, so such a grader
+    rejects every one for format before it judges any, and reads clean whether or not it is
+    weak. Measured: a grader that accepts the *first* ``\\boxed{}`` of a reply — a
+    contradiction the payloads never form — scored 0.
     """
     if report.gap.score is None or report.gap.score > 0:
         return None
@@ -121,8 +177,9 @@ def _zero_score_caveat(report: Report) -> str | None:
         )
     return (
         f"{prefix}a clean result bounds what {which} could construct — it is not a proof "
-        f"that the verifier is sound. Graders that accept by substring or by the last "
-        f"number in a reply score 0 here and are still exploitable."
+        f"that the verifier is sound. The known blind spot is a grader that reads only one "
+        f"answer format, such as the last \\boxed{{}}: no payload here is written in it, so "
+        f"such a grader reads clean whether or not it is weak."
     )
 
 
@@ -164,6 +221,9 @@ def render(report: Report, console: Console) -> None:
     # The gap and its coverage are rendered by GapScore.__str__ so the two cannot drift
     # apart, and so no caller can accidentally print a bare number.
     console.print(f"  [bold]{escape(str(report.gap))}[/bold]")
+    basis = _gap_basis(report)
+    if basis is not None:
+        console.print(f"  [dim]{escape(basis)}[/dim]", highlight=False)
     caveat = _zero_score_caveat(report)
     if caveat is not None:
         console.print(f"  [dim]note {escape(caveat)}[/dim]", highlight=False)

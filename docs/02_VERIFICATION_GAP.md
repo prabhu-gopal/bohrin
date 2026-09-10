@@ -83,6 +83,32 @@ measures *correctness* of acceptance, `determinism` measures *reliability* of
 scoring. A verifier can fail either independently, so neither subsumes the
 other and the pair gives real coverage rather than two views of one defect.
 
+## Reporting uncertainty
+
+A sub-score is a proportion of tasks, and a proportion is only as good as the number of
+tasks under it. `2 of 2` and `300 of 300` both read as "every task compromised"; the first
+is a lead and the second is a measurement. The coverage descriptor above says which
+*probes* contributed, and cannot say how many *tasks* each one managed to measure — which
+is where a large number can be built from almost nothing. Measured on a synthetic
+environment before this rule existed: `weak_oracle` could measure only 2 of 20 tasks, and
+the report printed `VERIFICATION GAP: 50 / 100 coverage: 2 of 2 probes`.
+
+So every rate carries its sample size and a 95% **Wilson score interval** — in the terminal,
+directly beneath the gap (`rests on: weak_oracle 2 of 2 tasks (95% CI 34–100%)`), and in
+`--json` as `detail.rate`: `affected`, `measured`, `interval_95`.
+
+**Why Wilson.** The textbook `p ± 1.96·√(p(1−p)/n)` fails exactly where an audit's samples
+live: at small `n`, and at `p` near 0 or 1 — which is where a clean or a fully compromised
+verifier puts it. At `2 of 2` it collapses to `[1, 1]`, claiming certainty from two
+observations. Brown, Cai and DasGupta's comparison of nine methods (*Statistical Science*,
+2001) recommended Wilson for small samples; recent guidance on evaluating agents over
+small task sets makes the same recommendation, with uncertainty reported per task set
+rather than only in aggregate.
+
+**What it does not describe.** Sampling uncertainty only. Whether the operators could
+construct the relevant payload at all is a separate and qualitative limit, stated by the
+caveat the report prints under any clean result.
+
 ## What the gap is not
 
 - **Not a benchmark score.** There is no leaderboard, and Bohrin will not

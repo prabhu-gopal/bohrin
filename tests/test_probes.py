@@ -359,3 +359,11 @@ async def test_a_task_where_everything_fails_is_not_blamed_on_the_grader() -> No
 
     assert not [f for f in result.findings if isinstance(f, HarnessDisruption)]
     assert result.status is ProbeStatus.ERROR, "it must still be reported, as an unmeasurable task"
+
+
+async def test_every_rate_carries_its_sample_and_interval() -> None:
+    """Report schema 1.3: the counts a sub-score came from, and a Wilson 95% interval, so
+    ``3 of 3`` can be told apart from ``300 of 300`` in the JSON as well as the terminal."""
+    result = await WeakOracleProbe().run(_fixtures.weak_source(3), CFG)
+
+    assert result.detail["rate"] == {"affected": 3, "measured": 3, "interval_95": [0.4385, 1.0]}

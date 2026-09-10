@@ -27,6 +27,7 @@ from bohrin.execute.runner import score_many
 from bohrin.ir.evidence import Finding, Flake
 from bohrin.ir.task import Candidate, Provenance, Task
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
+from bohrin.scoring.interval import rate
 
 #: Rewards closer than this are treated as equal, so ordinary float noise is not reported
 #: as a defect. A verifier whose reward wobbles in the twelfth decimal is not the problem
@@ -176,6 +177,7 @@ class DeterminismProbe(Probe):
             detail={
                 "repeats": config.repeats,
                 "tasks_measured": measured,
+                "rate": rate(len(findings), measured),
                 "errors": errors,
                 "detection_power": power,
                 "power_note": (

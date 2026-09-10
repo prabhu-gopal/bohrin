@@ -143,6 +143,15 @@ their verifier is sound.
 
 §0 below had always said so. The report had not — and the report is what people read.
 
+> **Update, 1.2.** Both examples here have since been resolved, and the caveat's wording
+> had not kept up. `glossary` is caught by `false_negation` (1.1.0), and `proposer_solver`
+> attaches no reward function to its tasks and now reports as unmeasured rather than clean.
+> Measured against synthetic graders of each shape, substring, first-number and
+> last-number graders are all caught. The caveat named them anyway until 1.2, while saying
+> nothing of the blind spot that does exist — a grader reading only one answer format, such
+> as the last `\boxed{}`, which rejects every payload on format and reads clean whether or
+> not it is weak. The caveat now names that instead.
+
 **Fixed:** a clean score carries a line naming how many operators were tried and what a
 clean result bounds.
 
@@ -215,7 +224,9 @@ strongest available argument for a dedicated answer-leakage check.
 One defect found, zero false accusations. But two of the three clean results are a limit of
 the operators, not a verdict on the grader: `glossary` scores `answer.lower() in reply`, and
 `proposer_solver` scores on the last integer in the reply. Both accept submissions that are
-obviously not solutions; no fixed operator here constructs one.
+obviously not solutions; no fixed operator here constructs one. *(Superseded: `glossary` is
+caught by `false_negation` from 1.1.0, and `proposer_solver` was later found to attach no
+reward function to its tasks — see the 1.2 update above.)*
 
 The single hit is instructive about *why* it hit. `scratchpad` grades `self.data.word in
 answer` while its own prompt contains `word="alpha"`, so `identity_return` — echo the

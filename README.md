@@ -149,13 +149,17 @@ full coverage, and two Bohrin declined to score, saying so in the report rather
 than reporting them clean (`gsm8k` needs a runtime; `reverse_text`'s own
 reference answer fails its own verifier).
 
-Two of the three "clean" results are a limit of the operators, not a verdict on
-the grader. `glossary` accepts any reply containing the answer as a substring,
-and `proposer_solver` grades on the last integer in the reply. Both are
-exploitable; no fixed operator here constructs the payload that does it.
+That sweep predates 1.1.0, and two of its "clean" results have since been
+resolved. `glossary`, which accepts any reply containing the answer as a
+substring, is now caught by `false_negation` — an explicit denial of the answer
+contains the answer too, and a substring check cannot tell the two apart. And
+`proposer_solver` turned out to attach no reward function to its tasks at all; it
+is now reported as unmeasured rather than clean.
 
-That gap is the honest boundary of the open core, and it is stated here rather
-than discovered later.
+The boundary that remains is a grader that reads only one answer format, such as
+the last `\boxed{}` in a reply: no fixed payload here is written in it, so such a
+grader reads clean whether or not it is weak. That is the honest edge of the open
+core, and it is stated here rather than discovered later.
 
 ## The rule this codebase is built around
 

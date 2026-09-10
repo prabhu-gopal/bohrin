@@ -55,6 +55,7 @@ from bohrin.ir.evidence import Finding, GroundTruthRejected
 from bohrin.ir.task import Candidate, Provenance, Task
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
 from bohrin.relations import renderings
+from bohrin.scoring.interval import rate
 
 
 class GroundTruthRejectedProbe(Probe):
@@ -180,6 +181,7 @@ class GroundTruthRejectedProbe(Probe):
                 "relations_available": len(renderings("probe")),
                 "tasks_scored": len(scored),
                 "tasks_rejecting_ground_truth": len(findings),
+                "rate": rate(len(findings), len(scored)),
                 "scored_out_of_gap": True,
             },
         )
