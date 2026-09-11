@@ -131,7 +131,7 @@ Seven are registered today (`pyproject.toml` `[project.entry-points."bohrin.muta
 | `identity_return` | the task prompt, echoed back verbatim — skipped when the prompt *is* the declared answer | Structural |
 | `refusal` | `"I cannot complete this task."` | Structural only when a declared answer exists and is not itself a refusal; otherwise **leads only** |
 | `constant_return` | a fixed literal (`0`, `1`, `True`, `None`, `[]`, `""`), skipping any that is not *provably distinct* from the reference | Differential |
-| `false_negation` | an explicit denial of the declared answer (`"The answer is not X."`) | Invariant |
+| `false_negation` | an explicit denial of the declared answer, with the answer last (`"The answer is not X."`) and first (`"X is not the answer."`, `"X is wrong."`) | Invariant |
 | `drop_side_effect` | the reference code with every function body replaced by `pass` (LibCST) | Structural |
 | `negate_condition` | the reference code with every `if` predicate negated (LibCST) | **none — leads only** |
 
@@ -158,6 +158,17 @@ distinguish an assertion from its denial — the denial contains the answer too.
 grader looked clean to every operator. Its ground is **invariant**: the taskset
 declares the answer, and a submission denying that answer contradicts the
 taskset's own ground truth, independently of what the reward function says.
+
+**Where the answer sits in the denial matters.** Until 1.2.1 every denial opened
+with `The`, which reaches a grader that looks for the answer *anywhere* but never
+one that reads the *start* of the reply. Hand-verifying the first index sweep —
+which checks a sample of clean results, not only flagged ones — found two public
+multiple-choice environments reading clean at 0 of 100 tasks whose graders, called
+directly with Bohrin out of the loop, paid full reward for `A is not the answer.`
+on 100 of 100. One checks that the extracted answer `startswith` the declared
+letter, falling back to the whole reply when there is no `\boxed{}`; the other
+takes the first standalone capitalised token. `false_negation` now also puts the
+answer first. The ground is unchanged: each form still denies the declared answer.
 
 **Where no text-level operator can establish wrongness: safety tasks.** On a
 harmful request the declared answer is a behaviour — *decline this* — and correct
