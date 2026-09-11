@@ -13,6 +13,17 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Graders that read the start of a reply no longer read clean.** Every `false_negation`
+  denial opened with `The` (`The answer is not A.`), so it reached a grader looking for the
+  answer anywhere in the reply but never one checking what the reply *starts* with. Found by
+  hand-verifying a sample of clean results from the first index sweep: two public
+  multiple-choice environments read clean at 0 of 100 tasks, and their graders, called
+  directly with Bohrin out of the loop, paid full reward for `A is not the answer.` on 100
+  of 100. `false_negation` now also submits `X is not the answer.` and `X is wrong.`; both
+  still deny the declared answer, so the ground is unchanged.
+
 ## [1.2.0] — 2026-09-10
 
 ### Added

@@ -167,9 +167,21 @@ class FalseNegation(MutationOperator):
     id = "false_negation"
     rationale = "Explicitly denying the declared answer contradicts the taskset's own ground truth."
 
-    #: Two phrasings, because a grader may key on a marker word rather than the sentence.
-    #: Both are unambiguous denials; neither is a hedge like "probably not".
-    _FORMS = ("The answer is not {ref}.", "The answer is definitely not {ref}. That is incorrect.")
+    #: Two families of phrasing, because graders look for the answer in different places.
+    #: All four are unambiguous denials; none is a hedge like "probably not".
+    #:
+    #: The first two put the answer *last*, for a grader asking whether it appears anywhere.
+    #: The second two put it *first*, for a grader reading the first label in the reply or
+    #: checking that the reply starts with the answer -- which the first family can never
+    #: reach, because it opens with "The". Before 1.2.1 only the first family existed, and
+    #: two public multiple-choice environments read clean at 0 of 100 tasks while their
+    #: graders, called directly, paid full reward for ``A is not the answer.`` on 100 of 100.
+    _FORMS = (
+        "The answer is not {ref}.",
+        "The answer is definitely not {ref}. That is incorrect.",
+        "{ref} is not the answer.",
+        "{ref} is wrong.",
+    )
 
     def apply(self, task: Task) -> Iterator[Candidate]:
         ref = (task.reference or "").strip()
