@@ -18,4 +18,7 @@ __version__ = "1.2.0"
 #
 # 1.3 adds ``detail.rate`` — ``affected``, ``measured``, ``interval_95`` — to every probe
 # that reports a proportion of tasks.
-REPORT_SCHEMA_VERSION = "1.3"
+#
+# 1.4 adds ``detail.tasks_scale_unknown`` to ``weak_oracle``: tasks excluded because their
+# rubric paid more than its own declared full marks.
+REPORT_SCHEMA_VERSION = "1.4"

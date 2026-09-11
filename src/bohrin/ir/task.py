@@ -88,6 +88,12 @@ class Verdict:
     passed: bool
     per_fn: Mapping[str, float] = field(default_factory=dict)
     raw: Mapping[str, Any] = field(default_factory=dict)
+    #: The reward came out *above* full marks as the rubric declares them. ``passed`` means
+    #: "reached full marks", and full marks are read from the rubric's weights, which assume
+    #: each reward function returns 0 to 1. A rubric paying past that -- a sum of 0-3
+    #: criteria, a mean of 1-5 ratings -- has a scale Bohrin does not know, so on it
+    #: ``passed`` says only "scored at least 1", not "scored like a correct reply".
+    scale_exceeded: bool = False
 
 
 __all__ = ["Candidate", "Ground", "Provenance", "Task", "Verdict"]

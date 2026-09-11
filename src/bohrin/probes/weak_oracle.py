@@ -11,7 +11,7 @@ is the discipline around what may be reported.
 from __future__ import annotations
 
 import shlex
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import replace
 
 from bohrin.adapters.base import TaskSource
@@ -19,7 +19,7 @@ from bohrin.adapters.verifiers_v1 import reference_renderings
 from bohrin.config import ScanConfig
 from bohrin.execute.runner import ScoreOutcome, score_many
 from bohrin.ir.evidence import BaselineFailure, Exploit, Finding, HarnessDisruption, Unverified
-from bohrin.ir.task import Candidate, Provenance, Task
+from bohrin.ir.task import Candidate, Provenance, Task, Verdict
 from bohrin.mutate import discover as discover_operators
 from bohrin.mutate.equivalence import code_equivalent, collides_under, reads_as_refusal
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
@@ -56,6 +56,35 @@ def _is_the_reference(payload: str, reference: str) -> bool:
     may apply: as an answer (every normalisation in the equivalence ladder) or as a program
     (Trivial Compiler Equivalence). Either one means the candidate cannot be wrong."""
     return collides_under(payload, reference) is not None or code_equivalent(payload, reference)
+
+
+_OFF_SCALE = (
+    "the verifier accepted this, but its rubric paid more than its own declared full marks on "
+    "this task, so its scale is unknown and a reply reaching the bar cannot be shown to have "
+    "scored like a correct one"
+)
+
+
+class _ScaleWatch:
+    """A source that remembers every task on which the rubric paid past full marks.
+
+    Wraps the baseline and the candidates alike. A reference paying 15 on a rubric whose
+    weights promise at most 1 is as telling as a candidate doing so: either way, "reached
+    full marks" on that task no longer means "scored like a correct reply".
+    """
+
+    def __init__(self, source: TaskSource) -> None:
+        self._source = source
+        self.off_scale: set[str] = set()
+
+    def tasks(self) -> Iterator[Task]:
+        return self._source.tasks()
+
+    async def score(self, task: Task, candidate: Candidate) -> Verdict:
+        verdict = await self._source.score(task, candidate)
+        if verdict.scale_exceeded:
+            self.off_scale.add(task.id)
+        return verdict
 
 
 class WeakOracleProbe(Probe):
@@ -111,7 +140,8 @@ class WeakOracleProbe(Probe):
         # reaches the user instead of an error count.
         offline, refused = self._partition_scoreable(tasks)
 
-        measurable, baseline_failures, baseline_errors = await self._establish_baseline(source, offline, config)
+        watch = _ScaleWatch(source)
+        measurable, baseline_failures, baseline_errors = await self._establish_baseline(watch, offline, config)
         baseline_failures = [*refused, *baseline_failures]
         # Serialized identically on every path: a key whose type depends on status breaks
         # any consumer that reads the JSON.
@@ -178,8 +208,45 @@ class WeakOracleProbe(Probe):
                 reason="no operator could establish wrongness for any task (is a reference solution available?)",
             )
 
-        outcomes = await score_many(source, work, config)
+        outcomes = await score_many(watch, work, config)
         findings, unverified, errors = self._triage(outcomes)
+
+        # A rubric that paid past its own declared full marks has a scale Bohrin cannot read,
+        # so on that task "reached full marks" is not evidence of anything. Its tasks leave
+        # the denominator and what it accepted becomes a lead. Found on real environments: a
+        # 0-15 criteria sum and a 1-5 rating mean were both reported as exploited, because
+        # 12 and 2.5 each clear a bar of 1.
+        off_scale = watch.off_scale & {t.id for t in measurable}
+        if off_scale:
+            unverified = [
+                *unverified,
+                *(
+                    Unverified(task_id=f.task_id, candidate=f.candidate, verdict=f.verdict, reason=_OFF_SCALE)
+                    for f in findings
+                    if isinstance(f, Exploit) and f.task_id in off_scale
+                ),
+            ]
+            # Exploits only: a crash the payload triggered is a defect on any scale.
+            findings = [f for f in findings if not (isinstance(f, Exploit) and f.task_id in off_scale)]
+            measurable = [t for t in measurable if t.id not in off_scale]
+        if not measurable:
+            return ProbeResult(
+                probe_id=self.id,
+                status=ProbeStatus.ERROR,
+                tasks_probed=len(off_scale),
+                unverified=tuple(unverified),
+                reason=(
+                    "not measured: on every task the rubric paid more than its own declared full "
+                    "marks, so its scale is unknown and no accepted reply can be shown to have "
+                    "scored like a correct one"
+                ),
+                detail={
+                    "baseline_failures": baseline_detail,
+                    "candidates_submitted": len(work),
+                    "tasks_scale_unknown": len(off_scale),
+                    "errors": errors,
+                },
+            )
 
         # If nothing was successfully scored there is no measurement, and a sub-score of
         # zero would report a verifier as clean that was never actually probed. This is the
@@ -227,6 +294,8 @@ class WeakOracleProbe(Probe):
                 # Candidates submitted as leads because the task's declared answer is a
                 # refusal, where no non-compliant reply can be shown to be wrong.
                 "grounds_withdrawn": grounds_withdrawn,
+                # Tasks excluded because their rubric paid past its own declared full marks.
+                "tasks_scale_unknown": len(off_scale),
                 "errors": errors,
             },
         )

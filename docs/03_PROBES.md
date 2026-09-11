@@ -193,6 +193,16 @@ extracts the longest standalone A–I run and compares it exactly, so
 `"The answer is not ABC."` yields `ABC`. Both reward a reply that explicitly
 states the answer is wrong.
 
+**Full marks are read from the rubric, so a rubric paying past them is not
+measured.** A candidate counts as accepted when its reward reaches the sum of the
+rubric's weights, which assumes every reward function returns 0 to 1. Some pay on
+other scales — a sum of 0–3 criteria, a mean of 1–5 ratings — and on those an
+ordinary reply clears the bar without scoring anything like a correct one. Until
+1.2.1 two such public environments were reported as exploited. Now a task on
+which any reply, the reference included, scores above full marks leaves the
+denominator, its acceptances become leads, and `detail.tasks_scale_unknown`
+counts it.
+
 `negate_condition` carries **no ground**. Negating a predicate changes the source
 but not necessarily the behaviour: a branch whose two arms do the same thing is
 the textbook equivalent mutant, and nothing short of executing both tells them

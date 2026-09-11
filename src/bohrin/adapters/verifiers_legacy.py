@@ -424,6 +424,8 @@ class _LegacySource:
                 "attainable": self._attainable,
                 "declared_rewards": list(task.reward_fns),
             },
+            # Tolerance for float summation of the weights, not for the reward's scale.
+            scale_exceeded=bool(self._attainable) and total > self._attainable + 1e-9,
         )
 
 
