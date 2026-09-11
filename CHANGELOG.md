@@ -24,6 +24,21 @@ from. The entries below are the terse canonical record.
   of 100. `false_negation` now also submits `X is not the answer.` and `X is wrong.`; both
   still deny the declared answer, so the ground is unchanged.
 
+- **A rubric that pays past its own full marks is no longer read as exploited.** A reply
+  counts as accepted when its reward reaches full marks, and full marks are the sum of the
+  rubric's weights — which assumes every reward function returns 0 to 1. Found by
+  hand-verifying the first index sweep: two public environments pay on other scales (a sum
+  of five 0–3 criteria, and a mean of 1–5 ratings), and both were reported as exploited
+  because 12 and 2.5 each clear a bar of 1. A task on which any reply — the reference
+  included — scores above full marks is now excluded from `weak_oracle`, and what it
+  accepted is reported as a lead. When every task is excluded the probe reports *not
+  measured*, never clean.
+
+### Changed
+
+- **Report schema 1.4.** `weak_oracle`'s `detail` gains `tasks_scale_unknown`, the number of
+  tasks excluded for the reason above. Additive; no existing key changes.
+
 ## [1.2.0] — 2026-09-10
 
 ### Added

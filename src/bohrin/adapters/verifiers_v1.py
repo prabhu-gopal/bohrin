@@ -419,6 +419,8 @@ class _VerifiersSource:
                 "skipped_rewards": skipped,
                 "declared_rewards": list(task.reward_fns),
             },
+            # Tolerance for float summation of the weights, not for the reward's scale.
+            scale_exceeded=bool(attainable) and total > attainable + 1e-9,
         )
 
 

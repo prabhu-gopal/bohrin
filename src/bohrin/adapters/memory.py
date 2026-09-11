@@ -24,10 +24,15 @@ class MemorySource:
         grader: Grader,
         *,
         pass_at: float = 1.0,
+        full_marks: float | None = None,
     ) -> None:
         self._tasks = tuple(tasks)
         self._grader = grader
         self._pass_at = pass_at
+        #: Full marks as the grader *declares* them, when a test needs one. A reward above it
+        #: is flagged ``scale_exceeded``, exactly as the real adapters flag a rubric paying
+        #: past the sum of its weights. ``None`` declares nothing, and nothing is flagged.
+        self._full_marks = full_marks
         #: Number of score() calls, so tests can assert on effort as well as outcome.
         self.calls = 0
 
@@ -41,6 +46,7 @@ class MemorySource:
             reward=reward,
             passed=reward >= self._pass_at,
             per_fn={task.reward_fns[0]: reward} if task.reward_fns else {},
+            scale_exceeded=self._full_marks is not None and reward > self._full_marks,
         )
 
 
