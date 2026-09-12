@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING, Any
 
 from bohrin.adapters._package import distribution_name
 from bohrin.adapters.base import Adapter, MissingExtraError, TasksetLoadError, TaskSource
+from bohrin.adapters.selection import select_indices
 from bohrin.ir.task import Candidate, Task, Verdict
 from bohrin.relations import renderings as relation_renderings
 
@@ -338,6 +339,15 @@ class _VerifiersSource:
                 self.corpus_total = len(taskset)
             except (TypeError, AttributeError):
                 self.corpus_total = None
+        if config.sample_seed is not None:
+            raise TasksetLoadError(
+                f"taskset {taskset_id!r} cannot be sampled: a v1 taskset is an iterable this "
+                f"adapter can only take from the front, so --sample-seed has no honest meaning "
+                f"here. Re-run without it to audit the first --max-tasks tasks."
+            )
+        _, self.selection_mode = select_indices(self.corpus_total, config.max_tasks, None)
+        #: No sample was drawn, so there is no seed to record.
+        self.selection_seed: int | None = None
         if config.max_tasks is not None:
             taskset = taskset.head(config.max_tasks)
         _require_bounded(taskset, taskset_id)

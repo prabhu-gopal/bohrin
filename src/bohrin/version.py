@@ -21,4 +21,7 @@ __version__ = "1.2.0"
 #
 # 1.4 adds ``detail.tasks_scale_unknown`` to ``weak_oracle``: tasks excluded because their
 # rubric paid more than its own declared full marks.
-REPORT_SCHEMA_VERSION = "1.4"
+#
+# 1.5 adds ``selection`` — ``mode`` (all / prefix / random) and ``seed`` — naming how the
+# audited tasks were chosen from the taskset.
+REPORT_SCHEMA_VERSION = "1.5"

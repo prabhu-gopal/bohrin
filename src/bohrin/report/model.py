@@ -27,6 +27,12 @@ class Report:
     #: can say. Reported because a clean result over a prefix is a far weaker claim than a
     #: clean result over a corpus, and the two are indistinguishable without this number.
     corpus_total: int | None = None
+    #: How the audited tasks were chosen — ``all``, ``prefix`` or ``random`` — and, for a
+    #: sample, the seed that redraws it. Part of the evidence, not a detail: a rate over the
+    #: first 100 tasks describes those tasks, while a rate over 100 drawn at random
+    #: estimates the taskset. ``None`` where the adapter does not say.
+    selection_mode: str | None = None
+    selection_seed: int | None = None
     #: How the verifier's code was executed. Part of the evidence: a result produced with
     #: no boundary must never be mistaken for one produced inside a container.
     isolation: Assessment | None = None
@@ -68,6 +74,7 @@ class Report:
             "tasks_total": self.tasks_total,
             "corpus_total": self.corpus_total,
             "truncated": self.truncated,
+            "selection": {"mode": self.selection_mode, "seed": self.selection_seed},
             "isolation": self.isolation.to_dict() if self.isolation else None,
             "verification_gap": {
                 "score": self.gap.score,

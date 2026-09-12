@@ -105,6 +105,17 @@ observations. Brown, Cai and DasGupta's comparison of nine methods (*Statistical
 small task sets makes the same recommendation, with uncertainty reported per task set
 rather than only in aggregate.
 
+**An interval needs a sample.** A Wilson interval says how far the measured rate may sit
+from the rate of the population the tasks were drawn from — which is the taskset only when
+the tasks were drawn at random. `--max-tasks N` takes the *first* N, and a taskset is
+routinely ordered by subject, source or difficulty, so a prefix rate describes the prefix
+and the interval around it describes the prefix too. `--sample-seed S` draws the N
+uniformly at random instead, and the report records the mode and the seed
+(`100 random of 3270 tasks (seed 7)`, and `selection` in `--json`) so a reader can tell
+which of the two claims a number is making. Any published rate over a bounded audit should
+be sampled; the prefix remains the default because it is what an unseeded command has
+always meant.
+
 **What it does not describe.** Sampling uncertainty only. Whether the operators could
 construct the relevant payload at all is a separate and qualitative limit, stated by the
 caveat the report prints under any clean result.

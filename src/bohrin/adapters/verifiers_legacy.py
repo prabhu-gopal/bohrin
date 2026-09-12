@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from bohrin.adapters._package import distribution_name
 from bohrin.adapters.base import Adapter, MissingExtraError, TasksetLoadError, TaskSource
+from bohrin.adapters.selection import RANDOM, select_indices
 from bohrin.ir.task import Candidate, Task, Verdict
 
 if TYPE_CHECKING:
@@ -301,9 +302,25 @@ class _LegacySource:
         #: over a prefix is not mistaken for a clean result over the taskset.
         self.corpus_total: int | None = _length_of(dataset)
         bound = config.max_tasks
-        self._rows: list[dict[str, Any]] = [
-            dict(row) for index, row in enumerate(dataset) if bound is None or index < bound
-        ]
+        if config.sample_seed is not None and self.corpus_total is None:
+            raise TasksetLoadError(
+                f"environment {env_id!r} does not report how many tasks it has, so a uniform "
+                f"random sample cannot be drawn from it. Re-run without --sample-seed to audit "
+                f"the first --max-tasks tasks instead — and read that result as a statement "
+                f"about those tasks, not about the environment."
+            )
+        indices, mode = select_indices(self.corpus_total, bound, config.sample_seed)
+        #: How the audited tasks were chosen, and the seed that redraws the same sample.
+        self.selection_mode: str = mode
+        self.selection_seed: int | None = config.sample_seed if mode == RANDOM else None
+        if indices is None:
+            self._rows: list[dict[str, Any]] = [
+                dict(row) for index, row in enumerate(dataset) if bound is None or index < bound
+            ]
+        else:
+            # Random access, so sampling 100 of 414,513 rows costs 100 row reads rather than
+            # a walk of the whole split.
+            self._rows = [dict(dataset[index]) for index in indices]
         #: Bohrin task id -> its row, populated by tasks().
         self._by_id: dict[str, dict[str, Any]] = {}
 

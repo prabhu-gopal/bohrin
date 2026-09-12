@@ -30,6 +30,20 @@ is needed to upgrade.
 - **No more false exploits on rubrics that score past 1.** A grader that sums or averages
   scores above 1 is now reported as *not measured* rather than as broken.
 
+## Added
+
+- **`--sample-seed N`: audit a random sample, not the first N tasks.** `--max-tasks N`
+  audits the *first* N, which is a statement about those N and nothing else — measured on a
+  published environment, a bound of 10 scored 0 while a bound of 20 scored 50 on the same
+  verifier, because the tasks carrying the defect sat at positions 11 and 12. Tasksets are
+  also commonly ordered by subject or source, so the opening tasks are not a haphazard
+  slice. With a seed, the tasks are drawn uniformly at random, so the rate estimates the
+  whole taskset and the interval beside it means what it says. The report prints how the
+  tasks were chosen — `100 random of 3270 tasks (seed 7)` — and records it in `--json`, and
+  the same seed redraws the same sample, so a published number stays reproducible. A
+  taskset that will not report its length cannot be sampled, and that run is refused rather
+  than quietly given a prefix. Without the flag, nothing changes.
+
 ## Fixed
 
 - **`false_negation` now also puts the answer first.** Its denials all opened with `The`
