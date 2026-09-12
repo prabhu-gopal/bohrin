@@ -15,7 +15,6 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import replace
 
 from bohrin.adapters.base import TaskSource
-from bohrin.adapters.verifiers_v1 import reference_renderings
 from bohrin.config import ScanConfig
 from bohrin.execute.runner import ScoreOutcome, score_many
 from bohrin.ir.evidence import BaselineFailure, Exploit, Finding, HarnessDisruption, Unverified
@@ -23,6 +22,9 @@ from bohrin.ir.task import Candidate, Provenance, Task, Verdict
 from bohrin.mutate import discover as discover_operators
 from bohrin.mutate.equivalence import code_equivalent, collides_under, reads_as_refusal
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
+from bohrin.relations import Relation
+from bohrin.relations import discover as discover_relations
+from bohrin.relations import renderings as relation_renderings
 from bohrin.scoring.interval import rate
 
 
@@ -42,13 +44,48 @@ def _baseline_candidates(task: Task) -> list[Candidate]:
             payload=rendering,
             provenance=Provenance(
                 operator="baseline",
-                base="reference",
+                # The relation's id, not the word "reference": whichever rendering the
+                # verifier accepts names the answer format it reads, and that is what the
+                # wrong payloads then have to be written in to reach it at all.
+                base=relation_id,
                 detail=f"the taskset's known-good answer, submitted as {rendering[:40]!r}",
             ),
             ground=None,
         )
-        for rendering in reference_renderings(reference)
+        for relation_id, rendering in relation_renderings(reference)
     ]
+
+
+#: Renderings that submit the answer as it is stored. A verifier accepting one of these
+#: reads bare answers, so the operators' own payloads already reach it.
+_BARE = frozenset({"verbatim", "stripped"})
+
+
+def _in_accepted_form(candidate: Candidate, relation: Relation) -> Candidate | None:
+    """``candidate`` rewritten into the answer format this task's verifier accepted.
+
+    The ground is carried over unchanged, and that is the whole argument for this being
+    sound: a relation is certified *meaning-preserving*, so the rendering of a provably
+    wrong answer is the same wrong answer in another presentation. What changes is only
+    whether the verifier will look at it.
+    """
+    try:
+        rendered = relation.render(candidate.payload)
+    except Exception:  # a bad relation must never take down an audit
+        return None
+    if rendered is None or rendered.strip() == candidate.payload.strip():
+        return None
+    return replace(
+        candidate,
+        payload=rendered,
+        provenance=replace(
+            candidate.provenance,
+            detail=(
+                f"{candidate.provenance.detail}; written as {relation.id}, the answer format "
+                f"this task's verifier accepted for its own answer"
+            ),
+        ),
+    )
 
 
 def _is_the_reference(payload: str, reference: str) -> bool:
@@ -141,7 +178,11 @@ class WeakOracleProbe(Probe):
         offline, refused = self._partition_scoreable(tasks)
 
         watch = _ScaleWatch(source)
-        measurable, baseline_failures, baseline_errors = await self._establish_baseline(watch, offline, config)
+        measurable, baseline_failures, baseline_errors, accepted_form = await self._establish_baseline(
+            watch, offline, config
+        )
+        by_id = {relation.id: relation for relation in discover_relations()}
+        wanted_form = {task_id: by_id[form] for task_id, form in accepted_form.items() if form in by_id}
         baseline_failures = [*refused, *baseline_failures]
         # Serialized identically on every path: a key whose type depends on status breaks
         # any consumer that reads the JSON.
@@ -168,6 +209,7 @@ class WeakOracleProbe(Probe):
         # verifier is concerned, so only the first is sent.
         equivalent_suppressed = 0
         grounds_withdrawn = 0
+        in_accepted_form = 0
         for task in measurable:
             submitted: set[str] = set()
             # On a task whose declared answer is itself a refusal, "correct" means only
@@ -200,6 +242,23 @@ class WeakOracleProbe(Probe):
                         grounds_withdrawn += 1
                     submitted.add(key)
                     work.append((task, cand))
+
+                    # And again in the answer format this verifier demonstrated it reads.
+                    # A grader gated on one format -- the last \boxed{}, say -- rejects every
+                    # bare payload for its presentation before judging its content, and so
+                    # reads clean whether or not it is weak. That was the blind spot printed
+                    # on every clean report. The ground carries over because the relation is
+                    # certified meaning-preserving: a wrong answer rewritten is still wrong.
+                    relation = wanted_form.get(task.id)
+                    twin = _in_accepted_form(cand, relation) if relation is not None else None
+                    if twin is None or twin.payload.strip() in submitted:
+                        continue
+                    if twin.known_wrong and task.reference and _is_the_reference(twin.payload, task.reference):
+                        equivalent_suppressed += 1
+                        continue
+                    submitted.add(twin.payload.strip())
+                    work.append((task, twin))
+                    in_accepted_form += 1
         if not work:
             return ProbeResult(
                 probe_id=self.id,
@@ -296,6 +355,9 @@ class WeakOracleProbe(Probe):
                 "grounds_withdrawn": grounds_withdrawn,
                 # Tasks excluded because their rubric paid past its own declared full marks.
                 "tasks_scale_unknown": len(off_scale),
+                # Extra candidates written in the answer format the verifier accepted for
+                # its own answer. Zero means every verifier here read bare answers.
+                "candidates_in_accepted_form": in_accepted_form,
                 "errors": errors,
             },
         )
@@ -354,19 +416,25 @@ class WeakOracleProbe(Probe):
     @staticmethod
     async def _establish_baseline(
         source: TaskSource, tasks: Sequence[Task], config: ScanConfig
-    ) -> tuple[list[Task], list[BaselineFailure], int]:
+    ) -> tuple[list[Task], list[BaselineFailure], int, dict[str, str]]:
         """Confirm each reference passes its own verifier before trusting any mutant.
 
         Tasks with no reference are admitted unbaselined: the structural operators (an
         empty reply, a refusal) remain valid there, and excluding those tasks entirely
         would make the probe useless on the many tasksets that ship no reference. The count
         is recorded so the report can say which tasks carried the weaker guarantee.
+
+        The fourth return value is what the search *learned*: for each task whose verifier
+        wanted its answer in some presentation other than the stored one, the relation that
+        produced it. That is the answer format the verifier reads, discovered from the
+        verifier's own behaviour rather than guessed from its source, and the wrong payloads
+        are then written in it too.
         """
         with_reference = [t for t in tasks if t.reference is not None]
         without_reference = [t for t in tasks if t.reference is None]
 
         if not with_reference:
-            return without_reference, [], 0
+            return without_reference, [], 0, {}
 
         # Renderings are tried in waves: every still-unresolved task is scored against one
         # rendering in parallel, and a task drops out as soon as one is accepted. Submitting
@@ -376,6 +444,8 @@ class WeakOracleProbe(Probe):
         best: dict[str, tuple[float, str | None]] = {t.id: (0.0, None) for t in with_reference}
         measurable: list[Task] = list(without_reference)
         errors = 0
+        #: task id -> the relation whose rendering this task's verifier accepted.
+        accepted_form: dict[str, str] = {}
 
         max_renderings = max((len(_baseline_candidates(t)) for t in with_reference), default=0)
         for index in range(max_renderings):
@@ -395,6 +465,13 @@ class WeakOracleProbe(Probe):
                     measurable.append(out.task)
                     pending.pop(out.task.id, None)
                     best[out.task.id] = (out.verdict.reward, None)
+                    # A verifier that accepts the answer as stored reads bare answers, and
+                    # the operators' payloads already reach it. Anything else is a format
+                    # this verifier requires, and a payload not written in it may be
+                    # rejected for its presentation before its content is ever judged.
+                    form = out.candidate.provenance.base
+                    if form not in _BARE:
+                        accepted_form[out.task.id] = form
                 elif out.verdict.reward > reward:
                     best[out.task.id] = (out.verdict.reward, err)
             if not pending:
@@ -416,7 +493,7 @@ class WeakOracleProbe(Probe):
                     ),
                 )
             )
-        return measurable, failures, errors
+        return measurable, failures, errors, accepted_form
 
     @staticmethod
     def _triage(outcomes: Iterable[ScoreOutcome]) -> tuple[list[Finding], list[Unverified], int]:
