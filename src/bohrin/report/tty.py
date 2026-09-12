@@ -165,7 +165,17 @@ def _zero_score_caveat(report: Report) -> str | None:
     count = len(operators) if operators else None
     which = f"the {count} model-free operators" if count else "the model-free operators"
     prefix = ""
-    if report.truncated:
+    if report.truncated and report.selection_mode == "random":
+        # A sample carries its own caveat, and it is a different one: the tasks after the
+        # bound are represented here, but only to within the interval printed beside the
+        # rate. Reusing the prefix wording would understate what a sample buys.
+        prefix = (
+            f"{report.tasks_total} of {report.corpus_total} tasks were audited, drawn "
+            f"uniformly at random (seed {report.selection_seed}), so this estimates the "
+            f"taskset to within the interval above rather than proving every task clean. "
+            f"Beyond that, "
+        )
+    elif report.truncated:
         # Measured, not hypothetical: on a published environment a 10-task bound scored 0
         # while a 20-task bound scored 50 on the same verifier, because the tasks carrying
         # the defect sat at positions 11 and 12. --max-tasks takes a prefix, not a sample,
@@ -189,11 +199,14 @@ def render(report: Report, console: Console) -> None:
     console.print(f"[bold]Bohrin[/bold]  ·  {escape(report.target)}")
     # "8 tasks" and "8 of 541 tasks" are different claims about what was audited, and the
     # difference carries the whole weight of a clean result.
-    task_span = (
-        f"{report.tasks_total} of {report.corpus_total} tasks"
-        if report.truncated
-        else _plural(report.tasks_total, "task")
-    )
+    # And "100 of 3270" and "100 random of 3270" are different claims again: the first
+    # describes the first hundred tasks, the second estimates the taskset.
+    if report.truncated and report.selection_mode == "random":
+        task_span = f"{report.tasks_total} random of {report.corpus_total} tasks (seed {report.selection_seed})"
+    elif report.truncated:
+        task_span = f"{report.tasks_total} of {report.corpus_total} tasks"
+    else:
+        task_span = _plural(report.tasks_total, "task")
     line = f"{report.adapter} · {task_span} · {_plural(len(report.results), 'probe')}"
     if report.isolation is not None:
         line += f" · isolation: {report.isolation.effective.name.lower()}"

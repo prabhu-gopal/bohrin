@@ -88,6 +88,12 @@ class ScanConfig:
     #: Cap on tasks probed; None means every task.
     max_tasks: int | None = None
 
+    #: Seed for drawing ``max_tasks`` tasks uniformly at random instead of taking the first
+    #: ``max_tasks``. None keeps the prefix. A rate measured over a prefix describes the
+    #: prefix; a rate measured over a seeded sample estimates the taskset, which is what a
+    #: published number has to do. See :mod:`bohrin.adapters.selection`.
+    sample_seed: int | None = None
+
     #: Repeats for the determinism probe.
     repeats: int = DEFAULT_REPEATS
 

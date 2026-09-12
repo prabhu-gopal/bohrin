@@ -68,6 +68,13 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--probe", action="append", default=[], metavar="ID", help="run only this probe (repeatable)")
     audit.add_argument("--all", dest="all_probes", action="store_true", help="include probes held back by default")
     audit.add_argument("--max-tasks", type=int, default=None, metavar="N", help="probe at most N tasks")
+    audit.add_argument(
+        "--sample-seed",
+        type=int,
+        default=None,
+        metavar="N",
+        help="draw the --max-tasks tasks uniformly at random with this seed, instead of taking the first N",
+    )
     audit.add_argument("--task", action="append", default=[], metavar="ID", help="probe only this task id (repeatable)")
     audit.add_argument(
         "--operator", action="append", default=[], metavar="ID", help="apply only this operator (repeatable)"
@@ -149,6 +156,7 @@ def _cmd_audit(args: argparse.Namespace, console: Console, err: Console) -> int:
             concurrency=args.concurrency or default_concurrency(),
             per_task_timeout=args.timeout,
             max_tasks=args.max_tasks,
+            sample_seed=args.sample_seed,
             repeats=args.repeats,
             only=frozenset(args.probe),
             only_tasks=frozenset(args.task),
@@ -178,6 +186,11 @@ def _cmd_audit(args: argparse.Namespace, console: Console, err: Console) -> int:
         # getattr, not an attribute access: `corpus_total` is an optional part of the
         # adapter contract, and an adapter written against the previous one must keep working.
         corpus_total=getattr(source, "corpus_total", None),
+        # Same optional-attribute contract as corpus_total: an adapter written against the
+        # previous contract reports no selection, and the report says nothing rather than
+        # claiming a prefix it cannot vouch for.
+        selection_mode=getattr(source, "selection_mode", None),
+        selection_seed=getattr(source, "selection_seed", None),
         isolation=isolation,
     )
 

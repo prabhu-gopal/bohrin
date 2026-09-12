@@ -108,6 +108,12 @@ inference, no rollout — so an audit takes seconds.
 A taskset that generates tasks forever is refused unless you bound it with
 `--max-tasks N`, rather than run until you notice.
 
+`--max-tasks N` audits the **first** N tasks. Add `--sample-seed S` to audit N
+drawn uniformly at random instead, which is what makes the reported rate an
+estimate of the whole taskset rather than a statement about its opening tasks.
+The mode and the seed are printed and recorded, and the same seed redraws the
+same sample.
+
 ### What it will not do without being asked
 
 Scoring runs the taskset's own code. Bohrin refuses to execute it with no

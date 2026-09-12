@@ -13,6 +13,25 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Added
+
+- **`--sample-seed N` audits a uniform random sample instead of the first N tasks.**
+  `--max-tasks N` takes a prefix, and a prefix is not a sample: measured on a published
+  environment, a bound of 10 scored 0 and a bound of 20 scored 50 on the same verifier,
+  because the tasks carrying the defect sat at positions 11 and 12. Tasksets are also
+  routinely ordered by subject or source, so a prefix rate describes the prefix — and the
+  Wilson interval printed beside it describes the prefix too. With a seed, the audited
+  tasks are drawn uniformly, the rate estimates the taskset, and the same seed redraws the
+  same sample. The mode and seed are printed (`100 random of 3270 tasks (seed 7)`) and
+  recorded in `--json`. Sampling needs a taskset that reports its length; where that is
+  unknown, the run is refused rather than quietly served a prefix. Unseeded behaviour is
+  unchanged.
+
+### Changed
+
+- **Report schema 1.5.** Adds `selection` — `mode` (`all`, `prefix` or `random`) and
+  `seed`. Additive; no existing key changes.
+
 ### Fixed
 
 - **Graders that read the start of a reply no longer read clean.** Every `false_negation`
