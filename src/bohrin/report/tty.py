@@ -153,11 +153,12 @@ def _zero_score_caveat(report: Report) -> str | None:
     last-number graders are all caught. So the report was telling users that Bohrin could
     not do something it could, while staying silent about something it cannot.
 
-    What does still read clean is a grader that parses **one answer format** — typically the
-    last ``\\boxed{}`` in a reply. Bohrin's payloads are not written in it, so such a grader
-    rejects every one for format before it judges any, and reads clean whether or not it is
-    weak. Measured: a grader that accepts the *first* ``\\boxed{}`` of a reply — a
-    contradiction the payloads never form — scored 0.
+    A grader parsing **one answer format** was the next such omission, and it is closed in
+    1.2.1: the baseline already discovers the format a verifier wants, by submitting
+    presentations of the known-good answer until one is accepted, so the wrong payloads are
+    now written in that same format. What remains is the case where there is nothing to
+    learn it from — a task with no declared answer, where no baseline runs — and a format
+    outside the relation catalogue, which no rendering produces.
     """
     if report.gap.score is None or report.gap.score > 0:
         return None
@@ -185,11 +186,23 @@ def _zero_score_caveat(report: Report) -> str | None:
             f"audited, and a bound takes a prefix rather than a sample — a defect in the "
             f"tasks after it cannot appear here. Beyond that, "
         )
+    unbaselined = sum(int(result.detail.get("tasks_without_reference") or 0) for result in report.results)
+    # Where a task declares an answer, its verifier's own accepted presentation is known and
+    # the payloads are written in it. Where none is declared, there is nothing to learn the
+    # format from, and a grader gated on one still rejects every payload unread.
+    blind = (
+        f"The known blind spot is a grader that reads only one answer format: on the "
+        f"{unbaselined} task(s) here with no declared answer there is nothing to learn that "
+        f"format from, so such a grader reads clean whether or not it is weak."
+        if unbaselined
+        else (
+            "The known blind spot is a grader whose answer format is outside the relation "
+            "catalogue, which no rendering here produces."
+        )
+    )
     return (
         f"{prefix}a clean result bounds what {which} could construct — it is not a proof "
-        f"that the verifier is sound. The known blind spot is a grader that reads only one "
-        f"answer format, such as the last \\boxed{{}}: no payload here is written in it, so "
-        f"such a grader reads clean whether or not it is weak."
+        f"that the verifier is sound. {blind}"
     )
 
 

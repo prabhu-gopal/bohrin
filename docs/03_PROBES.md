@@ -203,6 +203,19 @@ which any reply, the reference included, scores above full marks leaves the
 denominator, its acceptances become leads, and `detail.tasks_scale_unknown`
 counts it.
 
+**Every payload is also submitted in the format the verifier accepted.** A grader
+that reads one answer format — typically the last `\boxed{}` — never judges a bare
+payload's content at all: it rejects it for presentation first, and so reads clean
+whether or not it is weak. The baseline already learns that format, because it
+submits presentations of the known-good answer until one is accepted; whichever
+relation produced the accepted one is the format that verifier reads. Each wrong
+payload is then re-submitted through the same relation. The ground is carried over,
+and the argument is the relation's own certification: a meaning-preserving
+rewriting of a provably wrong answer is the same wrong answer, differently
+presented. A verifier that accepts the answer as stored is sent nothing extra —
+every additional submission costs a scoring call against someone else's
+environment — and `detail.candidates_in_accepted_form` reports how many were added.
+
 `negate_condition` carries **no ground**. Negating a predicate changes the source
 but not necessarily the behaviour: a branch whose two arms do the same thing is
 the textbook equivalent mutant, and nothing short of executing both tells them

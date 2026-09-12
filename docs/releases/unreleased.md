@@ -20,7 +20,7 @@ is needed to upgrade.
 
 - **Breaking changes:** none
 - **Action required:** none — `pip install --upgrade 'bohrin[verifiers]'`
-- **New minimums:** none — `--json` consumers see report schema **1.4**, which only adds a key
+- **New minimums:** none — `--json` consumers see report schema **1.5**, which only adds keys
 
 ## Highlights
 
@@ -43,6 +43,15 @@ is needed to upgrade.
   the same seed redraws the same sample, so a published number stays reproducible. A
   taskset that will not report its length cannot be sampled, and that run is refused rather
   than quietly given a prefix. Without the flag, nothing changes.
+
+- **Wrong answers are now submitted in the format your verifier accepts.** If your grader
+  only reads the last `\boxed{}`, every payload Bohrin sent was rejected for its
+  presentation before its content was judged — so the grader scored clean whether or not it
+  was weak, and the report said so as its standing caveat. Bohrin already finds the format
+  your verifier wants: the baseline submits presentations of your own known-good answer
+  until one is accepted. Each wrong payload is now sent in that same format. The reasoning
+  stays sound because those rewritings are certified meaning-preserving — a wrong answer
+  rewritten is still wrong. A verifier that reads bare answers is sent nothing extra.
 
 ## Fixed
 
@@ -71,12 +80,14 @@ is needed to upgrade.
 
 ## Changed
 
-- **Report schema 1.4.** `weak_oracle`'s `detail` gains `tasks_scale_unknown`. Additive.
+- **Report schema 1.5.** Adds `selection` (`mode` and `seed`), and `weak_oracle`'s
+  `detail.tasks_scale_unknown` and `detail.candidates_in_accepted_form`. Additive.
 
 ## Known limitations
 
-- A grader that reads only one answer format — typically the last `\boxed{}` — still
-  reads clean whether or not it is weak. Bohrin's payloads are not written in it.
+- A grader that reads only one answer format is now probed in that format — but only where
+  the task declares an answer, since that is what the format is learned from. On a task
+  with no declared answer, such a grader still reads clean whether or not it is weak.
 - On a rubric that scores past 1, a real defect is now reported as a lead rather than an
   exploit. One of the two environments above gives an empty reply its maximum score, which
   is a genuine weakness; Bohrin can no longer claim it, because doing so needs the scale it

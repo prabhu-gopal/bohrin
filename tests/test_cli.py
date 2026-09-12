@@ -429,16 +429,24 @@ def _one_probe_report(result: Any, score: float) -> Any:
 
 
 def test_the_caveat_names_the_blind_spot_that_actually_exists() -> None:
-    """Until 1.2 the caveat warned that substring and last-number graders were missed. They
-    have been caught since `false_negation` in 1.1.0; a grader that reads one answer format
-    is what is missed, and the caveat said nothing about it."""
+    """The caveat tracks what Bohrin actually cannot do, and has been wrong twice by lagging
+    behind a fix. Until 1.2 it named substring and last-number graders, caught since 1.1.0.
+    Until 1.2.1 it named format-gated graders, which are now probed in the format the
+    verifier itself accepted — so what remains is a task with no declared answer, where
+    there is no baseline to learn a format from."""
     from bohrin.probes.base import ProbeResult, ProbeStatus
 
-    clean = ProbeResult(probe_id="weak_oracle", status=ProbeStatus.OK, sub_score=0.0, tasks_probed=5)
+    clean = ProbeResult(
+        probe_id="weak_oracle",
+        status=ProbeStatus.OK,
+        sub_score=0.0,
+        tasks_probed=5,
+        detail={"tasks_without_reference": 5},
+    )
     out = " ".join(_render(_one_probe_report(clean, 0.0)).split())
 
     assert "not a proof that the verifier is sound" in out
-    assert "\\boxed{}" in out, "the caveat must name the format-gated blind spot"
+    assert "no declared answer" in out, "the caveat must name the blind spot that remains"
     assert "substring" not in out and "last number" not in out, "it must not claim a gap Bohrin has closed"
 
 

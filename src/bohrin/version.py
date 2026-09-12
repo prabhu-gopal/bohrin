@@ -22,6 +22,8 @@ __version__ = "1.2.0"
 # 1.4 adds ``detail.tasks_scale_unknown`` to ``weak_oracle``: tasks excluded because their
 # rubric paid more than its own declared full marks.
 #
-# 1.5 adds ``selection`` — ``mode`` (all / prefix / random) and ``seed`` — naming how the
-# audited tasks were chosen from the taskset.
+# 1.5 adds two keys, both additive: ``selection`` — ``mode`` (all / prefix / random) and
+# ``seed`` — naming how the audited tasks were chosen from the taskset; and
+# ``detail.candidates_in_accepted_form`` on ``weak_oracle``, counting payloads re-submitted
+# in the answer format the verifier accepted for its own answer.
 REPORT_SCHEMA_VERSION = "1.5"

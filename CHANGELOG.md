@@ -27,10 +27,24 @@ from. The entries below are the terse canonical record.
   unknown, the run is refused rather than quietly served a prefix. Unseeded behaviour is
   unchanged.
 
+- **Wrong payloads are now written in the answer format the verifier itself accepted.** A
+  grader gated on one format — the last `\boxed{}`, say — rejects a bare payload for its
+  presentation before judging its content, so it scored every submission zero and read
+  clean whether or not it was weak. That was the blind spot printed on every clean report.
+  The baseline already discovers the format, by submitting presentations of the known-good
+  answer until one is accepted; each wrong payload is now submitted in that format too. The
+  ground carries over because the relation is certified meaning-preserving: a wrong answer
+  rewritten is the same wrong answer. Nothing extra is sent to a verifier that reads bare
+  answers, and `detail.candidates_in_accepted_form` counts what was added.
+
 ### Changed
 
-- **Report schema 1.5.** Adds `selection` — `mode` (`all`, `prefix` or `random`) and
-  `seed`. Additive; no existing key changes.
+- **Report schema 1.5.** Adds `selection` — `mode` (`all`, `prefix` or `random`) and `seed`
+  — and `weak_oracle`'s `detail.candidates_in_accepted_form`. Additive; no existing key
+  changes.
+- **The clean-result caveat names the blind spot that is left.** With format-gated graders
+  now reached, what remains is a task with **no declared answer**, where no baseline runs
+  and so no format can be learned.
 
 ### Fixed
 
