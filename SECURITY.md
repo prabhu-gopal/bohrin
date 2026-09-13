@@ -6,7 +6,9 @@ Security fixes land on the latest released version only.
 
 | Version | Supported |
 | ------- | --------- |
-| 1.1.x   | ✅        |
+| 1.3.x   | ✅        |
+| 1.2.x   | ❌ — upgrade |
+| 1.1.x   | ❌ — upgrade |
 | 1.0.x   | ❌ — upgrade |
 | 0.x     | ❌ — yanked; that line was a different tool, now published as [`adduct`](https://pypi.org/project/adduct/) |
 

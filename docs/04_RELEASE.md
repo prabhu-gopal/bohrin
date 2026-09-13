@@ -12,7 +12,7 @@
 | `determinism` probe | **Open** | Universal — needs no rubric structure or reference solution; cannot false-accuse |
 | Baseline mutation operators | **Open** | Published, mechanical techniques; withholding them buys nothing |
 | Report renderer — tty + `--json` today; html planned | **Open** | Distribution — the artifact gets forwarded to third parties |
-| Adapters — `verifiers` v1 today; OpenEnv planned | **Open** | Standard-native; makes the installed base addressable |
+| Adapters — `verifiers` `load_environment` and v1 today; OpenEnv planned | **Open** | Standard-native; makes the installed base addressable |
 | Adversarial attack engine | **Closed** | The operative capability, and dual-use |
 | Maintained attack library | **Closed** | Refreshed against each model generation — the subscription |
 | Probes 3–6 | **Closed** | Held as options; openable later, never recallable |

@@ -61,14 +61,14 @@ def _exact(task: Task, reply: str) -> float:
 
 
 async def test_a_prefix_grader_is_caught() -> None:
-    """Before 1.2.1: read clean, on a grader that pays for ``A is not the answer.``."""
+    """Before 1.3.0: read clean, on a grader that pays for ``A is not the answer.``."""
     result = await WeakOracleProbe().run(MemorySource([_mcq("A")], _startswith_after_boxed), CONFIG)
 
     assert "false_negation" in _exploited(result)
 
 
 async def test_a_first_label_grader_is_caught() -> None:
-    """Before 1.2.1: read clean. ``The answer is not A.`` gives ``THE`` as the first token."""
+    """Before 1.3.0: read clean. ``The answer is not A.`` gives ``THE`` as the first token."""
     result = await WeakOracleProbe().run(MemorySource([_mcq("A")], _first_label), CONFIG)
 
     assert "false_negation" in _exploited(result)

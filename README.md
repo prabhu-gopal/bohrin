@@ -98,9 +98,22 @@ the verifier. Confirmed independently by scoring the same payload through
 
 ### Reading a taskset
 
-Bohrin audits [`verifiers`](https://github.com/PrimeIntellect-ai/verifiers) v1
-tasksets. A taskset is an installed Python package, so install it before
-auditing the directory it came from.
+Bohrin audits [`verifiers`](https://github.com/PrimeIntellect-ai/verifiers)
+environments through **both** of the APIs in use:
+
+- `load_environment` — the entry point most published environments expose. This
+  is the one you almost certainly have.
+- `verifiers.v1` — the newer taskset class.
+
+The report header names which one it read (`verifiers_legacy` or
+`verifiers_v1`), so a result always says how the environment was loaded. A
+taskset is an installed Python package, so install it before auditing the
+directory it came from.
+
+One pin to know about: upstream removed `load_environment` after `verifiers`
+0.3.1. If your environment resolves a newer build, Bohrin cannot read it through
+that API and will say so, naming the removal — pin `verifiers<0.3.2` to audit
+it.
 
 Scoring invokes the task's reward functions directly — no agent, no model
 inference, no rollout — so an audit takes seconds.
@@ -145,7 +158,7 @@ reward signal.
 
 ### What they will and will not find
 
-The open probes use six deterministic, model-free operators. They cost nothing
+The open probes use seven deterministic, model-free operators. They cost nothing
 but reward invocations and they are reproducible, but they do not find what a
 motivated attacker finds.
 
@@ -162,10 +175,19 @@ contains the answer too, and a substring check cannot tell the two apart. And
 `proposer_solver` turned out to attach no reward function to its tasks at all; it
 is now reported as unmeasured rather than clean.
 
-The boundary that remains is a grader that reads only one answer format, such as
-the last `\boxed{}` in a reply: no fixed payload here is written in it, so such a
-grader reads clean whether or not it is weak. That is the honest edge of the open
-core, and it is stated here rather than discovered later.
+Until 1.3.0 the boundary left after those was a grader that reads only one
+answer format — the last `\boxed{}`, say — because no fixed payload was written
+in it. It no longer is: the baseline learns the format from the verifier's own
+acceptance of the declared answer, and every wrong payload is re-submitted
+through the same meaning-preserving rewriting.
+
+The boundary that remains is a task that declares **no answer at all**. Most
+operators need one — there is nothing to contradict, and nothing to be provably
+distinct from — so only the payloads needing none are tried: an empty reply, a
+refusal, the prompt echoed back. A grader rejecting those three has been asked
+very little, and the report says so on the clean line rather than letting it read
+as a full audit. That is the honest edge of the open core, and it is stated here
+rather than discovered later.
 
 ## The rule this codebase is built around
 
