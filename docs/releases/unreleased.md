@@ -92,6 +92,11 @@ is needed to upgrade.
 
 ## Changed
 
+- **A clean result now tells you how much it was worth.** If your taskset declares no
+  answers, Bohrin can only try the submissions that need none — an empty reply, a refusal,
+  your own prompt echoed back — so a clean result there is a much weaker statement than one
+  where a known-good answer let every operator run. The headline now says so.
+
 - **Report schema 1.5.** Adds `selection` (`mode` and `seed`), and `weak_oracle`'s
   `detail.tasks_scale_unknown` and `detail.candidates_in_accepted_form`. Additive.
 

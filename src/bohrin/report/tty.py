@@ -67,10 +67,32 @@ def _headline(result: ProbeResult) -> str:
     accepted = reported.get("affected", n) if isinstance(reported, dict) else n
     basis = _basis(result)
     if not accepted:
-        return f"no accepted wrong solutions{basis}"
+        return f"no accepted wrong solutions{basis}{_answer_free_note(result)}"
     if accepted == 1:
         return f"1 task accepts a known-wrong solution{basis}"
     return f"{accepted} tasks accept known-wrong solutions{basis}"
+
+
+def _answer_free_note(result: ProbeResult) -> str:
+    """Said only where a clean result rests entirely on tasks with no declared answer.
+
+    Most operators need a known-good answer to establish that a candidate is wrong: without
+    one there is nothing to contradict, nothing to be provably distinct from, and only the
+    payloads that need no answer at all can be submitted — an empty reply, a refusal, the
+    prompt echoed back. A verifier that rejects those three has been asked very little.
+
+    "no accepted wrong solutions (of 100 measured)" reads like the opposite. Measured on a
+    57-environment sweep: 5 of the 16 environments that could be measured declared no answer
+    on any task, so nearly a third of the clean results were this weaker kind and nothing in
+    the headline separated them.
+    """
+    measurable = result.detail.get("tasks_measurable")
+    without = result.detail.get("tasks_without_reference")
+    if not isinstance(measurable, int) or not isinstance(without, int):
+        return ""
+    if not measurable or without < measurable:
+        return ""
+    return " — but no task here declares an answer, so only the payloads needing none were tried"
 
 
 def _basis(result: ProbeResult) -> str:
