@@ -173,7 +173,7 @@ class FalseNegation(MutationOperator):
     #: The first two put the answer *last*, for a grader asking whether it appears anywhere.
     #: The second two put it *first*, for a grader reading the first label in the reply or
     #: checking that the reply starts with the answer -- which the first family can never
-    #: reach, because it opens with "The". Before 1.2.1 only the first family existed, and
+    #: reach, because it opens with "The". Before 1.3.0 only the first family existed, and
     #: two public multiple-choice environments read clean at 0 of 100 tasks while their
     #: graders, called directly, paid full reward for ``A is not the answer.`` on 100 of 100.
     _FORMS = (

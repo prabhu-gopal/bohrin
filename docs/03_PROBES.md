@@ -159,7 +159,7 @@ grader looked clean to every operator. Its ground is **invariant**: the taskset
 declares the answer, and a submission denying that answer contradicts the
 taskset's own ground truth, independently of what the reward function says.
 
-**Where the answer sits in the denial matters.** Until 1.2.1 every denial opened
+**Where the answer sits in the denial matters.** Until 1.3.0 every denial opened
 with `The`, which reaches a grader that looks for the answer *anywhere* but never
 one that reads the *start* of the reply. Hand-verifying the first index sweep —
 which checks a sample of clean results, not only flagged ones — found two public
@@ -198,7 +198,7 @@ measured.** A candidate counts as accepted when its reward reaches the sum of th
 rubric's weights, which assumes every reward function returns 0 to 1. Some pay on
 other scales — a sum of 0–3 criteria, a mean of 1–5 ratings — and on those an
 ordinary reply clears the bar without scoring anything like a correct one. Until
-1.2.1 two such public environments were reported as exploited. Now a task on
+1.3.0 two such public environments were reported as exploited. Now a task on
 which any reply, the reference included, scores above full marks leaves the
 denominator, its acceptances become leads, and `detail.tasks_scale_unknown`
 counts it.

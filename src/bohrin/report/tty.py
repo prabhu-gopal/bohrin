@@ -176,7 +176,7 @@ def _zero_score_caveat(report: Report) -> str | None:
     not do something it could, while staying silent about something it cannot.
 
     A grader parsing **one answer format** was the next such omission, and it is closed in
-    1.2.1: the baseline already discovers the format a verifier wants, by submitting
+    1.3.0: the baseline already discovers the format a verifier wants, by submitting
     presentations of the known-good answer until one is accepted, so the wrong payloads are
     now written in that same format. What remains is the case where there is nothing to
     learn it from — a task with no declared answer, where no baseline runs — and a format

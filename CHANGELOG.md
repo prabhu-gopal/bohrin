@@ -13,7 +13,31 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **The README said Bohrin reads `verifiers` v1 tasksets, and never mentioned
+  `load_environment`.** That is the API most published environments expose — the one 1.2.0
+  added support for, after recognising 0 of 109 environments without it — so the page
+  describing what Bohrin can read omitted the format nearly all of its readers have. Both
+  APIs are now named, along with which one the report header reports and the
+  `verifiers<0.3.2` pin needed where upstream has removed the legacy entry point.
+
+- **Documentation still described the `\boxed{}` blind spot as open.** 1.3.0 closed it —
+  wrong payloads are re-submitted in the format the verifier accepted — but the README's
+  "honest edge of the open core" paragraph and `docs/05_ROBUSTNESS.md` both still named it
+  as the boundary that remains. They now name the boundary that actually remains: a task
+  declaring no answer, where no format can be learned because no baseline runs.
+
+- **The operator count was stated as six in the README and `docs/05_ROBUSTNESS.md`.**
+  Seven are registered; `false_negation` was not counted.
+
+- **Seven references to "1.2.1", a version that was never released.** The fixes from
+  11–13 September were planned as a patch and shipped as 1.3.0, since `--sample-seed` is a
+  new flag and the report schema moved 1.3 → 1.5. Two of the stale references were in the
+  public probe documentation.
+
+- **`SECURITY.md` listed 1.1.x as the supported line**, and `docs/04_RELEASE.md`'s
+  open/closed table described the adapter row as v1-only.
 
 ## [1.3.0] — 2026-09-13
 

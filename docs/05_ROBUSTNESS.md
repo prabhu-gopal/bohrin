@@ -152,6 +152,14 @@ their verifier is sound.
 > as the last `\boxed{}`, which rejects every payload on format and reads clean whether or
 > not it is weak. The caveat now names that instead.
 
+> **Update, 1.3.0.** That blind spot is closed. The baseline already learns the format a
+> verifier reads, because it submits presentations of the declared answer until one is
+> accepted; every wrong payload is now re-submitted through the same relation, and the
+> ground carries over because the rewriting is certified meaning-preserving. What the
+> caveat names now is the case where no format can be learned at all — a task declaring
+> **no answer**, where only the three payloads needing none can be tried, and a clean
+> result says so on its own line.
+
 **Fixed:** a clean score carries a line naming how many operators were tried and what a
 clean result bounds.
 
@@ -196,9 +204,9 @@ the first that could not fail, only hang.
 
 ## Open — ranked by how likely they are to matter
 
-### 0. Recall is bounded by six fixed operators, and now measurably so
+### 0. Recall is bounded by seven fixed operators, and now measurably so
 
-The open probes carry six deterministic, model-free operators. A sweep of six `verifiers`
+The open probes carry seven deterministic, model-free operators. A sweep of six `verifiers`
 v1 environments puts a number on what that buys:
 
 | Environment | Result |
