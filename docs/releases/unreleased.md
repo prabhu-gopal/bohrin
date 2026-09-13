@@ -5,125 +5,51 @@ date: "unreleased"
 # tag: "vX.Y.Z"        # add at release time
 breaking: false
 summary: >
-  Two fixes from hand-verifying the first index sweep: weak graders that read clean are now
-  caught, and graders that score past 1 are no longer accused.
+  One sentence shown on the changelog index. What this release is, in plain terms.
 ---
 
 ## TL;DR
 
-Before publishing an index, Bohrin's own findings on 20 public environments were checked by
-hand, flagged and clean alike. That turned up one way a weak grader read clean and one way a
-grader Bohrin could not judge was reported as exploited. This release fixes both. No action
-is needed to upgrade.
+One short paragraph a reader skims in five seconds: what this release is, and
+whether they need to do anything to upgrade.
 
 ## Upgrade impact
 
 - **Breaking changes:** none
 - **Action required:** none — `pip install --upgrade 'bohrin[verifiers]'`
-- **New minimums:** none — `--json` consumers see report schema **1.5**, which only adds keys
+- **New minimums:** none
 
 ## Highlights
 
-- **Graders that read the start of a reply are now caught.** Before this, a grader that
-  only checked what a reply *begins* with could read clean while paying full marks for a
-  reply that denies the right answer.
-- **No more false exploits on rubrics that score past 1.** A grader that sums or averages
-  scores above 1 is now reported as *not measured* rather than as broken.
+- **<the change>** (#NN) — why it matters to a user, in one or two sentences.
 
 ## Added
 
-- **`--sample-seed N`: audit a random sample, not the first N tasks.** `--max-tasks N`
-  audits the *first* N, which is a statement about those N and nothing else — measured on a
-  published environment, a bound of 10 scored 0 while a bound of 20 scored 50 on the same
-  verifier, because the tasks carrying the defect sat at positions 11 and 12. Tasksets are
-  also commonly ordered by subject or source, so the opening tasks are not a haphazard
-  slice. With a seed, the tasks are drawn uniformly at random, so the rate estimates the
-  whole taskset and the interval beside it means what it says. The report prints how the
-  tasks were chosen — `100 random of 3270 tasks (seed 7)` — and records it in `--json`, and
-  the same seed redraws the same sample, so a published number stays reproducible. A
-  taskset that will not report its length cannot be sampled, and that run is refused rather
-  than quietly given a prefix. Without the flag, nothing changes.
-
-- **Wrong answers are now submitted in the format your verifier accepts.** If your grader
-  only reads the last `\boxed{}`, every payload Bohrin sent was rejected for its
-  presentation before its content was judged — so the grader scored clean whether or not it
-  was weak, and the report said so as its standing caveat. Bohrin already finds the format
-  your verifier wants: the baseline submits presentations of your own known-good answer
-  until one is accepted. Each wrong payload is now sent in that same format. The reasoning
-  stays sound because those rewritings are certified meaning-preserving — a wrong answer
-  rewritten is still wrong. A verifier that reads bare answers is sent nothing extra.
-
-## Fixed
-
-- **`0` is no longer reported as a wrong answer for the grid `[[0]]`.** If your verifier
-  accepts a one-cell answer written without its brackets — a common, correct thing to do,
-  especially where your own prompts show answers as digit rows — Bohrin used to call that
-  an exploit. It now treats `0`, `[0]` and `[[0]]` as the same answer. A different cell, or
-  more than one cell, is still probed exactly as before.
-- **A clearer message when `verifiers` is too new.** The `load_environment` API was removed
-  from `verifiers` after 0.3.1. If a taskset pulls in a newer build, Bohrin cannot read it —
-  and it used to tell you to upgrade, which is the one thing that cannot help. It now says
-  the API was removed and to pin `verifiers<0.3.2`. On a 57-environment sweep, 8
-  environments installed a `verifiers` past the removal, so this is the message people meet
-  most often.
-
-- **`false_negation` now also puts the answer first.** Its denials all opened with `The`
-  — `The answer is not A.` — which catches a grader that looks for the answer anywhere in
-  the reply, but never one that reads the first label, or checks that the reply starts
-  with the answer. The first index sweep's hand-verification checks a sample of *clean*
-  results as well as flagged ones, because a false clean is the failure an auditing tool
-  can least afford. It found two public multiple-choice environments that read clean at 0
-  of 100 tasks, whose graders — called directly, with Bohrin not installed — paid full
-  reward for `A is not the answer.` on 100 of 100 tasks. Two new forms, `X is not the
-  answer.` and `X is wrong.`, now reach them. Each still contradicts the declared answer,
-  so a correct grader is no more exposed than before: an exact-match grader rejects all
-  four forms.
-
-- **A rubric that pays past its own full marks is no longer read as exploited.** Bohrin
-  counts a reply as accepted when its reward reaches full marks, and it reads full marks
-  from the rubric's weights, which assume every reward function returns between 0 and 1.
-  Some don't: the same hand-verification found one public environment that sums five
-  criteria scored 0–3 (worth up to 15) and one that averages 1–5 ratings. On both,
-  ordinary replies cleared a bar of 1 — a prompt echo scored 12 of 15 on the first — and were
-  reported as full-marks exploits. Bohrin cannot read a rubric's true scale, so a task on
-  which any reply, the reference included, scores above full marks is now left out of the
-  measurement, and anything it accepted is shown as a lead. If that leaves nothing, the
-  probe says *not measured*, never clean.
+- …
 
 ## Changed
 
-- **A clean result now tells you how much it was worth.** If your taskset declares no
-  answers, Bohrin can only try the submissions that need none — an empty reply, a refusal,
-  your own prompt echoed back — so a clean result there is a much weaker statement than one
-  where a known-good answer let every operator run. The headline now says so.
+- …
 
-- **Report schema 1.5.** Adds `selection` (`mode` and `seed`), and `weak_oracle`'s
-  `detail.tasks_scale_unknown` and `detail.candidates_in_accepted_form`. Additive.
+## Fixed
+
+- …
+
+## Removed
+
+- …
 
 ## Known limitations
 
-- A grader that reads only one answer format is now probed in that format — but only where
-  the task declares an answer, since that is what the format is learned from. On a task
-  with no declared answer, such a grader still reads clean whether or not it is weak.
-- On a rubric that scores past 1, a real defect is now reported as a lead rather than an
-  exploit. One of the two environments above gives an empty reply its maximum score, which
-  is a genuine weakness; Bohrin can no longer claim it, because doing so needs the scale it
-  cannot read.
+- …
 
 ## Verified
 
 - `ruff check` · `ruff format --check` · `mypy --strict` · `pytest` — all clean
-- Eight new tests. A prefix grader and a first-label grader are each caught; every denial
-  form contradicts the answer rather than restating it; an exact-match grader is untouched.
-  A rating-mean grader and a criteria-sum grader are no longer accused; only the off-scale
-  task leaves the denominator; an ordinary 0–1 grader is measured exactly as before.
-- Real environments, each fix installed into a fresh venv per environment, cap 100: the
-  two clean-reading multiple-choice environments went from 0/100 to 100/100; the two
-  off-scale environments went from "exploited" to *not measured*; four controls were
-  unchanged at 100/100.
+- `pip install 'bohrin[verifiers]'` in a fresh venv, then `bohrin audit <a real public taskset>` — produced <result> in <time>
 
 ## Links
 
 - Full changelog entry: [CHANGELOG.md](../../CHANGELOG.md)
-- Compare: `v1.2.0...vX.Y.Z`
-- PRs in this release: #57, #NN
+- Compare: `v1.3.0...vX.Y.Z`
+- PRs in this release: #NN
