@@ -39,6 +39,16 @@ from. The entries below are the terse canonical record.
 
 ### Changed
 
+- **A clean result says when it rests on tasks with no declared answer.** Without a
+  known-good answer most operators cannot establish that a candidate is wrong, so only the
+  payloads needing none are submitted — an empty reply, a refusal, the prompt echoed back. A
+  verifier rejecting those three has been asked very little, while `no accepted wrong
+  solutions (of 100 measured)` reads like the opposite. Measured on a 57-environment sweep:
+  5 of the 16 environments that could be measured declared no answer on any task, so nearly
+  a third of the clean results were this weaker kind with nothing separating them. The
+  headline now adds *"but no task here declares an answer, so only the payloads needing none
+  were tried"*. Scores are unchanged.
+
 - **Report schema 1.5.** Adds `selection` — `mode` (`all`, `prefix` or `random`) and `seed`
   — and, on `weak_oracle`, `detail.tasks_scale_unknown` and
   `detail.candidates_in_accepted_form`. Additive; no existing key changes.
