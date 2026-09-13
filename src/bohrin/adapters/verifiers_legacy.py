@@ -68,6 +68,34 @@ def _installed_version() -> str | None:
         return None
 
 
+def _release(version: str) -> tuple[int, ...]:
+    """The leading numeric components of a version, for ordering only.
+
+    ``0.3.2.dev86`` gives ``(0, 3, 2)``: a pre-release of 0.3.2 carries 0.3.2's API, which
+    is exactly the case this has to get right -- that is the version a taskset pinning a
+    dev build actually installs. Deliberately tiny rather than a ``packaging`` dependency,
+    because the only question asked of it is which side of one removal a version sits on.
+    """
+    out: list[int] = []
+    for part in version.split("."):
+        digits = ""
+        for char in part:
+            if not char.isdigit():
+                break
+            digits += char
+        if not digits:
+            break
+        out.append(int(digits))
+    return tuple(out)
+
+
+#: The first release without ``verifiers.legacy``. 0.3.1 ships it; 0.3.2.dev86 does not --
+#: measured by importing both. An environment built on ``load_environment`` cannot be read
+#: at all under this version or later, and telling its user to *upgrade* sends them further
+#: from a working setup.
+_LEGACY_REMOVED_IN = (0, 3, 2)
+
+
 def _available() -> bool:
     """Whether the API this adapter reads is importable — not merely `verifiers` itself.
 
@@ -245,6 +273,16 @@ class VerifiersLegacyAdapter(Adapter):
         if installed is None:
             raise MissingExtraError(
                 "this looks like a verifiers environment; reading it requires: pip install 'bohrin[verifiers]'"
+            )
+        if _release(installed) >= _LEGACY_REMOVED_IN:
+            # Upgrading is the natural guess and it is the wrong move here: this version is
+            # already past the removal, so every newer one fails the same way.
+            raise MissingExtraError(
+                f"this looks like a verifiers environment built on `load_environment`, but the "
+                f"installed verifiers ({installed}) no longer ships `verifiers.legacy` — that "
+                f"API was removed after 0.3.1, so upgrading cannot fix this. A taskset carries "
+                f"its own pins, and one of them pulled verifiers past the removal. Pin it back "
+                f"in this environment: pip install 'verifiers<0.3.2'"
             )
         raise MissingExtraError(
             f"this looks like a verifiers environment, but the installed verifiers "

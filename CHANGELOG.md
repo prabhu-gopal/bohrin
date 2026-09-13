@@ -58,6 +58,14 @@ from. The entries below are the terse canonical record.
   one-element containers before comparing. Like every rung it can only remove a finding: a
   different cell (`0` vs `[[1]]`), several cells (`0` vs `[[0, 0]]`) and an empty container
   all stay distinct.
+- **A `verifiers` newer than the adapter supports is now named as such, instead of being
+  told to upgrade.** Upstream removed the legacy `load_environment` API after 0.3.1. A
+  taskset pinning a newer build installs a `verifiers` that will never have it, and Bohrin
+  answered with "Bohrin needs 0.3.0 or newer" — advice to upgrade, given to someone already
+  past the removal, where upgrading cannot help. It now says the API was removed after 0.3.1
+  and to pin `verifiers<0.3.2`. Measured on a 57-environment sweep: **8 environments** hit
+  this, making it the most common failure the adapter reports. The original message is
+  unchanged for the case it was written for, a pin resolving `verifiers` *downwards*.
 
 - **Graders that read the start of a reply no longer read clean.** Every `false_negation`
   denial opened with `The` (`The answer is not A.`), so it reached a grader looking for the

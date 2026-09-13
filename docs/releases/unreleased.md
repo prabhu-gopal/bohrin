@@ -60,6 +60,12 @@ is needed to upgrade.
   especially where your own prompts show answers as digit rows — Bohrin used to call that
   an exploit. It now treats `0`, `[0]` and `[[0]]` as the same answer. A different cell, or
   more than one cell, is still probed exactly as before.
+- **A clearer message when `verifiers` is too new.** The `load_environment` API was removed
+  from `verifiers` after 0.3.1. If a taskset pulls in a newer build, Bohrin cannot read it —
+  and it used to tell you to upgrade, which is the one thing that cannot help. It now says
+  the API was removed and to pin `verifiers<0.3.2`. On a 57-environment sweep, 8
+  environments installed a `verifiers` past the removal, so this is the message people meet
+  most often.
 
 - **`false_negation` now also puts the answer first.** Its denials all opened with `The`
   — `The answer is not A.` — which catches a grader that looks for the answer anywhere in
