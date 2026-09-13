@@ -40,13 +40,24 @@ from. The entries below are the terse canonical record.
 ### Changed
 
 - **Report schema 1.5.** Adds `selection` — `mode` (`all`, `prefix` or `random`) and `seed`
-  — and `weak_oracle`'s `detail.candidates_in_accepted_form`. Additive; no existing key
-  changes.
+  — and, on `weak_oracle`, `detail.tasks_scale_unknown` and
+  `detail.candidates_in_accepted_form`. Additive; no existing key changes.
 - **The clean-result caveat names the blind spot that is left.** With format-gated graders
   now reached, what remains is a task with **no declared answer**, where no baseline runs
   and so no format can be learned.
 
+
 ### Fixed
+
+- **A one-cell answer written without its brackets is no longer called wrong.** `0`, `[0]`
+  and `[[0]]` are the same answer, and the equivalence ladder treated them as three. Found
+  by reviewing a finding Bohrin had already made: a public grid-answer environment parses
+  space-separated digit rows as a grid — the format its own prompts use — so the reply `0`
+  *is* the grid `[[0]]` there and the verifier rewarding it is correct. `constant_return`
+  reported that verifier as exploited on two tasks. A `singleton` rung now unwraps
+  one-element containers before comparing. Like every rung it can only remove a finding: a
+  different cell (`0` vs `[[1]]`), several cells (`0` vs `[[0, 0]]`) and an empty container
+  all stay distinct.
 
 - **Graders that read the start of a reply no longer read clean.** Every `false_negation`
   denial opened with `The` (`The answer is not A.`), so it reached a grader looking for the
@@ -66,11 +77,6 @@ from. The entries below are the terse canonical record.
   included — scores above full marks is now excluded from `weak_oracle`, and what it
   accepted is reported as a lead. When every task is excluded the probe reports *not
   measured*, never clean.
-
-### Changed
-
-- **Report schema 1.4.** `weak_oracle`'s `detail` gains `tasks_scale_unknown`, the number of
-  tasks excluded for the reason above. Additive; no existing key changes.
 
 ## [1.2.0] — 2026-09-10
 
