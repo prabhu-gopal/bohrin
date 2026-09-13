@@ -232,8 +232,10 @@ soundness checks, and both can only ever *remove* findings:
 
 - **`provably_distinct`** — text level. Two payloads are distinct only when no
   normalisation a correct verifier might apply makes them equal: whitespace,
-  case, numeric parsing, Python literals, JSON, and the common spellings of true
-  and false. `"1"` and `"1.0"` are different strings and the same answer, so a
+  case, numeric parsing, Python literals, JSON, the common spellings of true and
+  false, and one-element containers (`0`, `[0]` and `[[0]]` are one answer, which
+  is how a grid-answer verifier accepting a bare `0` stopped being reported as
+  exploited). `"1"` and `"1.0"` are different strings and the same answer, so a
   verifier accepting the first for the second is doing numeric comparison
   correctly. The burden of proof sits on us: any collision means no ground.
 - **`code_equivalent`** — code level, [Trivial Compiler

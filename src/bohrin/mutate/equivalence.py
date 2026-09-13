@@ -99,6 +99,42 @@ def _boolish(text: str) -> object | None:
     return None
 
 
+def _singleton(text: str) -> object | None:
+    """Unwrap one-element containers, so ``[[0]]``, ``[0]`` and ``0`` collapse.
+
+    A one-cell answer has several faithful spellings, and a verifier is entitled to accept
+    all of them. Measured, not supposed: a public grid-answer environment parses
+    space-separated digit rows as a grid — the format its own prompts use — so the reply
+    ``0`` *is* the grid ``[[0]]`` there, and the verifier rewarding it is correct. Before
+    this rung existed ``constant_return`` claimed ``0`` was provably distinct from
+    ``[[0]]`` and reported that verifier as exploited, on two tasks.
+
+    Deliberately conservative in the direction this module always leans: it can only
+    remove a finding. What it costs is recall on a grader that *should* insist on the
+    container — one rejecting ``5`` where ``[5]`` is required would no longer be probed with
+    the bare literal. A missed lead is recoverable; a false accusation is not.
+    """
+    candidate = text.strip()
+    if not candidate or len(candidate) > _MAX_PARSE:
+        return None
+    value: object
+    try:
+        value = json.loads(candidate)
+    except (ValueError, RecursionError):
+        try:
+            value = ast.literal_eval(candidate)
+        except (ValueError, SyntaxError, MemoryError, RecursionError, TypeError):
+            return None
+    while isinstance(value, list | tuple) and len(value) == 1:
+        value = value[0]
+    # A bare scalar is normalised too, not only a wrapped one: ``0`` has to land on the
+    # same value as ``[[0]]`` for the two to collide. A container of several items is not
+    # a one-cell answer, and an empty one has no cell at all.
+    if isinstance(value, list | tuple | dict | set):
+        return None
+    return ("singleton", repr(value))
+
+
 #: Ordered so the cheapest and most common collisions are reported first. A
 #: normalisation returning ``None`` does not apply to that payload and is skipped —
 #: it never counts as a collision.
@@ -110,6 +146,7 @@ _LADDER: tuple[tuple[str, Callable[[str], object | None]], ...] = (
     ("literal", _literal),
     ("json", _json),
     ("boolean", _boolish),
+    ("singleton", _singleton),
 )
 
 

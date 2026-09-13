@@ -55,6 +55,12 @@ is needed to upgrade.
 
 ## Fixed
 
+- **`0` is no longer reported as a wrong answer for the grid `[[0]]`.** If your verifier
+  accepts a one-cell answer written without its brackets — a common, correct thing to do,
+  especially where your own prompts show answers as digit rows — Bohrin used to call that
+  an exploit. It now treats `0`, `[0]` and `[[0]]` as the same answer. A different cell, or
+  more than one cell, is still probed exactly as before.
+
 - **`false_negation` now also puts the answer first.** Its denials all opened with `The`
   — `The answer is not A.` — which catches a grader that looks for the answer anywhere in
   the reply, but never one that reads the first label, or checks that the reply starts
