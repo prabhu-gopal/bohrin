@@ -15,6 +15,21 @@ from. The entries below are the terse canonical record.
 
 ### Fixed
 
+- **CLI values that cannot measure anything are refused with exit 2, instead of running and
+  exiting 0.** Found by probing the flags of the released 1.3.0 against a real 3270-task
+  environment: `--max-tasks 0` and `--max-tasks -5` audited no tasks; `--repeats 0`
+  measured nothing; `--timeout 0` abandoned every scoring call; `--concurrency -1` was
+  taken silently; and `--fail-on-gap 150` set a gate the gap, which tops out at 100, can
+  never reach. Each exited 0 — in CI, a green build. Worst was `--sample-seed 7` without
+  `--max-tasks`: the seed was ignored, all 3270 tasks were audited, and the report recorded
+  the seed as none. All seven now fail at parse time, before any taskset code runs, with a
+  message naming the flag and the valid range. `--repeats 1` was already reported honestly
+  as *not applicable*, and is now refused with the same reason.
+
+- **The README's example output matched an older release.** It is presented as a real run,
+  not an illustration, but predated the confidence interval on each rate and the `rests on:`
+  line. Re-run against `scratchpad` with 1.3.0; the example now reproduces exactly.
+
 - **The README said Bohrin reads `verifiers` v1 tasksets, and never mentioned
   `load_environment`.** That is the API most published environments expose — the one 1.2.0
   added support for, after recognising 0 of 109 environments without it — so the page
