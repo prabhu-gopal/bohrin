@@ -5,25 +5,40 @@ date: "unreleased"
 # tag: "vX.Y.Z"        # add at release time
 breaking: false
 summary: >
-  Documentation corrections only: the README now names the `verifiers` API most
-  environments actually use, and the "what we still miss" paragraph describes the blind
-  spot that is open rather than the one 1.3.0 closed.
+  Flags that cannot measure anything now fail instead of passing in silence, and the README
+  names the `verifiers` API most environments actually use.
 ---
 
 ## TL;DR
 
-No code changed. Six documentation defects found by auditing the repository against the
-released 1.3.0 — the most costly being that the README described Bohrin as reading only
-`verifiers` v1 tasksets, when the API most published environments expose is
-`load_environment`, supported since 1.2.0. Nothing to upgrade.
+Found by auditing the released 1.3.0 before running the index sweep on it. Seven CLI values
+that measure nothing used to start an audit and exit 0 — a green CI build with nothing
+behind it — and now exit 2. Six documentation defects are also fixed, the most costly being
+that the README described Bohrin as reading only `verifiers` v1 tasksets, when most
+published environments expose `load_environment`, supported since 1.2.0.
 
 ## Upgrade impact
 
-- **Breaking changes:** none
-- **Action required:** none
+- **Breaking changes:** none — every refused value was already producing an audit that
+  measured nothing
+- **Action required:** only if a script passes one of the refused values. It will now exit
+  2 instead of 0; that run was never measuring anything, so fix the value — most often by
+  adding `--max-tasks N` beside an existing `--sample-seed`
 - **New minimums:** none
 
 ## Fixed
+
+- **A mistyped flag now fails instead of passing.** `--max-tasks 0`, `--repeats 0`,
+  `--timeout 0`, a negative `--concurrency`, and a `--fail-on-gap` outside 0–100 each used
+  to start an audit that measured nothing and exited 0, which in CI looks exactly like a
+  clean result. `--fail-on-gap 150` was the quietest of them: a gate that can never close.
+  All of them now exit 2 with a message naming the flag and what it accepts.
+- **`--sample-seed` without `--max-tasks` is refused.** A seed chooses *which* tasks to
+  take, so without a bound it has nothing to choose — and it was ignored without a word:
+  asking for a sample of a 3270-task environment audited all 3270 and recorded no seed. It
+  now tells you to add `--max-tasks N`.
+- **The README's example is a real 1.3.0 run again**, including the confidence intervals
+  and the `rests on:` line it had been missing.
 
 - **The README now says Bohrin reads both `verifiers` APIs.** It named only v1 tasksets and
   never mentioned `load_environment` — the entry point most published environments expose,

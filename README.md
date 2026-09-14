@@ -33,9 +33,12 @@ verifiers_v1 · 8 tasks · 3 probes · isolation: none
   determinism    ░░░░░░░░░░░░░░░  no variance observed in 5 runs
   ground_truth_rejected ░░░░░░░░░░░░░░░  the declared answer was accepted on
 every task
-  weak_oracle    ███████████████  8 tasks accept known-wrong solutions
+  weak_oracle    ███████████████  8 tasks accept known-wrong solutions (of 8
+measured · 95% CI 68–100%)
 
   VERIFICATION GAP: 50 / 100   coverage: 3 of 3 probes
+  rests on: determinism 0 of 8 tasks (95% CI 0–32%) · weak_oracle 8 of 8 tasks
+(95% CI 68–100%)
 
   EXPLOIT ▸ false_negation accepted on 8 tasks (reward 1)
            explicitly denies the declared answer 'alpha'

@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from rich.console import Console
@@ -29,6 +30,49 @@ _USER_ERRORS = (UnknownFormatError, MissingExtraError, TasksetLoadError, FileNot
 #: because a CI author should not have to learn a per-tool dialect: 0 clean, 1 findings,
 #: 2 fatal/input error. Code 3 is ours and is the point of the design — see `_gate`.
 EXIT_CLEAN, EXIT_FINDINGS, EXIT_USER_ERROR, EXIT_UNDECIDED = 0, 1, 2, 3
+
+
+def _int_at_least(minimum: int, why: str) -> Callable[[str], int]:
+    """An argparse type for an integer that means nothing below ``minimum``.
+
+    Every value refused here used to be accepted and to produce an audit that measured
+    nothing and exited 0: ``--max-tasks 0`` audited no tasks, ``--repeats 0`` ran no repeats.
+    A run that cannot measure anything is bad input, and bad input exits 2 — a CI job that
+    typed ``-5`` for ``5`` should fail loudly, not report a clean build.
+    """
+
+    def parse(text: str) -> int:
+        try:
+            value = int(text)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"expected an integer, got {text!r}") from None
+        if value < minimum:
+            raise argparse.ArgumentTypeError(f"must be at least {minimum} ({why}), got {value}")
+        return value
+
+    return parse
+
+
+def _positive_seconds(text: str) -> float:
+    """``--timeout 0`` abandoned every scoring call before it started, so nothing was measured."""
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a number of seconds, got {text!r}") from None
+    if not value > 0:  # also rejects nan
+        raise argparse.ArgumentTypeError(f"must be greater than 0 seconds, got {text}")
+    return value
+
+
+def _gap_score(text: str) -> float:
+    """The gap runs 0 to 100, so ``--fail-on-gap 150`` was a gate that could never close."""
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a score from 0 to 100, got {text!r}") from None
+    if not 0 <= value <= 100:  # also rejects nan
+        raise argparse.ArgumentTypeError(f"must be between 0 and 100, the gap's own range, got {text}")
+    return value
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -67,7 +111,13 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--json", dest="json_path", metavar="FILE", help="write the full report as JSON")
     audit.add_argument("--probe", action="append", default=[], metavar="ID", help="run only this probe (repeatable)")
     audit.add_argument("--all", dest="all_probes", action="store_true", help="include probes held back by default")
-    audit.add_argument("--max-tasks", type=int, default=None, metavar="N", help="probe at most N tasks")
+    audit.add_argument(
+        "--max-tasks",
+        type=_int_at_least(1, "zero tasks measures nothing"),
+        default=None,
+        metavar="N",
+        help="probe at most N tasks",
+    )
     audit.add_argument(
         "--sample-seed",
         type=int,
@@ -79,10 +129,16 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument(
         "--operator", action="append", default=[], metavar="ID", help="apply only this operator (repeatable)"
     )
-    audit.add_argument("--repeats", type=int, default=DEFAULT_REPEATS, metavar="N", help="determinism repeats")
+    audit.add_argument(
+        "--repeats",
+        type=_int_at_least(2, "one run cannot disagree with itself"),
+        default=DEFAULT_REPEATS,
+        metavar="N",
+        help="determinism repeats",
+    )
     audit.add_argument(
         "--concurrency",
-        type=int,
+        type=_int_at_least(0, "0 chooses automatically"),
         default=0,
         metavar="N",
         help="max scoring calls in flight (0 = choose from CPU count and free memory)",
@@ -94,7 +150,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     audit.add_argument(
         "--timeout",
-        type=float,
+        type=_positive_seconds,
         default=30.0,
         metavar="SEC",
         help="seconds before one scoring call is abandoned, including a synchronous reward function",
@@ -106,7 +162,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     audit.add_argument(
         "--fail-on-gap",
-        type=float,
+        type=_gap_score,
         default=None,
         metavar="SCORE",
         help="exit 1 if the Verification Gap is at or above SCORE (0-100)",
@@ -289,7 +345,13 @@ def _cmd_explain(probe_id: str, console: Console, err: Console) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    args = parser.parse_args(argv)
+    # A seed chooses which --max-tasks tasks to take; with no bound there is nothing to
+    # choose, and the flag used to be ignored in silence -- a run asking for a sample of a
+    # 3270-task taskset audited all 3270 and recorded its seed as none. Refused, not guessed.
+    if args.command == "audit" and args.sample_seed is not None and args.max_tasks is None:
+        parser.error("--sample-seed draws the --max-tasks tasks at random, so it needs --max-tasks N")
     no_color = getattr(args, "no_color", False)
     console = Console(no_color=no_color or None)
     err = Console(stderr=True, no_color=no_color or None)
