@@ -18,9 +18,9 @@ from bohrin.adapters.base import TaskSource
 from bohrin.config import ScanConfig
 from bohrin.execute.runner import ScoreOutcome, score_many
 from bohrin.ir.evidence import BaselineFailure, Exploit, Finding, HarnessDisruption, Unverified
-from bohrin.ir.task import Candidate, Provenance, Task, Verdict
+from bohrin.ir.task import Candidate, Ground, Provenance, Task, Verdict
 from bohrin.mutate import discover as discover_operators
-from bohrin.mutate.equivalence import code_equivalent, collides_under, reads_as_refusal
+from bohrin.mutate.equivalence import code_equivalent, collides_under, reads_as_refusal, reads_as_structured_state
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
 from bohrin.relations import Relation
 from bohrin.relations import discover as discover_relations
@@ -217,6 +217,11 @@ class WeakOracleProbe(Probe):
             # wrong there, so each is submitted as a lead instead. Applied here rather than
             # left to operators so a third-party operator cannot miss it.
             refusal_task = bool(task.reference) and reads_as_refusal(task.reference or "")
+            # On a task whose declared "answer" is a JSON object, the field is grader state --
+            # a constraint spec, a game state -- not a reply. Denying it or differing from it
+            # proves nothing, so the grounds that rest on the reference are withdrawn. Grounds
+            # that need no answer (an empty reply, an echo, a refusal) are untouched.
+            state_task = bool(task.reference) and reads_as_structured_state(task.reference or "")
             for op in operators:
                 for cand in op.apply(task):
                     key = cand.payload.strip()
@@ -237,7 +242,9 @@ class WeakOracleProbe(Probe):
                     if cand.known_wrong and task.reference and _is_the_reference(cand.payload, task.reference):
                         equivalent_suppressed += 1
                         continue
-                    if cand.known_wrong and refusal_task:
+                    if cand.known_wrong and (
+                        refusal_task or (state_task and cand.ground in (Ground.DIFFERENTIAL, Ground.INVARIANT))
+                    ):
                         cand = replace(cand, ground=None)
                         grounds_withdrawn += 1
                     submitted.add(key)
@@ -351,7 +358,8 @@ class WeakOracleProbe(Probe):
                 # its own answer.
                 "equivalent_suppressed": equivalent_suppressed,
                 # Candidates submitted as leads because the task's declared answer is a
-                # refusal, where no non-compliant reply can be shown to be wrong.
+                # refusal, where no non-compliant reply can be shown to be wrong -- or a JSON
+                # object, where a ground resting on the answer has no answer to rest on.
                 "grounds_withdrawn": grounds_withdrawn,
                 # Tasks excluded because their rubric paid past its own declared full marks.
                 "tasks_scale_unknown": len(off_scale),

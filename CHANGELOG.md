@@ -15,6 +15,21 @@ from. The entries below are the terse canonical record.
 
 ### Fixed
 
+- **A declared answer that is a JSON object is no longer treated as an answer.** Two
+  grounds rest on the declared answer being the answer: `false_negation` (a denial of it
+  contradicts the taskset) and `constant_return` (a literal provably distinct from it is
+  wrong). Found by hand-verifying the 2026-09-13 sweep: an instruction-following
+  environment declares a constraint spec there — `{"func_name": "verify_postscript", ...}` —
+  and 8 of the 17 tasks Bohrin flagged on it rested on denials and constants of that spec
+  and nothing else. The spec even satisfied its own constraint, which is why the baseline
+  accepted it as a confirmed answer. Across all 57 sweep environments exactly two declared
+  JSON objects, and neither was an answer; the other declares a game's entire state.
+  On such a task those two grounds are now withdrawn and the candidates submitted as leads,
+  counted in `grounds_withdrawn`; grounds needing no answer (an empty reply, an echo, a
+  refusal) are unaffected, and JSON arrays and scalars remain answers. `ground_truth_rejected`
+  no longer submits such a field as ground truth — it had reported both environments as
+  rejecting their own answer, on 83 and 100 tasks. Removes findings only; no schema change.
+
 - **CLI values that cannot measure anything are refused with exit 2, instead of running and
   exiting 0.** Found by probing the flags of the released 1.3.0 against a real 3270-task
   environment: `--max-tasks 0` and `--max-tasks -5` audited no tasks; `--repeats 0`

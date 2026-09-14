@@ -5,8 +5,8 @@ date: "unreleased"
 # tag: "vX.Y.Z"        # add at release time
 breaking: false
 summary: >
-  Flags that cannot measure anything now fail instead of passing in silence, and the README
-  names the `verifiers` API most environments actually use.
+  Closes the last known way the sweep corpus produced false accusations, makes flags that
+  measure nothing fail instead of passing in silence, and brings the README up to date.
 ---
 
 ## TL;DR
@@ -27,6 +27,17 @@ published environments expose `load_environment`, supported since 1.2.0.
 - **New minimums:** none
 
 ## Fixed
+
+- **A JSON object in the answer field is no longer treated as the answer.** Some
+  environments put grader configuration there instead of an answer — a constraint spec an
+  instruction-following grader dispatches on, or a game's full state. Bohrin used to deny
+  that "answer" (`The answer is not {"func_name": ...}.`), watch the grader accept it, and
+  report an exploit. On one public environment, 8 of the 17 tasks it flagged rested on
+  nothing else. Those candidates are now leads, not findings. What still counts on the same
+  task is everything that needs no answer: a grader paying full marks for an empty reply,
+  a refusal or an echoed prompt is still caught. `ground_truth_rejected` also stops
+  reporting such a task as "rejecting its own answer". If your real answers are JSON
+  objects, a denial of one is now a lead rather than an exploit; JSON arrays are unaffected.
 
 - **A mistyped flag now fails instead of passing.** `--max-tasks 0`, `--repeats 0`,
   `--timeout 0`, a negative `--concurrency`, and a `--fail-on-gap` outside 0–100 each used

@@ -216,6 +216,15 @@ presented. A verifier that accepts the answer as stored is sent nothing extra �
 every additional submission costs a scoring call against someone else's
 environment — and `detail.candidates_in_accepted_form` reports how many were added.
 
+**A declared answer that is a JSON object is not an answer.** `false_negation` and
+`constant_return` both rest on the declared answer being the answer. Some environments put
+grader state in that field instead — a constraint spec an instruction-following grader
+dispatches on, a game's full state — and a denial of configuration contradicts nothing. On
+such a task those two grounds are withdrawn and the candidates become leads
+(`detail.grounds_withdrawn`), while grounds needing no answer are unaffected.
+`ground_truth_rejected` does not submit such a field as ground truth. The cost is recall on
+tasks whose genuine answer is a JSON object; JSON arrays and scalars are unaffected.
+
 `negate_condition` carries **no ground**. Negating a predicate changes the source
 but not necessarily the behaviour: a branch whose two arms do the same thing is
 the textbook equivalent mutant, and nothing short of executing both tells them

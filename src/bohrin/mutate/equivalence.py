@@ -214,6 +214,42 @@ def reads_as_refusal(text: str) -> bool:
     return any(marker in folded for marker in _REFUSAL_MARKERS)
 
 
+def reads_as_structured_state(text: str) -> bool:
+    """Whether a declared "answer" is a JSON object, and so grader state rather than a reply.
+
+    Two grounds rest on the declared answer being *the answer*: ``false_negation`` claims a
+    denial of it contradicts the taskset, and ``constant_return`` claims a literal provably
+    distinct from it is wrong. Neither holds when the field is configuration the grader
+    reads, not a reply it expects.
+
+    Measured, not supposed. Across a 57-environment sweep exactly two environments declared
+    JSON objects, and neither was an answer: an instruction-following environment declares
+    a constraint spec -- ``{"func_name": "verify_postscript", ...}`` -- and a word-grouping
+    game declares its whole game state. On the first, 8 of 17 flagged tasks rested only on
+    denials and constants of that spec; its structural findings, which need no answer, were
+    unaffected.
+
+    Conservative in the direction this module always leans: it can only remove a finding.
+    The cost is recall on a task whose real answer is a JSON object -- a structured
+    extraction, say -- where a denial *would* be wrong. Those candidates are still submitted,
+    as leads. Arrays and scalars are not affected; ``[[0]]`` stays an answer.
+
+    **Deliberately no size limit**, unlike the ladder above. The ladder's limit is safe
+    because returning ``None`` there only skips a normalisation. Here ``False`` means "this
+    is an answer", which *keeps* the grounds -- so a limit fails in the unsafe direction, on
+    exactly the long specs that embed the task's own prompt. Measured: one such spec on the
+    same environment was 7,278 characters, fell through a 4096-character limit, and was
+    still reported as a rejected answer. This runs once per task, not once per candidate.
+    """
+    candidate = text.strip()
+    if not candidate.startswith("{"):
+        return False
+    try:
+        return isinstance(json.loads(candidate), dict)
+    except (ValueError, RecursionError):
+        return False
+
+
 def _canonical(code: CodeType) -> tuple[object, ...]:
     """A comparable form of a code object with incidental detail removed.
 
@@ -306,4 +342,4 @@ def code_equivalent(left: str, right: str) -> bool:
     return _canonical(left_code) == _canonical(right_code)
 
 
-__all__ = ["code_equivalent", "collides_under", "provably_distinct", "reads_as_refusal"]
+__all__ = ["code_equivalent", "collides_under", "provably_distinct", "reads_as_refusal", "reads_as_structured_state"]
