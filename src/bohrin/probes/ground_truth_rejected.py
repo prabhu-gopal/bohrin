@@ -53,6 +53,7 @@ from bohrin.config import ScanConfig
 from bohrin.execute.runner import score_many
 from bohrin.ir.evidence import Finding, GroundTruthRejected
 from bohrin.ir.task import Candidate, Provenance, Task
+from bohrin.mutate.equivalence import reads_as_structured_state
 from bohrin.probes.base import Probe, ProbeResult, ProbeStatus
 from bohrin.relations import renderings
 from bohrin.scoring.interval import rate
@@ -94,8 +95,18 @@ class GroundTruthRejectedProbe(Probe):
         # Same two refusals weak_oracle makes, for the same reasons: a task with no reward
         # function has no verifier to audit, and one needing a runtime cannot be scored
         # honestly without one.
+        # And a third: a declared "answer" that is a JSON object is grader state, not a reply,
+        # so submitting it and reporting its rejection accuses the verifier of rejecting
+        # something it never asked for. Measured: two public environments declare a constraint
+        # spec and a game state there, and were reported as rejecting their own answer on 83
+        # and 100 tasks.
         scoreable = [
-            t for t in tasks if t.reward_fns and not t.metadata.get("requires_runtime") and (t.reference or "").strip()
+            t
+            for t in tasks
+            if t.reward_fns
+            and not t.metadata.get("requires_runtime")
+            and (t.reference or "").strip()
+            and not reads_as_structured_state(t.reference or "")
         ]
         if not scoreable:
             return ProbeResult(
@@ -104,7 +115,8 @@ class GroundTruthRejectedProbe(Probe):
                 tasks_probed=len(tasks),
                 reason=(
                     "no task has both a declared answer and a reward function that can be "
-                    "scored offline, so there is no ground truth to submit"
+                    "scored offline, so there is no ground truth to submit (a declared answer "
+                    "that is a JSON object is grader state, not a reply, and is not submitted)"
                 ),
             )
 
