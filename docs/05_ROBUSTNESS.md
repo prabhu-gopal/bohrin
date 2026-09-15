@@ -204,9 +204,9 @@ the first that could not fail, only hang.
 
 ## Open — ranked by how likely they are to matter
 
-### 0. Recall is bounded by seven fixed operators, and now measurably so
+### 0. Recall is bounded by fixed operators, and now measurably so
 
-The open probes carry seven deterministic, model-free operators. A sweep of six `verifiers`
+The open probes carry deterministic, model-free operators — seven when this was measured, nine now. A sweep of six `verifiers`
 v1 environments puts a number on what that buys:
 
 | Environment | Result |
@@ -227,7 +227,9 @@ exercise. Confirmed independently with Bohrin out of the loop.
 
 That is now **two independent real environments with the same root cause: the answer is
 sitting in the prompt.** A pattern with two data points, not an anecdote — and the
-strongest available argument for a dedicated answer-leakage check.
+strongest available argument for a dedicated answer-leakage check. *(Built: `answer_leakage`,
+see 03_PROBES.md. On the later 57-environment sweep none of the seven environments where an echo
+paid had a leaked answer — their answers were option labels present in every prompt.)*
 
 One defect found, zero false accusations. But two of the three clean results are a limit of
 the operators, not a verdict on the grader: `glossary` scores `answer.lower() in reply`, and
@@ -286,7 +288,13 @@ disruption is only reported for a task where **another candidate scored successf
 task where everything failed is environmental — possibly our own bug — and is reported as
 unmeasurable instead.
 
-**It fires nowhere on the current corpus.** Every environment was probed with an empty
+**Superseded — it fires on real graders.** On a 57-environment sweep one public multiple-choice
+grader raised on 100 of 100 tasks for replies without a standalone capital letter. Two changes
+followed: the finding now quotes the reward function's own exception instead of the adapter's
+guess at a whole-task cause, and `degenerate_output` submits the long and malformed replies a
+policy really produces, so a grader that breaks on those no longer reads as robust.
+
+**Originally: it fired nowhere on the first corpus.** Every environment was probed with an empty
 reply, a plain refusal, a 100 KB payload and a heavy-emoji payload; no reward function
 raised. The two errors seen are Bohrin's own runtime refusal (`bash_interception`) and
 upstream API drift (`nemo_gym_weather`), neither triggered by a payload. Reported here
@@ -305,7 +313,8 @@ decomposition is always available and is the actionable part. But the headline n
 pool, and that limitation belongs in the specification rather than in a reader's head.
 
 **Fix:** state it in `02_VERIFICATION_GAP.md`, and lead the report with the per-probe
-breakdown rather than the composite where space allows.
+breakdown rather than the composite where space allows. *(Partly done: the report now prints
+the acceptance and rejection sides beside the gap, and `--json` carries them.)*
 
 ### 4. The false-positive rate is unmeasured
 

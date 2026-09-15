@@ -26,4 +26,8 @@ __version__ = "1.3.2"
 # ``seed`` — naming how the audited tasks were chosen from the taskset; and
 # ``detail.candidates_in_accepted_form`` on ``weak_oracle``, counting payloads re-submitted
 # in the answer format the verifier accepted for its own answer.
-REPORT_SCHEMA_VERSION = "1.5"
+#
+# 1.6 adds, all additively: ``verification_gap.sides`` — the acceptance and rejection
+# directions side by side, each ``score`` and ``probes``; the ``answer_leakage`` probe and its
+# ``answer_in_prompt`` finding kind.
+REPORT_SCHEMA_VERSION = "1.6"

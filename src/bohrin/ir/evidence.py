@@ -160,6 +160,42 @@ class HarnessDisruption:
         return f"{self.task_id}: the verifier failed on a well-formed submission ({self.error[:80]})"
 
 
-Finding = Exploit | Flake | GroundTruthRejected | HarnessDisruption
+@dataclass(frozen=True, slots=True)
+class AnswerInPrompt:
+    """A task's declared answer is written, verbatim, in that task's own prompt.
 
-__all__ = ["BaselineFailure", "Exploit", "Finding", "Flake", "GroundTruthRejected", "HarnessDisruption", "Unverified"]
+    A task whose answer can be copied does not test whether the answer can be produced, and a
+    grader checking only that the answer *appears* in the reply pays full marks for the copy.
+
+    **A lead, never a verdict.** An extractive task — reading comprehension, a look-up — is
+    meant to contain its answer, and it produces exactly this record. So the probe emitting it
+    carries a weight of zero and ``summary`` states what was found, not what it means.
+    ``compared_with`` is the size of the control group: tasks with a provably different answer
+    whose prompts were checked and did *not* contain this one.
+    """
+
+    task_id: str
+    #: The declared answer, as stored by the taskset.
+    reference: str
+    #: The match with its surrounding context, as written in the prompt.
+    excerpt: str
+    compared_with: int = 0
+    repro_args: str = ""
+
+    @property
+    def summary(self) -> str:
+        return f"{self.task_id}: the declared answer appears verbatim in the prompt"
+
+
+Finding = Exploit | Flake | GroundTruthRejected | HarnessDisruption | AnswerInPrompt
+
+__all__ = [
+    "AnswerInPrompt",
+    "BaselineFailure",
+    "Exploit",
+    "Finding",
+    "Flake",
+    "GroundTruthRejected",
+    "HarnessDisruption",
+    "Unverified",
+]

@@ -150,9 +150,15 @@ async def test_a_full_audit_of_a_correct_verifier_scores_zero(
     gap = verification_gap(results, probes)
 
     assert gap.score == 0.0, f"a correct {name!r} verifier was scored {gap.score}"
-    # Zero at *no* coverage would be vacuous: the probes must actually have measured it.
-    assert len(gap.coverage.measured) == len(probes)
-    assert all(r.status is ProbeStatus.OK for r in results)
+    # Zero at *no* coverage would be vacuous: every probe that scores the verifier must actually
+    # have measured it. `answer_leakage` reads no verdicts, and declines on these one- to
+    # four-character answers because they appear in prompts by chance -- that is the guard
+    # working, and it has nothing to say about the verifier either way.
+    scoring = [r for r in results if r.probe_id != "answer_leakage"]
+    assert all(r.status is ProbeStatus.OK for r in scoring), [(r.probe_id, r.reason) for r in scoring]
+    assert set(gap.coverage.measured) >= {r.probe_id for r in scoring}
+    assert all(r.status is not ProbeStatus.ERROR for r in results)
+    assert all(not r.findings for r in results), "a correct verifier must produce no finding of any kind"
 
 
 # --------------------------------------------------------------- the underlying checks

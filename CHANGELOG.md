@@ -13,7 +13,43 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`answer_leakage`, a fourth probe: is the declared answer already written in the prompt?** A
+  task whose answer can be copied does not test producing it, and a grader checking only that the
+  answer appears in the reply pays for the copy. It calls no reward function, so it also reads
+  tasks the scoring probes must refuse. It is reported, never scored (weight 0): a
+  reading-comprehension task is meant to contain its answer and looks identical. Guards against
+  reporting coincidence: answers under 4 letters or digits and yes/no answers are not checked,
+  matches are whole-token after Unicode, case and whitespace normalisation, and an answer that
+  also appears in the prompt of a task with a provably different answer is shared vocabulary, not
+  a leak. On a 57-environment sweep the seven environments where echoing the prompt paid all had
+  option-label answers present in every prompt, and the probe reports none of them. On the public
+  `scratchpad` environment it reports all 8 tasks: the graded word is written in each prompt, the
+  same root cause behind the echo exploit already reported there.
+- **`answer_enumeration` operator: several answers stated, the declared one in the middle.** Catches
+  a grader that accepts the answer wherever it appears among several, which the Agentic Benchmark
+  Checklist lists as its own requirement. The declared answer is never first or last, so graders
+  reading the first or last stated answer are not accused; letter siblings are the options the
+  prompt offers on either side, and number siblings are larger and never contain its digits,
+  because a grader may take the last *valid* letter or read numbers with a sign-dropping `\d+`.
+- **`degenerate_output` operator: a repetition loop and a reply cut off inside nested markup.**
+  Real policies produce both, and until now every payload was short and well-formed, so a grader
+  that raises, recurses too deeply or hangs on long or malformed input read as robust. Crashes it
+  causes are reported as harness disruptions; acceptances are structural exploits only where the
+  task declares an answer that is not a refusal or a JSON object, and leads otherwise.
+- **The acceptance and rejection sides of the gap are reported beside it.** The terminal prints
+  `sides: acceptance N / 100 · rejection M / 100` when the rejection side was measured, and
+  `--json` carries `verification_gap.sides`. The headline is unchanged. Report schema 1.6.
+
+### Fixed
+
+- **A crash finding quotes the grader's own exception.** On a legacy environment the finding carried
+  the adapter's guess at why a whole task fails — "reward functions read rollout state" — even where
+  other submissions to the task scored normally, which makes the submission the cause. Measured on a
+  57-environment sweep: a public multiple-choice grader raised `'NoneType' object has no attribute
+  'group'` on 100 of 100 tasks and every finding blamed rollout state. Adapters now attach the
+  reward function's exception (`RewardFunctionError.reward_error`) and the finding uses it.
 
 ## [1.3.2] — 2026-09-15
 

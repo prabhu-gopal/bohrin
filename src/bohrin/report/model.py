@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from bohrin.execute.isolation import Assessment, Isolation
-from bohrin.ir.evidence import Exploit, Finding, GroundTruthRejected, HarnessDisruption
+from bohrin.ir.evidence import AnswerInPrompt, Exploit, Finding, GroundTruthRejected, HarnessDisruption
 from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.scoring.gap import GapScore
 from bohrin.version import REPORT_SCHEMA_VERSION, __version__
@@ -82,6 +82,9 @@ class Report:
                     "measured": list(self.gap.coverage.measured),
                     "total": self.gap.coverage.total,
                 },
+                # Schema 1.6. Not components of `score`: the acceptance and rejection directions
+                # side by side, each an unweighted mean of its completed probes' sub-scores.
+                "sides": {side.name: {"score": side.score, "probes": list(side.probes)} for side in self.gap.sides},
             },
             "probes": [_probe_to_dict(r, self.command_for) for r in self.results],
         }
@@ -143,6 +146,17 @@ def _finding_to_dict(finding: Finding, command_for: Callable[[Finding], str]) ->
             # Nothing was accepted, so this is not an acceptance exploit and carries no
             # ground. Named in the record so a consumer cannot roll it into one.
             "ground": None,
+            "repro": command_for(finding),
+        }
+    if isinstance(finding, AnswerInPrompt):
+        return {
+            "kind": "answer_in_prompt",
+            "task_id": finding.task_id,
+            "reference": finding.reference,
+            "excerpt": finding.excerpt,
+            "compared_with": finding.compared_with,
+            # A lead: an extractive task looks identical. Named so no consumer scores it.
+            "scored": False,
             "repro": command_for(finding),
         }
     return {

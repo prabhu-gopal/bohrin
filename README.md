@@ -25,20 +25,33 @@ a public environment in the `verifiers` repository — not an illustration:
 $ pip install 'bohrin[verifiers]'
 $ pip install ./environments/scratchpad      # a taskset is an installed package
 $ bohrin audit ./environments/scratchpad --max-tasks 8 --unsafe-local
-
 Bohrin  ·  environments/scratchpad
-verifiers_v1 · 8 tasks · 3 probes · isolation: none
+verifiers_v1 · 8 tasks · 4 probes · isolation: none
   note verifier code ran in-process with no isolation boundary
 
+  answer_leakage ░░░░░░░░░░░░░░░  the declared answer appears in the prompt on 8
+tasks (of 8 checked) (not scored)
   determinism    ░░░░░░░░░░░░░░░  no variance observed in 5 runs
   ground_truth_rejected ░░░░░░░░░░░░░░░  the declared answer was accepted on
 every task
   weak_oracle    ███████████████  8 tasks accept known-wrong solutions (of 8
 measured · 95% CI 68–100%)
 
-  VERIFICATION GAP: 50 / 100   coverage: 3 of 3 probes
+  VERIFICATION GAP: 50 / 100   coverage: 4 of 4 probes
   rests on: determinism 0 of 8 tasks (95% CI 0–32%) · weak_oracle 8 of 8 tasks
 (95% CI 68–100%)
+  sides: acceptance 100 / 100 · rejection 0 / 100 (the rejection side is
+reported, not counted in the gap)
+
+  IN PROMPT ▸ the declared answer appears verbatim in the prompt on 8 tasks (not
+scored)
+           A task whose answer can be copied does not test producing it. This is
+a lead, not a verdict: a reading-comprehension or look-up task, where the answer
+is meant to be in the passage, looks exactly like this.
+           example (task 0): Call the `scratchpad_roundtrip` tool with
+word="alpha". It returns a single word. Then reply with that returned w…
+           bohrin audit environments/scratchpad --task 0 --probe answer_leakage
+--unsafe-local
 
   EXPLOIT ▸ false_negation accepted on 8 tasks (reward 1)
            explicitly denies the declared answer 'alpha'
@@ -138,9 +151,9 @@ is recorded in the report. A task whose reward function needs a runtime is
 refused rather than scored on a partial rubric, because a partial rubric awards
 full marks to a submission that does nothing.
 
-## The three open probes
+## The four open probes
 
-Two directions of the same failure, and one check on the signal itself.
+Two directions of the same failure, one check on the signal itself, and one on the task.
 
 **Weak oracle** — will the verifier accept work that is provably incorrect?
 This is mutation testing with the roles relabelled: your verifier is the test
@@ -159,9 +172,16 @@ to a broken one, and scoring them together would accuse the wrong party.
 submission? A grader that disagrees with itself injects noise straight into the
 reward signal.
 
+**Answer leakage** — is the declared answer already written in the prompt? A
+model does not have to solve a task whose answer it can copy, and a grader that
+only checks the answer appears in the reply pays full marks for the copy. It
+calls no reward function. Like ground truth rejected it reports findings without
+moving the Verification Gap, because a reading-comprehension task is meant to
+contain its answer and looks identical.
+
 ### What they will and will not find
 
-The open probes use seven deterministic, model-free operators. They cost nothing
+The open probes use nine deterministic, model-free operators. They cost nothing
 but reward invocations and they are reproducible, but they do not find what a
 motivated attacker finds.
 

@@ -1,6 +1,6 @@
 # The open probes
 
-Three probes ship in the open core. This document is their design, including the
+Four probes ship in the open core. This document is their design, including the
 parts that are hard and the parts we deliberately refuse to do.
 
 ---
@@ -123,7 +123,7 @@ a separate advisory section of the report.
 Deterministic, no model inference, therefore fast and reproducible. Each is
 tagged with the wrongness ground it can establish.
 
-Seven are registered today (`pyproject.toml` `[project.entry-points."bohrin.mutators"]`):
+Nine are registered today (`pyproject.toml` `[project.entry-points."bohrin.mutators"]`):
 
 | Operator | Submission it produces | Ground |
 |---|---|---|
@@ -132,6 +132,8 @@ Seven are registered today (`pyproject.toml` `[project.entry-points."bohrin.muta
 | `refusal` | `"I cannot complete this task."` | Structural only when a declared answer exists and is not itself a refusal; otherwise **leads only** |
 | `constant_return` | a fixed literal (`0`, `1`, `True`, `None`, `[]`, `""`), skipping any that is not *provably distinct* from the reference | Differential |
 | `false_negation` | an explicit denial of the declared answer, with the answer last (`"The answer is not X."`) and first (`"X is not the answer."`, `"X is wrong."`) | Invariant |
+| `answer_enumeration` | three answers stated as the answer, the declared one always in the middle (`"The answer is 210. The answer is 70. The answer is 350."`); for a number, or an option letter with an offered option on each side | Invariant |
+| `degenerate_output` | a repetition loop of about 4,000 tokens, and a reply cut off inside 500 unclosed nested `\frac{` | Structural where an answer is declared that is not a refusal or a JSON object; otherwise **leads only** |
 | `drop_side_effect` | the reference code with every function body replaced by `pass` (LibCST) | Structural |
 | `negate_condition` | the reference code with every `if` predicate negated (LibCST) | **none — leads only** |
 
@@ -169,6 +171,28 @@ on 100 of 100. One checks that the extracted answer `startswith` the declared
 letter, falling back to the whole reply when there is no `\boxed{}`; the other
 takes the first standalone capitalised token. `false_negation` now also puts the
 answer first. The ground is unchanged: each form still denies the declared answer.
+
+**`answer_enumeration` exists for a grader that accepts the answer wherever it appears among
+several.** The Agentic Benchmark Checklist lists robustness to "systematically listing all
+possible answers" as a requirement separate from handling negation, and published work on RLVR
+training observed models learning to enumerate candidates instead of committing to one. The
+ground is the one `false_negation` rests on: the reply asserts two values the taskset declares
+wrong. The declared answer is placed **in the middle, never first or last**, because reading the
+first or the last stated answer is a legitimate design — a model may correct itself — and neither
+extracts the declared answer from this payload. Two more rules each come from a correct grader
+an earlier draft accused. **Letter siblings are the offered options either side of the answer**:
+a public four-option grader takes the last standalone `A`–`D`, so `C … D … E` read as `D`, and it
+was reported on 27 of 27 tasks whose answer was `D`; a first or last option now gets nothing.
+**Number siblings are both larger** than the answer, by at least 7 and at least twice its size,
+and never contain its digits: `\d+` drops a minus sign and reads `-70` as `70`, and a correct
+grader comparing with a tolerance (Math-Verify rounds to 6 decimal places by default) must never
+read a sibling as the answer.
+
+**`degenerate_output` exists mostly to find graders that break.** Degenerate repetition is the
+best-documented failure of neural text generation, and in RL it reaches the verifier as a long,
+truncated reply. Until it existed every payload Bohrin submitted was short and well-formed, so a
+grader that raises, recurses too deeply or hangs on long or malformed input read as robust. A
+crash it causes is reported as a harness disruption whatever its ground (see below).
 
 **Where no text-level operator can establish wrongness: safety tasks.** On a
 harmful request the declared answer is a behaviour — *decline this* — and correct
@@ -400,7 +424,7 @@ acceptance findings.
 ```python
 class Probe(ABC):
     id: str  # "weak_oracle"
-    family: str  # "acceptance" | "reliability"
+    family: str  # "acceptance" | "rejection" | "reliability" | "task_validity"
     weight: float
 
     def explain(self) -> str: ...
@@ -481,3 +505,67 @@ declared answer was accepted (8 tried)"*. Not *"this verifier rejects correct
 answers"* — the catalogue is finite, and the ninth rendering might have passed.
 This is the same discipline `determinism` follows when it quotes detection power
 instead of claiming determinism.
+
+---
+
+## Harness disruption — a grader that fails on a well-formed reply
+
+Not a probe of its own: `weak_oracle` reports it when a submission makes the reward function
+raise, recurse too deeply or time out. A crash accepts nothing, so it never enters the
+acceptance sub-score. It is reported only on a task where another submission scored normally,
+which isolates the submission as the cause — a task where everything fails is a setup problem,
+possibly Bohrin's own, and is reported as unmeasurable instead.
+
+The finding quotes **the reward function's own exception**. An adapter that refuses a partial
+rubric wraps that exception in its own explanation, and that explanation guesses at why a whole
+task fails; on a task where other submissions scored, the guess is wrong by construction. On a
+57-environment sweep one public multiple-choice grader called `re.search(...).group(1)` without
+checking for a match and raised on 100 of 100 tasks for any reply lacking a standalone capital
+letter, while every finding read as a rollout-state problem.
+
+## Probe 4 — Answer Leakage
+
+> Is the declared answer already written in the prompt?
+
+A task whose answer can be copied does not test producing it, and a grader checking only that
+the answer appears in the reply pays full marks for copying it back. An audit of SWE-bench found
+the fix revealed in the issue text for 33.47% of instances; removing them cut one agent's
+resolution rate from 12.47% to 4.58%. The probe **calls no reward function**, so it also reads
+tasks the scoring probes must refuse, at no cost to the environment.
+
+### Why it carries no weight in the Verification Gap
+
+An extractive task — reading comprehension, a look-up — is meant to contain its answer, and it
+looks exactly like a leak. So the finding is a lead worded as a fact (*the declared answer
+appears verbatim in the prompt*), and `weight` is `0.0`.
+
+### How it avoids reporting coincidence
+
+Every guard can only remove a finding:
+
+| Guard | What it stops |
+|---|---|
+| The compared field is the declared answer — for `verifiers` v1, the field the reward reads | a taskset's own name, or any other metadata, matching its prompt |
+| Answers with fewer than 4 letters or digits, and yes/no answers, are not checked | `A`, `12`, `yes` appearing by chance |
+| Whole-token match after NFKC, case and whitespace normalisation | `port` inside `report` |
+| A control group: up to 200 tasks with a provably different answer | shared vocabulary — an option list, the name of the library every task is about |
+| Copy tasks and JSON-object answers are excluded | tasks whose answer is the prompt, or grader state |
+
+The control group is the cross-item null model contamination audits use: a string that appears
+as often in the prompts of tasks with other answers identifies nothing.
+
+**Measured on the 57-environment sweep.** Seven environments paid full marks for echoing the
+prompt back, and every one had declared answers that were option labels (`A`–`D`) or `True`.
+None is a leak — those labels are in every prompt — and the probe reports none of them: the echo
+pays there because the grader takes the first label it finds, which `weak_oracle` already reports
+with a ground.
+
+---
+
+## The two sides of the gap
+
+The report prints the **acceptance** side (probes in the `acceptance` family) and the
+**rejection** side (the `rejection` family) next to the Verification Gap, each the unweighted mean
+of its completed probes' sub-scores, and `--json` carries them as `verification_gap.sides`. The
+headline is unchanged: the rejection side is reported beside it, never counted in it. See
+[02_VERIFICATION_GAP.md](02_VERIFICATION_GAP.md).

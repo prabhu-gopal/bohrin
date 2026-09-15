@@ -9,7 +9,7 @@ from __future__ import annotations
 from rich.console import Console
 from rich.markup import escape
 
-from bohrin.ir.evidence import Exploit, Finding, Flake, GroundTruthRejected, HarnessDisruption
+from bohrin.ir.evidence import AnswerInPrompt, Exploit, Finding, Flake, GroundTruthRejected, HarnessDisruption
 from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.report.model import Report
 
@@ -59,6 +59,13 @@ def _headline(result: ProbeResult) -> str:
             return "the declared answer was accepted on every task"
         noun = "task" if n == 1 else "tasks"
         return f"the declared answer was refused on {n} {noun} (not scored)"
+    if result.probe_id == "answer_leakage":
+        # A fact, not a verdict: an extractive task contains its answer by design.
+        checked = result.detail.get("tasks_checked")
+        of = f" (of {checked} checked)" if isinstance(checked, int) else ""
+        if not n:
+            return f"no declared answer found in its own prompt{of}"
+        return f"the declared answer appears in the prompt on {_plural(n, 'task')}{of} (not scored)"
     # Acceptances only. A harness disruption is a finding on the same list, but nothing was
     # accepted, and counting its task here printed "1 task accepts a known-wrong solution"
     # beside a sub-score of zero -- an accusation in the line a reader skims first,
@@ -137,6 +144,24 @@ def _gap_basis(report: Report) -> str | None:
     return "rests on: " + " · ".join(parts) if parts else None
 
 
+def _sides_line(report: Report) -> str | None:
+    """Both directions of the gap, printed only when the rejection side was measured.
+
+    The headline counts only probes that can be scored soundly, which today leaves the
+    rejection side out of it. Without this line a reader sees one number and reasonably takes it
+    for the whole reward signal; with it, the direction the number does not cover is in view.
+    """
+    by_name = {side.name: side for side in report.gap.sides}
+    rejection = by_name.get("rejection")
+    if rejection is None or rejection.score is None:
+        return None
+    parts = [
+        f"{side.name} {side.score:.0f} / 100" if side.score is not None else f"{side.name} not measured"
+        for side in report.gap.sides
+    ]
+    return "sides: " + " · ".join(parts) + " (the rejection side is reported, not counted in the gap)"
+
+
 def _grouped(report: Report) -> dict[tuple[str, str], list[Finding]]:
     """Collapse findings that share a root cause, preserving report order.
 
@@ -153,6 +178,8 @@ def _grouped(report: Report) -> dict[tuple[str, str], list[Finding]]:
                 key = ("rejected", result.probe_id)
             elif isinstance(finding, HarnessDisruption):
                 key = ("disruption", finding.operator)
+            elif isinstance(finding, AnswerInPrompt):
+                key = ("in_prompt", result.probe_id)
             else:
                 key = ("flake", result.probe_id)
             groups.setdefault(key, []).append(finding)
@@ -272,6 +299,9 @@ def render(report: Report, console: Console) -> None:
     basis = _gap_basis(report)
     if basis is not None:
         console.print(f"  [dim]{escape(basis)}[/dim]", highlight=False)
+    sides = _sides_line(report)
+    if sides is not None:
+        console.print(f"  [dim]{escape(sides)}[/dim]", highlight=False)
     caveat = _zero_score_caveat(report)
     if caveat is not None:
         console.print(f"  [dim]note {escape(caveat)}[/dim]", highlight=False)
@@ -336,6 +366,25 @@ def render(report: Report, console: Console) -> None:
             console.print(
                 f"           example (task {escape(first_finding.task_id)}): "
                 f"[cyan]{escape(first_finding.reference[:_PAYLOAD_CHARS])}[/cyan]",
+                highlight=False,
+            )
+        elif isinstance(first_finding, AnswerInPrompt):
+            noun = "task" if tasks == 1 else "tasks"
+            console.print(
+                f"  [yellow]IN PROMPT[/yellow] ▸ the declared answer appears verbatim in the prompt on "
+                f"{tasks} {noun} [dim](not scored)[/dim]",
+                highlight=False,
+            )
+            console.print(
+                "           [dim]A task whose answer can be copied does not test producing it. This is a "
+                "lead, not a verdict: a reading-comprehension or look-up task, where the answer is "
+                "meant to be in the passage, looks exactly like this.[/dim]",
+                highlight=False,
+            )
+            excerpt = first_finding.excerpt or first_finding.reference
+            excerpt = excerpt if len(excerpt) <= _PAYLOAD_CHARS * 2 else excerpt[: _PAYLOAD_CHARS * 2 - 1] + "…"
+            console.print(
+                f"           example (task {escape(first_finding.task_id)}): [cyan]{escape(excerpt)}[/cyan]",
                 highlight=False,
             )
         elif isinstance(first_finding, Flake):

@@ -136,6 +136,11 @@ class ScoreOutcome:
     verdict: Verdict | None = None
     #: Populated instead of ``verdict`` when the call timed out or raised.
     error: str | None = None
+    #: The environment's own exception, when an adapter wrapped it (see
+    #: :class:`~bohrin.adapters.base.RewardFunctionError`). ``error`` is the adapter's message,
+    #: which explains why the task was refused; this is what the reward function itself raised,
+    #: and it is the part a crash finding has to quote.
+    cause: str | None = None
 
 
 async def score_many(
@@ -173,7 +178,13 @@ async def score_many(
             except asyncio.CancelledError:
                 raise  # cancellation is not an audit finding; let it propagate
             except Exception as exc:
-                return ScoreOutcome(task, candidate, error=f"{type(exc).__name__}: {exc}")
+                cause = getattr(exc, "reward_error", None)
+                return ScoreOutcome(
+                    task,
+                    candidate,
+                    error=f"{type(exc).__name__}: {exc}",
+                    cause=cause if isinstance(cause, str) else None,
+                )
             return ScoreOutcome(task, candidate, verdict=verdict)
 
     with _loop_watchdog(asyncio.get_running_loop(), timeout):

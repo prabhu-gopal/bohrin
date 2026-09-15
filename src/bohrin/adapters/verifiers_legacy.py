@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from bohrin.adapters._package import distribution_name
-from bohrin.adapters.base import Adapter, MissingExtraError, TasksetLoadError, TaskSource
+from bohrin.adapters.base import Adapter, MissingExtraError, RewardFunctionError, TasksetLoadError, TaskSource
 from bohrin.adapters.selection import RANDOM, select_indices
 from bohrin.ir.task import Candidate, Task, Verdict
 
@@ -485,11 +485,12 @@ class _LegacySource:
             # answer fails too, which reads as a verifier that rejects its own ground truth.
             # Refusing the task is the only honest option, and the probe excludes it by name.
             first = errors.messages[0]
-            raise RuntimeError(
+            raise RewardFunctionError(
                 f"task {task.id!r}: {len(errors.messages)} reward function call(s) raised while "
                 f"scoring, so the rubric was only partially evaluated. A score from a partial "
                 f"rubric manufactures findings in both directions, so this task is not scored. "
-                f"{_likely_cause(first)} First error: {first}"
+                f"{_likely_cause(first)} First error: {first}",
+                reward_error=first,
             )
 
         reward = state.get("reward")
