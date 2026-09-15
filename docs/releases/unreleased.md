@@ -5,14 +5,13 @@ date: "unreleased"
 # tag: "vX.Y.Z"        # add at release time
 breaking: false
 summary: >
-  Fixes found by auditing 57 public environments: Bohrin no longer hangs after its report.
+  One sentence shown on the changelog index. What this release is, in plain terms.
 ---
 
 ## TL;DR
 
-Engine fixes found while running Bohrin across 57 public environments. The most visible: on
-some environments the `bohrin` command printed its report or error and then never exited,
-which hangs a CI job. Nothing to change on upgrade.
+One short paragraph a reader skims in five seconds: what this release is, and
+whether they need to do anything to upgrade.
 
 ## Upgrade impact
 
@@ -22,17 +21,11 @@ which hangs a CI job. Nothing to change on upgrade.
 
 ## Highlights
 
-- **`bohrin` exits when it is done.** A hang after the report, inherited from a library the
-  environment loads, can no longer keep your terminal or CI job waiting.
+- **<the change>** (#NN) — why it matters to a user, in one or two sentences.
 
 ## Added
 
-- **Bohrin now recognises `Final Answer: X`.** Some graders only accept an answer written as
-  `Final Answer: B`, usually because the prompt asks for exactly that. Bohrin learns the
-  format a grader wants by trying presentations of your declared answer, and this one was
-  missing, so such a grader could never be measured. It is now tried, after every existing
-  presentation. On the public environment that exposed the gap, it also revealed a weakness:
-  the grader pays full marks for `Final Answer: B is not the answer.`
+- …
 
 ## Changed
 
@@ -40,21 +33,7 @@ which hangs a CI job. Nothing to change on upgrade.
 
 ## Fixed
 
-- **Clearer message when a grader needs a key.** If an environment's grader stops because an
-  API key such as `PRIME_API_KEY` isn't set, Bohrin now says exactly that, instead of
-  suggesting the grader needs a live rollout.
-- **The "verifiers too new" message explains what actually happened.** Usually nothing in
-  your environment pinned a newer `verifiers`: a requirement that mentions a pre-release (for
-  example `>=0.1.11.dev0`) makes pip install the newest pre-release. The fix is the same as
-  before, `pip install 'verifiers<0.3.2'`, and 0.3.1 still satisfies that requirement.
-
-- **No more hang after the report.** On one public environment, Bohrin printed its load
-  error and the process then sat for 11 minutes until it was stopped. The cause was not in
-  Bohrin: after the environment's dataset build failed, a data library it uses (Apache
-  Arrow) waited forever while the process was shutting down, and plain Python without Bohrin
-  hung the same way. But the hung terminal was Bohrin's, so the `bohrin` command now ends
-  its process as soon as its output is written. Reports and `--json` files are written
-  first, and every exit code is unchanged.
+- …
 
 ## Removed
 
@@ -72,5 +51,5 @@ which hangs a CI job. Nothing to change on upgrade.
 ## Links
 
 - Full changelog entry: [CHANGELOG.md](../../CHANGELOG.md)
-- Compare: `v1.3.1...vX.Y.Z`
+- Compare: `v1.3.2...vX.Y.Z`
 - PRs in this release: #NN

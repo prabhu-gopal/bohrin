@@ -13,6 +13,10 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.3.2] — 2026-09-15
+
 ### Added
 
 - **`Final Answer: X` is now a presentation Bohrin tries for the declared answer.** Found on
@@ -862,7 +866,8 @@ sweep measures one. No accuracy claim is made in the meantime.
   yanked and point users at `adduct`; the verifier auditor starts at 1.0.0, so that the
   discontinuity reads as a break rather than an upgrade.
 
-[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/prabhu-gopal/bohrin/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/prabhu-gopal/bohrin/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/prabhu-gopal/bohrin/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/prabhu-gopal/bohrin/compare/v1.1.0...v1.2.0
