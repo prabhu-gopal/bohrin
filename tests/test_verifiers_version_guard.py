@@ -68,3 +68,21 @@ def test_verifiers_absent_asks_for_the_extra(monkeypatch: pytest.MonkeyPatch) ->
     message = _refusal(monkeypatch, None)
 
     assert "pip install 'bohrin[verifiers]'" in message
+
+
+@pytest.mark.parametrize("installed", ["0.3.2.dev95", "0.3.2"])
+def test_the_message_names_the_real_cause_of_a_version_past_the_removal(
+    monkeypatch: pytest.MonkeyPatch, installed: str
+) -> None:
+    """Before: it said a taskset's pins "pulled verifiers past the removal". None had.
+
+    Measured on the 2026-09-15 sweep: 10 of 57 environments installed 0.3.2.dev95. One asks for
+    `verifiers>=0.1.11.dev0`; naming a dev release makes pip consider pre-releases for that
+    requirement, so it picked the newest (a stable `>=0.1.11` resolves 0.3.1). Holding
+    `verifiers<0.3.2` made two of them load. The advice was right and the explanation was not.
+    """
+    message = _refusal(monkeypatch, installed)
+
+    assert "pre-release" in message
+    assert "pulled verifiers past the removal" not in message
+    assert "0.3.1 still" in message, "the user needs to know the pin cannot break the taskset's own requirement"

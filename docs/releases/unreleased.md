@@ -40,6 +40,14 @@ which hangs a CI job. Nothing to change on upgrade.
 
 ## Fixed
 
+- **Clearer message when a grader needs a key.** If an environment's grader stops because an
+  API key such as `PRIME_API_KEY` isn't set, Bohrin now says exactly that, instead of
+  suggesting the grader needs a live rollout.
+- **The "verifiers too new" message explains what actually happened.** Usually nothing in
+  your environment pinned a newer `verifiers`: a requirement that mentions a pre-release (for
+  example `>=0.1.11.dev0`) makes pip install the newest pre-release. The fix is the same as
+  before, `pip install 'verifiers<0.3.2'`, and 0.3.1 still satisfies that requirement.
+
 - **No more hang after the report.** On one public environment, Bohrin printed its load
   error and the process then sat for 11 minutes until it was stopped. The cause was not in
   Bohrin: after the environment's dataset build failed, a data library it uses (Apache
