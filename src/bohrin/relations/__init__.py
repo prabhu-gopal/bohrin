@@ -33,6 +33,9 @@ _BUILTIN_ORDER = (
     "latex_fraction",
     "display_fraction",
     "braced_sqrt_argument",
+    # Appended, not inserted: the order is the baseline's search order, and moving an existing
+    # relation would change which rendering an already-published audit accepted first.
+    "final_answer_label",
 )
 
 
