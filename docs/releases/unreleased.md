@@ -5,72 +5,51 @@ date: "unreleased"
 # tag: "vX.Y.Z"        # add at release time
 breaking: false
 summary: >
-  A fourth probe that finds answers written in their own prompts, two operators for graders that
-  pay for several answers at once or break on degenerate replies, and the gap's two sides reported.
+  One sentence shown on the changelog index. What this release is, in plain terms.
 ---
 
 ## TL;DR
 
-Bohrin now checks whether a task hands its answer to the model in the prompt, tries two new kinds
-of wrong reply — several answers at once, and the long or cut-off output a policy produces when
-generation goes wrong — and prints the acceptance and rejection sides beside the Verification Gap.
-Nothing to do to upgrade; `--json` gains fields and moves to report schema 1.6.
+One short paragraph a reader skims in five seconds: what this release is, and
+whether they need to do anything to upgrade.
 
 ## Upgrade impact
 
 - **Breaking changes:** none
 - **Action required:** none — `pip install --upgrade 'bohrin[verifiers]'`
 - **New minimums:** none
-- **Audits make more scoring calls:** up to four more submissions per task, two of them long
-  (about 16,000 characters). A grader that is slow on long input may now time out, and is
-  reported when it does.
 
 ## Highlights
 
-- **Answer leakage** — a model does not have to solve a task whose answer is in the question, and a
-  grader looking only for the answer somewhere in the reply pays full marks for copying it. The new
-  probe finds that without calling a reward function. It is a lead, not a verdict, because reading
-  comprehension looks the same.
-- **Graders that break are no longer invisible** — Bohrin used to submit only short, tidy replies.
-  It now also submits a repetition loop and a reply cut off inside nested `\boxed{\frac{`, so a
-  grader that raises, recurses too deeply or hangs on them is reported.
-- **A crash finding names the real exception** — instead of a generic guess about rollout state.
+- **<the change>** (#NN) — why it matters to a user, in one or two sentences.
 
 ## Added
 
-- `answer_leakage` probe (weight 0, reported only), with guards against coincidence: short and
-  yes/no answers are not checked, matching is whole-token after normalisation, and an answer also
-  present in the prompt of a task with a different answer is treated as shared vocabulary.
-- `answer_enumeration` operator — the declared answer stated among two provably different ones,
-  always in the middle, for numbers and for option letters the prompt offers on both sides.
-- `degenerate_output` operator — a repetition loop and a truncated nested-markup reply.
-- `verification_gap.sides` in `--json`, and a `sides:` line in the terminal.
+- …
+
+## Changed
+
+- …
 
 ## Fixed
 
-- Crash findings on legacy `verifiers` environments quote the reward function's exception rather
-  than the adapter's whole-task explanation.
+- …
+
+## Removed
+
+- …
 
 ## Known limitations
 
-- `answer_leakage` cannot tell a leak from an extractive task, does not check answers under four
-  letters or digits, and does not find paraphrased or partial leaks.
-- `answer_enumeration` stays silent on answers that are neither a number nor an option letter, and
-  on the first and last option of a multiple-choice question.
+- …
 
 ## Verified
 
 - `ruff check` · `ruff format --check` · `mypy --strict` · `pytest` — all clean
-- Re-audited nine public environments from a 57-environment sweep with the same settings (100 tasks,
-  seed 7, one fresh venv each): every existing finding reproduced exactly, the new operators reported
-  no false accusation, and a grader that crashed on 100 of 100 tasks is now reported with its own
-  exception. Two false accusations an earlier draft of `answer_enumeration` and `degenerate_output`
-  made on those environments were fixed before release and are pinned by tests.
-- `bohrin audit ./environments/scratchpad --max-tasks 8 --unsafe-local` on the public `verifiers`
-  repository: `answer_leakage` reports the answer in the prompt on 8 of 8 tasks, output as in README.
+- `pip install 'bohrin[verifiers]'` in a fresh venv, then `bohrin audit <a real public taskset>` — produced <result> in <time>
 
 ## Links
 
 - Full changelog entry: [CHANGELOG.md](../../CHANGELOG.md)
-- Compare: `v1.3.2...vX.Y.Z`
+- Compare: `vPREV...vX.Y.Z`
 - PRs in this release: #NN
