@@ -74,6 +74,8 @@ Each probe defines its own normalisation, documented with it in
 |---|---|
 | `weak_oracle` | fraction of tasks accepting at least one known-wrong candidate |
 | `determinism` | fraction of tasks where an identical submission scored differently across repeats |
+| `ground_truth_rejected` | fraction of tasks refusing every rendering of their own declared answer — weight 0, reported only |
+| `answer_leakage` | fraction of checked tasks whose declared answer is in their own prompt — weight 0, reported only |
 
 Both are proportions of tasks, not counts, so a 40-task and a 400-task
 environment produce comparable numbers.
@@ -82,6 +84,23 @@ The scoring probes deliberately measure different failure modes — `weak_oracle
 measures *correctness* of acceptance, `determinism` measures *reliability* of
 scoring. A verifier can fail either independently, so neither subsumes the
 other and the pair gives real coverage rather than two views of one defect.
+
+## Two sides
+
+A reward signal can be wrong in two directions: paying for wrong work, and refusing right work.
+They are different defects with different fixes, so the report prints both beside the headline:
+
+```
+VERIFICATION GAP: 50 / 100   coverage: 4 of 4 probes
+sides: acceptance 50 / 100 · rejection 12 / 100 (the rejection side is reported, not counted in the gap)
+```
+
+Each side is the **unweighted** mean of the sub-scores of its completed probes — `acceptance`
+and `rejection` families respectively — and a side none of whose probes completed is `null`, never
+0. Unweighted because a probe's gap weight decides whether it may move the headline, which is a
+soundness question, not a statement about how it compares with probes on its own side. In
+`--json` the sides are `verification_gap.sides` (report schema 1.6). The headline is computed
+exactly as above; the sides never change it.
 
 ## Reporting uncertainty
 

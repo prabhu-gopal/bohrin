@@ -45,6 +45,26 @@ class TasksetLoadError(Exception):
     """
 
 
+class RewardFunctionError(RuntimeError):
+    """An adapter refused a score because the environment's reward function raised.
+
+    The message explains the refusal — a partial rubric's number cannot be trusted — and
+    guesses at why a whole task fails. ``reward_error`` keeps what the reward function itself
+    raised, separately, because the guess and the exception answer different questions. Where
+    other submissions to the same task scored normally the guess is wrong by construction — the
+    submission triggered it — and a crash finding has to quote the exception, not the guess.
+
+    Measured on the 2026-09-15 sweep: a grader calling ``re.search(...).group(1)`` without
+    checking for a match raised on every reply lacking a standalone capital letter, and all 100
+    crash findings on that environment read "this usually means the reward functions read
+    rollout state", which was not the cause.
+    """
+
+    def __init__(self, message: str, *, reward_error: str) -> None:
+        super().__init__(message)
+        self.reward_error = reward_error
+
+
 @runtime_checkable
 class TaskSource(Protocol):
     """A loaded taskset: enumerate tasks, and score candidates against their verifier."""
@@ -106,4 +126,4 @@ class Adapter(ABC):
         """Open ``path``. Raises :class:`MissingExtraError` if a required extra is absent."""
 
 
-__all__ = ["Adapter", "MissingExtraError", "TaskSource", "UnknownFormatError"]
+__all__ = ["Adapter", "MissingExtraError", "RewardFunctionError", "TaskSource", "UnknownFormatError"]

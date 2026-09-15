@@ -530,7 +530,10 @@ class WeakOracleProbe(Probe):
                     findings.append(
                         HarnessDisruption(
                             task_id=out.task.id,
-                            error=out.error,
+                            # The reward function's own exception where the adapter kept it. The
+                            # adapter's message guesses why a *whole task* fails, and here other
+                            # submissions to this task scored, so the submission is the cause.
+                            error=out.cause or out.error,
                             payload=out.candidate.payload,
                             operator=out.candidate.provenance.operator,
                             repro_args=(

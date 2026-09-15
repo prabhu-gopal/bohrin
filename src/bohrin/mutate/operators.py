@@ -14,13 +14,21 @@ candidate's *behaviour*, and a difference in *source* is not evidence of one. Se
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
+from decimal import Decimal, InvalidOperation
 
 import libcst as cst
 
 from bohrin.ir.task import Candidate, Ground, Provenance, Task
 from bohrin.mutate.base import MutationOperator
-from bohrin.mutate.equivalence import code_equivalent, collides_under, reads_as_refusal
+from bohrin.mutate.equivalence import (
+    code_equivalent,
+    collides_under,
+    provably_distinct,
+    reads_as_refusal,
+    reads_as_structured_state,
+)
 
 
 def _cand(op: str, base: str, detail: str, payload: str, ground: Ground | None) -> Candidate:
@@ -202,6 +210,201 @@ class FalseNegation(MutationOperator):
                 payload,
                 Ground.INVARIANT,
             )
+
+
+#: A declared answer ``answer_enumeration`` can place among siblings: an integer or decimal,
+#: or a single option letter. Anything else has no sibling Bohrin can construct and prove
+#: different, so the operator stays silent rather than guessing one.
+_ENUMERABLE_NUMBER = re.compile(r"^-?\d+(?:\.\d+)?$")
+_ENUMERABLE_LETTER = re.compile(r"^[A-Za-z]$")
+
+#: An option label at the start of a line, in the shapes public prompts use: ``Option A:``,
+#: ``(A)``, ``A.``, ``A)`` and ``[A]``.
+_OPTION_LABEL = re.compile(r"^[ \t]*(?:option[ \t]+)?[(\[]?([A-Z])[)\].:][ \t]", re.IGNORECASE | re.MULTILINE)
+
+
+def _offered_letters(prompt: str) -> str:
+    """The option letters a prompt lists, when they run contiguously from ``A``; else ``""``."""
+    found = {m.group(1).upper() for m in _OPTION_LABEL.finditer(prompt)}
+    letters = ""
+    for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+        if letter not in found:
+            break
+        letters += letter
+    return letters if len(letters) >= 2 else ""
+
+
+def _siblings(ref: str, prompt: str = "") -> tuple[str, str] | None:
+    """Two answers provably different from ``ref``, written the way ``ref`` is written.
+
+    **Letters are the options on either side of the declared one**, and only when the prompt
+    lists them. A grader may take the last *valid* letter, and a sibling the task does not offer
+    is invisible to it. Measured on a public four-option environment before this rule: its grader
+    takes the last standalone ``A``-``D``, so ``C … D … E`` read as ``D`` and a correct grader was
+    reported as exploited on 27 of 27 tasks whose answer was ``D``. A first or last option has
+    no offered letter on one side, so the operator stays silent there.
+
+    **Numbers go up, never down, and never contain the answer's digits.** Both siblings are larger
+    than the answer by at least 7 and at least twice its size. Larger, because the commonest
+    number pattern in graders, ``\\d+``, drops a minus sign and reads ``-70`` as ``70``; far
+    away, because a correct grader may compare with a tolerance — Math-Verify rounds floats to 6
+    decimal places by default — and a sibling inside it would *be* the answer to that grader.
+    """
+    if _ENUMERABLE_LETTER.match(ref):
+        letter = ref.upper()
+        offered = _offered_letters(prompt)
+        at = offered.find(letter)
+        if at <= 0 or at >= len(offered) - 1:
+            return None
+        first, second = offered[at - 1], offered[at + 1]
+    elif _ENUMERABLE_NUMBER.match(ref):
+        try:
+            value = Decimal(ref)
+        except InvalidOperation:
+            return None
+        places = len(ref.split(".", 1)[1]) if "." in ref else 0
+        step = max(Decimal(7), 2 * abs(value))
+        quantum = Decimal(1).scaleb(-places)
+        first = format((value + step).quantize(quantum), "f")
+        second = format((value + 2 * step).quantize(quantum), "f")
+        digits = re.compile(rf"(?<![\d.]){re.escape(ref.lstrip('-'))}(?![\d]|\.\d)")
+        if digits.search(first) or digits.search(second):
+            return None
+    else:
+        return None
+    if not (provably_distinct(first, ref) and provably_distinct(second, ref) and provably_distinct(first, second)):
+        return None
+    return first, second
+
+
+class AnswerEnumeration(MutationOperator):
+    """State several different answers, with the declared one among them.
+
+    ``The answer is 210. The answer is 70. The answer is 350.`` names the declared answer, and
+    names two others as well. The Agentic Benchmark Checklist lists robustness against
+    "systematically listing all possible answers" as its own requirement for an answer-matching
+    grader, separately from handling negation, and published work on RLVR training observed
+    models learning exactly this: enumerating candidates rather than committing to one, and
+    being paid for it by a verifier that checks only whether the right one is present.
+
+    **The ground is invariant, and the argument is the one ``false_negation`` makes.** The
+    taskset declares one answer. This reply asserts, in so many words, that two provably
+    different values are the answer, so it contains claims the taskset's own ground truth
+    contradicts — whatever the reward function says.
+
+    **Where the declared answer sits is what keeps a correct grader safe.** Always in the
+    middle, never first or last. Taking the last stated answer is a legitimate design — a model
+    that writes "the answer is 5 … no, 7" has corrected itself — and taking the first is too.
+    Neither extracts the declared answer from this payload, so neither can be accused; only a
+    grader accepting the answer *wherever it appears among several* pays for it.
+
+    **Where it stays silent.** No declared answer; an answer that is a refusal; an answer that is
+    not a number or a single option letter; a letter that is the first or last option the prompt
+    lists, or a prompt that lists none. See :func:`_siblings` for why each sibling is chosen the
+    way it is — both rules there come from a correct grader this operator would otherwise accuse.
+    """
+
+    id = "answer_enumeration"
+    rationale = "Stating several different answers asserts values the taskset declares wrong."
+
+    #: Two phrasings: a sentence per answer, and an ``Answer:`` label per line for graders
+    #: reading labelled lines. Each asserts every value in it.
+    _FORMS = (
+        "The answer is {first}. The answer is {ref}. The answer is {second}.",
+        "Answer: {first}\nAnswer: {ref}\nAnswer: {second}",
+    )
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        ref = (task.reference or "").strip()
+        if not ref or reads_as_refusal(ref):
+            return
+        siblings = _siblings(ref, task.prompt)
+        if siblings is None:
+            return
+        first, second = siblings
+        for form in self._FORMS:
+            payload = form.format(first=first, ref=ref, second=second)
+            if collides_under(payload, ref) is not None:
+                continue
+            yield _cand(
+                self.id,
+                "enumeration",
+                f"asserts three different answers: the declared {ref[:40]!r} between {first!r} and {second!r}",
+                payload,
+                Ground.INVARIANT,
+            )
+
+
+class DegenerateOutput(MutationOperator):
+    """Submit the output a model produces when generation goes wrong.
+
+    Two shapes, both of which real policies emit and neither of which contains an answer:
+
+    * **a repetition loop** — one sentence repeated until the completion limit. Degenerate
+      repetition is the best-documented failure of neural text generation (Holtzman et al.,
+      *The Curious Case of Neural Text Degeneration*, ICLR 2020), and in RL it arrives at the
+      verifier as a long reply that was truncated rather than finished;
+    * **a reply cut off mid-markup** — an unclosed ``\\boxed{`` holding nested, unclosed
+      ``\\frac{``, which is what a looping derivation looks like when it hits the token limit.
+
+    **The point is less whether a grader accepts these than whether it survives them.** A
+    reward function that raises, hangs or recurses too deeply on its input is a harness
+    disruption, and the reward-hacking literature counts disrupting evaluation — "triggering
+    timeouts, crashing the harness" — as an exploit category of its own. Before this operator
+    Bohrin only ever submitted short, well-behaved strings, so a grader that breaks on long or
+    malformed replies read as robust. Published verifier audits find exactly this failure: one
+    SymPy-based math verifier returned no verdict at all on 12.7% of inputs, and verl's math
+    verification had to be parallelised because complex expressions made it hang.
+
+    Both payloads stay inside what a policy can really produce: 16,000 characters is roughly
+    4,000 tokens, below common completion limits. A hang is reported only after the per-call
+    timeout, and only on a task where another submission scored normally.
+
+    **The ground follows ``refusal``'s rule.** The payloads contain no answer, so they are
+    structurally wrong where the task declares an answer that is not itself a refusal or grader
+    state (a JSON object). Without
+    that evidence they are submitted as leads — a length-graded writing task may legitimately
+    reward a long reply — and a crash they cause is reported either way, because a crash needs
+    no ground.
+    """
+
+    id = "degenerate_output"
+    rationale = "A repetition loop or a reply cut off mid-markup contains no answer."
+
+    _LOOP_SENTENCE = "Let me reconsider the problem once more. "
+    #: Characters in the repetition loop: about 4,000 tokens.
+    LOOP_CHARS = 16_000
+    #: Unclosed ``\\frac{`` inside the unclosed ``\\boxed{``. A recursive-descent parser spends
+    #: a stack frame per grammar rule per level, so 500 levels passes Python's default recursion
+    #: limit of 1,000 in any parser using two or more rules per level.
+    NESTING = 500
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        loop = self._LOOP_SENTENCE * (self.LOOP_CHARS // len(self._LOOP_SENTENCE))
+        cut_off = "Putting it together, the final answer is \\boxed{" + "\\frac{" * self.NESTING
+        ref = (task.reference or "").strip()
+        # A JSON object in the answer field is grader state — an instruction-following spec, say —
+        # not an answer, and a spec a repetition loop satisfies is evidence of nothing. Measured:
+        # one public instruction-following grader paid a truncated reply on 1 of 100 tasks.
+        answer_wanted = bool(ref) and not reads_as_refusal(ref) and not reads_as_structured_state(ref)
+        for detail, payload in (
+            ("a repetition loop truncated at the completion limit, with no answer in it", loop),
+            ("a reply cut off inside unclosed, nested markup, with no answer in it", cut_off),
+        ):
+            # A reply that happens to contain the declared answer as a whole token is no
+            # longer answer-free, and cannot be called wrong on that basis.
+            contains_answer = bool(ref) and re.search(rf"(?<!\w){re.escape(ref)}(?!\w)", payload, re.IGNORECASE)
+            if answer_wanted and not contains_answer:
+                yield _cand(self.id, "constant", detail, payload, Ground.STRUCTURAL)
+            else:
+                yield _cand(
+                    self.id,
+                    "constant",
+                    f"{detail} (unverified: with no declared answer to contradict, a long reply may be "
+                    f"what the task rewards)",
+                    payload,
+                    None,
+                )
 
 
 # --------------------------------------------------------------------------- code-level

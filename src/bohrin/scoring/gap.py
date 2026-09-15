@@ -30,6 +30,27 @@ class Coverage:
         return f"{len(self.measured)} of {self.total} {'probe' if self.total == 1 else 'probes'}"
 
 
+#: The two directions a reward signal can be wrong in, as probe families. Reported side by
+#: side because they are different defects with different fixes, and pooling them is what the
+#: literature on reward hacking warns against.
+SIDES = ("acceptance", "rejection")
+
+
+@dataclass(frozen=True, slots=True)
+class Side:
+    """One direction of the gap: how often the verifier was wrong that way.
+
+    ``score`` is the unweighted mean of the sub-scores of this side's completed probes, 0-100,
+    or ``None`` when none completed. Unweighted on purpose: a probe's gap weight decides whether
+    it moves the headline, and a rejection-side probe is kept out of the headline for soundness
+    reasons that say nothing about how it compares with other rejection-side probes.
+    """
+
+    name: str
+    score: float | None
+    probes: tuple[str, ...]
+
+
 @dataclass(frozen=True, slots=True)
 class GapScore:
     """A Verification Gap, inseparable from the coverage that produced it.
@@ -43,6 +64,9 @@ class GapScore:
     #: None when no probe produced a measurement — not zero, which would read as "clean".
     score: float | None
     coverage: Coverage
+    #: Acceptance and rejection sides, for each that had a probe in the audit. Never part of
+    #: ``score``: the headline is still the weighted mean above.
+    sides: tuple[Side, ...] = ()
 
     def __str__(self) -> str:
         if self.score is None:
@@ -74,9 +98,28 @@ def verification_gap(results: Sequence[ProbeResult], probes: Sequence[Probe]) ->
         measured.append(result.probe_id)
 
     coverage = Coverage(measured=tuple(sorted(measured)), total=len(results))
+    sides = _sides(results, probes)
     if denominator == 0.0:
-        return GapScore(score=None, coverage=coverage)
-    return GapScore(score=100.0 * numerator / denominator, coverage=coverage)
+        return GapScore(score=None, coverage=coverage, sides=sides)
+    return GapScore(score=100.0 * numerator / denominator, coverage=coverage, sides=sides)
 
 
-__all__ = ["Coverage", "GapScore", "verification_gap"]
+def _sides(results: Sequence[ProbeResult], probes: Sequence[Probe]) -> tuple[Side, ...]:
+    """Each side of the gap that had a probe in the audit, in :data:`SIDES` order.
+
+    A side whose probes all failed or did not apply has ``score=None`` rather than 0, for the
+    same reason the headline does: an unmeasured side is not a clean one.
+    """
+    family = {p.id: p.family for p in probes}
+    out: list[Side] = []
+    for side in SIDES:
+        ran = [r for r in results if family.get(r.probe_id) == side]
+        if not ran:
+            continue
+        done = [r for r in ran if r.status is ProbeStatus.OK and r.sub_score is not None]
+        score = 100.0 * sum(r.sub_score or 0.0 for r in done) / len(done) if done else None
+        out.append(Side(name=side, score=score, probes=tuple(sorted(r.probe_id for r in done))))
+    return tuple(out)
+
+
+__all__ = ["SIDES", "Coverage", "GapScore", "Side", "verification_gap"]

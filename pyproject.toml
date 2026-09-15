@@ -82,6 +82,7 @@ verifiers_legacy = "bohrin.adapters.verifiers_legacy:VerifiersLegacyAdapter"
 weak_oracle = "bohrin.probes.weak_oracle:WeakOracleProbe"
 determinism = "bohrin.probes.determinism:DeterminismProbe"
 ground_truth_rejected = "bohrin.probes.ground_truth_rejected:GroundTruthRejectedProbe"
+answer_leakage = "bohrin.probes.answer_leakage:AnswerLeakageProbe"
 
 # Only operators that can establish a wrongness ground are registered. `off_by_one` and
 # `swap_operator` are deliberately absent until the differential comparator lands: without
@@ -94,6 +95,8 @@ refusal          = "bohrin.mutate.operators:Refusal"
 constant_return  = "bohrin.mutate.operators:ConstantReturn"
 drop_side_effect = "bohrin.mutate.operators:DropSideEffect"
 negate_condition = "bohrin.mutate.operators:NegateCondition"
+answer_enumeration = "bohrin.mutate.operators:AnswerEnumeration"
+degenerate_output = "bohrin.mutate.operators:DegenerateOutput"
 false_negation   = "bohrin.mutate.operators:FalseNegation"
 
 # Certified meaning-preserving rewritings of an answer. Ordering is fixed in
