@@ -27,6 +27,23 @@ from. The entries below are the terse canonical record.
 
 ### Fixed
 
+- **A grader that needs a credential is now reported as needing one.** Found on the
+  2026-09-15 sweep: an environment's reward function failed on every task with
+  `KeyError: 'PRIME_API_KEY'`, and Bohrin said the reward functions "read rollout state that
+  only a live multi-turn rollout produces" — true of many environments, not of that one. When
+  the first error is a `KeyError` on an environment-variable-shaped name that is not set,
+  the message now names the variable and says the grader needs a credential or service. An
+  ordinary state field (`'answer'`) and a variable that is set keep the previous explanation.
+
+- **The "verifiers too new" message states the real cause.** It said a taskset's pins had
+  "pulled verifiers past the removal". Measured on the same sweep, 10 of 57 environments
+  installed `verifiers` 0.3.2.dev95 without pinning past anything: a requirement naming a dev
+  release, such as `verifiers>=0.1.11.dev0`, makes pip consider pre-releases and take the
+  newest, while `>=0.1.11` resolves 0.3.1. The message now says so, and that 0.3.1 still
+  satisfies such a requirement; the advice, `pip install 'verifiers<0.3.2'`, is unchanged.
+  The `verifiers` extra is deliberately left uncapped: the v1 adapter audits correctly on
+  0.3.2.dev95, checked on the same day.
+
 - **`bohrin` now exits when its work is done, instead of hanging after the report.** Found
   on the 2026-09-15 sweep: after an environment's dataset build failed, Bohrin printed its
   load error and the process never exited — 11 minutes on one run, until stopped by hand. A

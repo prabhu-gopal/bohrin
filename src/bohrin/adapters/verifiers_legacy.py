@@ -16,6 +16,8 @@ from __future__ import annotations
 import ast
 import inspect
 import logging
+import os
+import re
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -280,9 +282,11 @@ class VerifiersLegacyAdapter(Adapter):
             raise MissingExtraError(
                 f"this looks like a verifiers environment built on `load_environment`, but the "
                 f"installed verifiers ({installed}) no longer ships `verifiers.legacy` — that "
-                f"API was removed after 0.3.1, so upgrading cannot fix this. A taskset carries "
-                f"its own pins, and one of them pulled verifiers past the removal. Pin it back "
-                f"in this environment: pip install 'verifiers<0.3.2'"
+                f"API was removed after 0.3.1, so upgrading cannot fix this. The usual cause is a "
+                f"requirement that names a pre-release, such as `verifiers>=0.1.11.dev0`: pip then "
+                f"installs the newest pre-release, and 0.3.2's are past the removal. 0.3.1 still "
+                f"satisfies such a requirement, so hold verifiers below 0.3.2 in this environment: "
+                f"pip install 'verifiers<0.3.2'"
             )
         raise MissingExtraError(
             f"this looks like a verifiers environment, but the installed verifiers "
@@ -302,6 +306,29 @@ class VerifiersLegacyAdapter(Adapter):
                 f"pip install -e {str(path)!r}"
             )
         return _LegacySource(env_id, config)
+
+
+#: A KeyError on a name shaped like an environment variable. ``os.environ["X"]`` raises
+#: ``KeyError: 'X'``, and the message a reward-function error carries is just ``'X'``.
+_ENV_VAR_KEY = re.compile(r"'([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)'\s*$")
+
+
+def _likely_cause(first_error: str) -> str:
+    """The most probable reason a reward function raised, for the user to act on.
+
+    Measured on the 2026-09-15 sweep: an environment's grader raised ``KeyError: 'PRIME_API_KEY'``
+    and the message said the rubric needed live rollout state -- true of many environments, false
+    of that one, and it pointed at the wrong fix. A missing environment variable is checkable, so
+    it is named when it is the cause; the rollout-state explanation stays the fallback.
+    """
+    match = _ENV_VAR_KEY.search(first_error)
+    if match and match.group(1) not in os.environ:
+        return (
+            f"The reward function looked up the environment variable {match.group(1)}, which is not "
+            f"set: this grader needs a credential or an external service to score, so it cannot be "
+            f"audited offline without one."
+        )
+    return "This usually means the reward functions read rollout state that only a live multi-turn rollout produces."
 
 
 class _LegacySource:
@@ -462,8 +489,7 @@ class _LegacySource:
                 f"task {task.id!r}: {len(errors.messages)} reward function call(s) raised while "
                 f"scoring, so the rubric was only partially evaluated. A score from a partial "
                 f"rubric manufactures findings in both directions, so this task is not scored. "
-                f"This usually means the reward functions read rollout state that only a live "
-                f"multi-turn rollout produces. First error: {first}"
+                f"{_likely_cause(first)} First error: {first}"
             )
 
         reward = state.get("reward")
