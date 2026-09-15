@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
+import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -365,12 +367,45 @@ def main(argv: list[str] | None = None) -> int:
     return EXIT_USER_ERROR
 
 
+def _exit_code(exc: SystemExit) -> int:
+    """The process exit code ``sys.exit`` would have produced for ``exc``."""
+    if exc.code is None:
+        return EXIT_CLEAN
+    if isinstance(exc.code, int):
+        return exc.code
+    # A non-integer code is a message; the interpreter prints it and exits 1.
+    print(exc.code, file=sys.stderr)
+    return 1
+
+
 def _run() -> None:
-    """Console-script wrapper: turn Ctrl-C into a clean exit rather than a traceback."""
+    """Console-script wrapper: exit when Bohrin's work is done, whatever the taskset loaded.
+
+    Ending with ``sys.exit`` hands the process to normal interpreter and C-runtime shutdown,
+    and that shutdown belongs to every library the taskset imported, not to Bohrin. Measured
+    on 2026-09-15: after an environment's dataset build failed, Bohrin printed its error and
+    the process never exited. A native stack showed Python had finished and the C runtime's
+    ``exit`` was blocked in Apache Arrow's global thread-pool destructor, waiting on a worker
+    that would never report. Plain Python with no Bohrin installed hung the same way, so the
+    cause is inherited, but a terminal or CI job that hangs after the report is Bohrin's
+    problem to solve.
+
+    So the output is flushed and the process ends with ``os._exit``, which skips library
+    teardown. Nothing of Bohrin's is lost: every report, including ``--json``, is written
+    before ``main`` returns. What is skipped is only foreign shutdown code, which cannot
+    change an audit that has already finished.
+    """
     try:
-        sys.exit(main())
-    except KeyboardInterrupt:  # pragma: no cover - requires a real SIGINT
-        sys.exit(130)
+        code = main()
+    except SystemExit as exc:  # argparse ends --help, --version and bad arguments this way
+        code = _exit_code(exc)
+    except KeyboardInterrupt:
+        code = 130
+    for stream in (sys.stdout, sys.stderr):
+        # A closed or broken pipe must not turn a finished run into a crash.
+        with contextlib.suppress(OSError, ValueError):
+            stream.flush()
+    os._exit(code)
 
 
 __all__ = ["main"]

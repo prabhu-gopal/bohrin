@@ -5,13 +5,14 @@ date: "unreleased"
 # tag: "vX.Y.Z"        # add at release time
 breaking: false
 summary: >
-  One sentence shown on the changelog index. What this release is, in plain terms.
+  Fixes found by auditing 57 public environments: Bohrin no longer hangs after its report.
 ---
 
 ## TL;DR
 
-One short paragraph a reader skims in five seconds: what this release is, and
-whether they need to do anything to upgrade.
+Engine fixes found while running Bohrin across 57 public environments. The most visible: on
+some environments the `bohrin` command printed its report or error and then never exited,
+which hangs a CI job. Nothing to change on upgrade.
 
 ## Upgrade impact
 
@@ -21,7 +22,8 @@ whether they need to do anything to upgrade.
 
 ## Highlights
 
-- **<the change>** (#NN) — why it matters to a user, in one or two sentences.
+- **`bohrin` exits when it is done.** A hang after the report, inherited from a library the
+  environment loads, can no longer keep your terminal or CI job waiting.
 
 ## Added
 
@@ -33,7 +35,13 @@ whether they need to do anything to upgrade.
 
 ## Fixed
 
-- …
+- **No more hang after the report.** On one public environment, Bohrin printed its load
+  error and the process then sat for 11 minutes until it was stopped. The cause was not in
+  Bohrin: after the environment's dataset build failed, a data library it uses (Apache
+  Arrow) waited forever while the process was shutting down, and plain Python without Bohrin
+  hung the same way. But the hung terminal was Bohrin's, so the `bohrin` command now ends
+  its process as soon as its output is written. Reports and `--json` files are written
+  first, and every exit code is unchanged.
 
 ## Removed
 
