@@ -6,7 +6,8 @@ Security fixes land on the latest released version only.
 
 | Version | Supported |
 | ------- | --------- |
-| 1.3.x   | ✅        |
+| 1.4.x   | ✅        |
+| 1.3.x   | ❌ — upgrade |
 | 1.2.x   | ❌ — upgrade |
 | 1.1.x   | ❌ — upgrade |
 | 1.0.x   | ❌ — upgrade |
