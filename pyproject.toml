@@ -116,6 +116,7 @@ trailing_period        = "bohrin.relations.builtin:TrailingPeriod"
 trailing_newline       = "bohrin.relations.builtin:TrailingNewline"
 display_fraction       = "bohrin.relations.builtin:DisplayFraction"
 braced_sqrt_argument   = "bohrin.relations.builtin:BracedSqrtArgument"
+final_answer_label     = "bohrin.relations.builtin:FinalAnswerLabel"
 
 [tool.hatch.version]
 path = "src/bohrin/version.py"

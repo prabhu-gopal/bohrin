@@ -27,7 +27,12 @@ which hangs a CI job. Nothing to change on upgrade.
 
 ## Added
 
-- …
+- **Bohrin now recognises `Final Answer: X`.** Some graders only accept an answer written as
+  `Final Answer: B`, usually because the prompt asks for exactly that. Bohrin learns the
+  format a grader wants by trying presentations of your declared answer, and this one was
+  missing, so such a grader could never be measured. It is now tried, after every existing
+  presentation. On the public environment that exposed the gap, it also revealed a weakness:
+  the grader pays full marks for `Final Answer: B is not the answer.`
 
 ## Changed
 

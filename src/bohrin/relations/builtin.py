@@ -119,6 +119,23 @@ class Prose(Relation):
         return f"The answer is {text}{stop}"
 
 
+class FinalAnswerLabel(Relation):
+    """``Final Answer: X`` -- the labelled answer line many prompts ask for verbatim.
+
+    SimpleBench's published system prompt ends "output your reasoning followed by your final
+    answer using the following format: Final Answer: X", and its grader parses exactly that. On
+    the 2026-09-15 sweep no other rendering earned a mark there, so without this relation the
+    baseline never found the format and every task read as unmeasurable.
+    """
+
+    id = "final_answer_label"
+    certification = "a 'Final Answer:' label before the answer; the label names the answer and does not change it"
+
+    def render(self, answer: str) -> str | None:
+        text = answer.strip()
+        return f"Final Answer: {text}" if text else None
+
+
 class ProseBoxed(Relation):
     id = "prose_boxed"
     certification = "a carrier sentence around a boxed answer; both are presentational"

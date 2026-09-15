@@ -13,6 +13,18 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Added
+
+- **`Final Answer: X` is now a presentation Bohrin tries for the declared answer.** Found on
+  the 2026-09-15 sweep: a public multiple-choice environment parses only that shape, the
+  format its own published system prompt asks for. Scored directly with Bohrin uninstalled,
+  it earned full marks on 3 of 3 tasks, while the bare answer, `\boxed{}`, an answer tag,
+  `Answer:` and a think-then-answer reply all earned 0. With no such relation the baseline
+  never found the format, and all 10 sampled tasks read as not measurable. The new
+  `final_answer_label` relation is appended to the search order, so no earlier audit accepts
+  a different rendering first. On that environment the grader then also pays full marks for
+  `Final Answer: B is not the answer.`, which `false_negation` now reports.
+
 ### Fixed
 
 - **`bohrin` now exits when its work is done, instead of hanging after the report.** Found
