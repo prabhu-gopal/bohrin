@@ -13,7 +13,19 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **`bohrin` now exits when its work is done, instead of hanging after the report.** Found
+  on the 2026-09-15 sweep: after an environment's dataset build failed, Bohrin printed its
+  load error and the process never exited — 11 minutes on one run, until stopped by hand. A
+  native stack showed Python had already finished and the C runtime's `exit` was blocked in
+  Apache Arrow's global thread-pool destructor, waiting on a worker that never reported.
+  Plain Python with no Bohrin installed hung the same way, so the cause is inherited from the
+  environment's libraries, but a terminal or CI job that hangs after the report was still
+  Bohrin's to fix. The console entry point now flushes its output and ends the process
+  without running library teardown. Every report, `--json` included, is written before that
+  point, so nothing of Bohrin's is skipped. Exit codes are unchanged, including `--help`,
+  `--version`, bad arguments (2) and Ctrl-C (130).
 
 ## [1.3.1] — 2026-09-14
 
