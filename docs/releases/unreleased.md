@@ -5,13 +5,14 @@ date: "unreleased"
 # tag: "vX.Y.Z"        # add at release time
 breaking: false
 summary: >
-  One sentence shown on the changelog index. What this release is, in plain terms.
+  States what is open in Bohrin and how new checks ship.
 ---
 
 ## TL;DR
 
-One short paragraph a reader skims in five seconds: what this release is, and
-whether they need to do anything to upgrade.
+The public boundary page now matches the code: four open probes, nine operators and
+seventeen answer relations. It also says what this repository accepts. Nothing to do on
+upgrade.
 
 ## Upgrade impact
 
@@ -21,7 +22,7 @@ whether they need to do anything to upgrade.
 
 ## Highlights
 
-- **<the change>** (#NN) — why it matters to a user, in one or two sentences.
+- **What is open, stated accurately** — `docs/04_RELEASE.md` listed two open probes while four ship. It now lists everything that is open and explains how the open check set changes.
 
 ## Added
 
@@ -29,7 +30,10 @@ whether they need to do anything to upgrade.
 
 ## Changed
 
-- …
+- **The open check set is complete as shipped.** The repository accepts accuracy fixes,
+  adapters and integrations, report renderers and bug fixes. New probes and operators are
+  published as separate packages through the public `bohrin.probes` and `bohrin.mutators`
+  entry points, the same mechanism the built-in checks use. `CONTRIBUTING.md` says the same.
 
 ## Fixed
 

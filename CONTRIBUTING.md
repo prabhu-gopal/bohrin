@@ -44,22 +44,24 @@ pytest                # the full suite; no network, no GPU
 The test suite runs entirely on synthetic fixtures, so it needs no environment and no network.
 It should finish in well under a minute.
 
-## Adding a probe
+## What this repository accepts
 
-Every probe must justify itself on four points, and a PR that skips any of them will be
-asked for it:
+The released checks — four probes, nine operators and seventeen answer relations — are the
+open check set, and it is complete as shipped (see
+[docs/04_RELEASE.md](docs/04_RELEASE.md#how-the-open-check-set-changes)). The most useful
+contributions are:
 
-1. **Mechanism.** One sentence on *why* this defect degrades a trained policy. Not "this is
-   unusual" — "this makes the policy learn X instead of Y."
-2. **Evidence.** A public issue, a paper, or a reproducible training run showing the defect
-   is real and matters. Plausibility is not evidence.
-3. **A fault-injection scenario.** Add it to the benchmark. A registry-enumerating test
-   fails the build if any probe lacks one, so this is not optional.
-4. **Measured error rates.** The benchmark reports recall and precision. If precision is
-   poor, the probe is not ready — raise the threshold or lower the severity.
+- **Accuracy.** A false positive report, a relation that stops a correct answer being
+  mistaken for a wrong one, or a fix to how wrongness is established. Every change here needs
+  a test that fails before it and passes after, and a real environment it was checked on.
+- **Adapters and integrations** for the places graders are written.
+- **Report renderers and bug fixes.**
 
-Detectors register through the `bohrin.probes` entry point, the same mechanism external
-plugins use. There is no privileged path for built-ins.
+**New probes and operators** are not merged here. Publish them as your own package: they
+register through the `bohrin.probes` and `bohrin.mutators` entry points, the same mechanism
+the built-in checks use, with no privileged path. A plugin that reports a finding must still
+establish wrongness independently of the verifier under audit, or it produces leads, not
+findings — see [docs/03_PROBES.md](docs/03_PROBES.md).
 
 ## Pull requests
 

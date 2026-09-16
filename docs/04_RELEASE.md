@@ -2,23 +2,40 @@
 
 ## The boundary
 
-**Public = how to test. Proprietary = what to try.**
+**Public = how to test and how to check a result. Proprietary = what to try.**
 
 | Component | Status | Reasoning |
 |---|---|---|
 | Probe framework and contract | **Open** | Adoption surface; carries no attack content |
 | Verification Gap spec + reference implementation | **Open** | A metric only the vendor can compute is a sales qualifier, not a standard — and reproducibility substitutes for accreditation |
-| `weak_oracle` probe | **Open** | Its yield depends on attack content, which is withheld |
-| `determinism` probe | **Open** | Universal — needs no rubric structure or reference solution; cannot false-accuse |
-| Baseline mutation operators | **Open** | Published, mechanical techniques; withholding them buys nothing |
+| Probes: `weak_oracle`, `determinism`, `ground_truth_rejected`, `answer_leakage` | **Open** | Fixed, model-free checks built on published techniques; see [03_PROBES.md](03_PROBES.md) |
+| Baseline mutation operators (nine) and answer relations (seventeen) | **Open** | Published, mechanical techniques; withholding them buys nothing |
 | Report renderer — tty + `--json` today; html planned | **Open** | Distribution — the artifact gets forwarded to third parties |
-| Adapters — `verifiers` `load_environment` and v1 today; OpenEnv planned | **Open** | Standard-native; makes the installed base addressable |
+| Adapters and integrations — `verifiers` `load_environment` and v1 today | **Open** | Standard-native; makes the installed base addressable |
 | Adversarial attack engine | **Closed** | The operative capability, and dual-use |
 | Maintained attack library | **Closed** | Refreshed against each model generation — the subscription |
-| Probes 3–6 | **Closed** | Held as options; openable later, never recallable |
+| Further probes and model-generated attacks, including attacks on AI judges | **Closed** | Held as options; openable later, never recallable |
 | `fix` — gated remediation | **Closed** | Requires knowing which assertion closes which exploit |
 | Certification service | **Closed** | Structurally impossible to self-issue |
 | Hosted CI, history, rollout API | **Closed** | Operated infrastructure |
+
+### How the open check set changes
+
+The first release held two probes back as options. Two fixed, model-free probes have
+since shipped open — one tests whether a verifier refuses its own answer written another
+way, the other whether a task's answer is already written in its prompt — and they stay
+open: nothing released is ever withdrawn.
+
+From here the released check set is **complete as shipped**:
+
+- **Accepted into this repository:** changes that make the existing checks more accurate
+  (a relation that stops a correct answer being mistaken for a wrong one, a fix to a
+  wrongness ground, a clearer refusal), new adapters and integrations, report renderers,
+  and bug fixes.
+- **Not accepted into this repository:** new attack content — new probes or operators
+  that construct wrong answers beyond the released set. Anyone can still publish them as
+  their own package through the public `bohrin.probes` and `bohrin.mutators` entry
+  points, which is exactly the mechanism first-party checks use.
 
 Two independent arguments produce this same line: distribution (a gated
 standard is not a standard) and certification credibility (an unauditable
