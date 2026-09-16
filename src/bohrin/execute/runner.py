@@ -31,7 +31,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from types import FrameType
 
-from bohrin.adapters.base import TaskSource
+from bohrin.adapters.base import ScoringRefused, TaskSource
 from bohrin.config import ScanConfig
 from bohrin.ir.task import Candidate, Task, Verdict
 
@@ -141,6 +141,9 @@ class ScoreOutcome:
     #: which explains why the task was refused; this is what the reward function itself raised,
     #: and it is the part a crash finding has to quote.
     cause: str | None = None
+    #: The adapter declined to score this submission (see
+    #: :class:`~bohrin.adapters.base.ScoringRefused`). It is an error, never a grader defect.
+    refused: bool = False
 
 
 async def score_many(
@@ -177,6 +180,8 @@ async def score_many(
                 )
             except asyncio.CancelledError:
                 raise  # cancellation is not an audit finding; let it propagate
+            except ScoringRefused as exc:
+                return ScoreOutcome(task, candidate, error=f"{type(exc).__name__}: {exc}", refused=True)
             except Exception as exc:
                 cause = getattr(exc, "reward_error", None)
                 return ScoreOutcome(

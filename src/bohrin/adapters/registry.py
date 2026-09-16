@@ -43,7 +43,8 @@ def detect(path: Path, adapters: list[Adapter] | None = None) -> Adapter:
         installed = ", ".join(sorted(a.name for a in candidates)) or "none"
         raise UnknownFormatError(
             f"no adapter recognised {str(path)!r}. Installed adapters: {installed}. "
-            f"If this is a verifiers taskset, install the extra: pip install 'bohrin[verifiers]'"
+            f"If this is a verifiers taskset, install the extra: pip install 'bohrin[verifiers]'; "
+            f"if it is an Inspect task file, point at the .py file that defines @task"
         )
     return scored[0][1]
 

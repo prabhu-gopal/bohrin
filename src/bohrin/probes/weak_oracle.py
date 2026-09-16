@@ -525,6 +525,10 @@ class WeakOracleProbe(Probe):
         for out in outcomes:
             if out.error is not None:
                 errors += 1
+                # A declined submission was never shown to the grader, so it cannot be the
+                # grader's crash, however many other submissions to the task scored.
+                if out.refused:
+                    continue
                 if out.task.id in scored_ok and out.task.id not in crashed:
                     crashed.add(out.task.id)
                     findings.append(

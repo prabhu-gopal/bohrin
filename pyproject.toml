@@ -44,11 +44,17 @@ dependencies = [
 # the package itself is on 0.3.x. It also requires Python >=3.11, which is one of the two
 # reasons this project's floor is 3.11; see CHANGELOG.
 verifiers = ["verifiers>=0.3.1"]
+# The adapter for Inspect evaluation tasks. The floor is the version whose private scoring
+# and registry details the adapter was built and tested against; see
+# src/bohrin/adapters/inspect_tasks.py.
+inspect = ["inspect_ai>=0.3.263"]
 
 dev = [
   # The verifiers extra is a dev dependency as well as an optional one: the adapter
   # re-implements a private upstream behaviour, and the tests that pin it must run in CI.
   "verifiers>=0.3.1",
+  # Same reason: the Inspect adapter intercepts private upstream functions, pinned by tests.
+  "inspect_ai>=0.3.263",
   "ruff>=0.6",
   "mypy>=1.11",
   "pytest>=8.2",
@@ -77,6 +83,7 @@ bohrin = "bohrin.cli:_run"
 [project.entry-points."bohrin.adapters"]
 verifiers_v1 = "bohrin.adapters.verifiers_v1:VerifiersV1Adapter"
 verifiers_legacy = "bohrin.adapters.verifiers_legacy:VerifiersLegacyAdapter"
+inspect = "bohrin.adapters.inspect_tasks:InspectAdapter"
 
 [project.entry-points."bohrin.probes"]
 weak_oracle = "bohrin.probes.weak_oracle:WeakOracleProbe"

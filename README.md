@@ -143,6 +143,27 @@ estimate of the whole taskset rather than a statement about its opening tasks.
 The mode and the seed are printed and recorded, and the same seed redraws the
 same sample.
 
+### Reading Inspect tasks
+
+Bohrin also audits [Inspect](https://inspect.aisi.org.uk/) evaluations: point it at a
+file that defines `@task` functions, or at a directory of them.
+
+```console
+$ pip install 'bohrin[inspect]'
+$ bohrin audit ./my_eval.py --unsafe-local
+```
+
+Each sample becomes one task, its target the declared answer, and each scorer is
+called directly with the candidate as the model's reply — no solver runs and no
+model is asked. Tasks built with no arguments are read; one that needs arguments is
+reported as not loadable.
+
+Some scorers cannot be graded this way, and Bohrin refuses them rather than scoring
+them: a task that runs in a sandbox, a model-graded scorer, and `choice`, which grades
+answers the multiple-choice solver marks. A custom scorer that reaches for a model or
+a sandbox while grading — even one that catches the failure itself — has that
+submission declined, and a declined submission is never reported as a grader defect.
+
 ### What it will not do without being asked
 
 Scoring runs the taskset's own code. Bohrin refuses to execute it with no

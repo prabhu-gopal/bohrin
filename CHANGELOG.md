@@ -13,6 +13,19 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Added
+
+- **Inspect evaluations can be audited.** `pip install 'bohrin[inspect]'`, then
+  `bohrin audit <file-or-directory>` on files defining Inspect `@task` functions. Each sample is a
+  task and its target the declared answer; scorers are called directly with the candidate as the
+  model's reply, so no solver or model runs. Tasks that run in a sandbox, model-graded scorers and
+  `choice` are refused, not scored. A custom scorer that reaches for a model or a sandbox while
+  grading has that submission declined, including when it catches the failure itself.
+- **`ScoringRefused`, for an adapter declining to score one submission.** Distinct from a reward
+  function raising: an audit reports a grader as crashing on a submission when other submissions to
+  the task scored, and a submission the adapter declined was never graded. Declined submissions are
+  counted as errors and never reported as a crash.
+
 ### Changed
 
 - **The open check set is stated as complete, and how new checks ship is written down.**
