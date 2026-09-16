@@ -13,7 +13,14 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **The open check set is stated as complete, and how new checks ship is written down.**
+  `docs/04_RELEASE.md` listed two open probes while four ship; it now lists all four, the nine
+  operators and seventeen relations, and says what the repository accepts: accuracy fixes,
+  adapters, renderers and bug fixes. New probes and operators are published as separate
+  packages through the public entry points rather than merged here. `CONTRIBUTING.md` says the
+  same.
 
 ## [1.4.0] — 2026-09-15
 

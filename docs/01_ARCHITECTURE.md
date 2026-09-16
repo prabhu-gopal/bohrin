@@ -29,7 +29,9 @@ bohrin/
 │   │   ├── base.py           # Probe ABC, ProbeResult
 │   │   ├── registry.py       # discovery + DEFAULT_EXCLUDED
 │   │   ├── weak_oracle.py    # open
-│   │   └── determinism.py    # open
+│   │   ├── determinism.py    # open
+│   │   ├── ground_truth_rejected.py  # open
+│   │   └── answer_leakage.py # open
 │   │
 │   ├── mutate/               # candidate generation (harness only)
 │   │   ├── base.py           # Mutation, MutationOperator
