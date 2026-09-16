@@ -191,6 +191,33 @@ class TaskSource(Protocol):
 `score()` is the only method that touches the environment's own code, which
 keeps the isolation boundary in one place.
 
+## Adapters: Inspect
+
+An Inspect evaluation is a `@task` function returning a `Task`: a dataset of samples, a
+solver that produces the model's reply, and scorers that grade it. A scorer is an async
+callable over a `TaskState` and a `Target`, so the adapter builds the state a finished
+sample would carry — the candidate as the model's output — and calls the scorer directly.
+Each sample is one Bohrin task, and its target is the reference.
+
+Two things cannot be done offline: asking a model to grade, and running a command in a
+sandbox. Declared ones are refused before scoring (a sandbox on the task or sample, the
+model-graded built-ins, and `choice`, whose grade depends on the multiple-choice
+solver). Undeclared ones are caught while scoring: every route to a model or a sandbox is
+intercepted for the duration of a Bohrin score call, and the attempt is recorded even when
+the scorer catches the failure.
+
+Such a submission is declined with `ScoringRefused`, not reported as an error of the
+grader. The distinction is load-bearing. The audit reports a grader as crashing on a
+submission when other submissions to the same task scored, and that inference is only
+sound if the exception came from the grader. A judge consulted for some replies and not
+others, and refused by Bohrin, would otherwise be reported as a crash Bohrin caused. A
+scorer that swallows the refusal and returns "incorrect" would make a correct answer look
+rejected. Both paths are tested, and each test fails with its guard removed.
+
+The interception rebinds private upstream functions (`get_model`, `active_model`,
+`Model.__init__`, `sandbox`). A test pins that they exist, so an upstream change breaks the
+build instead of silently changing audits.
+
 ## Execution isolation
 
 Bohrin submits candidates it generated to code the customer wrote. Even with

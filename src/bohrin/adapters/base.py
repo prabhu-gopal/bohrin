@@ -65,6 +65,17 @@ class RewardFunctionError(RuntimeError):
         self.reward_error = reward_error
 
 
+class ScoringRefused(RuntimeError):
+    """An adapter declined to score one submission, and the grader is not at fault.
+
+    Distinct from a reward function raising. When some submissions to a task score and one
+    raises, the audit reports the grader as crashing on that submission. That inference holds
+    only if the exception came from the grader. An adapter that *chooses* not to score -- a
+    grader reached for a model or a sandbox it cannot have offline -- must say so with this
+    type, or its own refusal is reported as the grader's defect.
+    """
+
+
 @runtime_checkable
 class TaskSource(Protocol):
     """A loaded taskset: enumerate tasks, and score candidates against their verifier."""
@@ -126,4 +137,11 @@ class Adapter(ABC):
         """Open ``path``. Raises :class:`MissingExtraError` if a required extra is absent."""
 
 
-__all__ = ["Adapter", "MissingExtraError", "RewardFunctionError", "TaskSource", "UnknownFormatError"]
+__all__ = [
+    "Adapter",
+    "MissingExtraError",
+    "RewardFunctionError",
+    "ScoringRefused",
+    "TaskSource",
+    "UnknownFormatError",
+]
