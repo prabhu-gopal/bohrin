@@ -2,40 +2,47 @@
 
 ## The boundary
 
-**Public = how to test and how to check a result. Proprietary = what to try.**
+**Open: one complete job. Paid: different jobs.**
+
+The job Bohrin does completely, for free, forever:
+
+> **Check a grader you own, on your machine.** No account, no upload, no part of that job
+> held back, and no check that exists only in a paid tier.
+
+What is sold is not more of that job. It is different jobs: searching a grader for cheats a
+fixed list cannot construct, watching a training run, reaching into systems Bohrin does not
+run, holding a risky action before it happens, remembering history across a team, and issuing
+a certificate an outsider can rely on.
 
 | Component | Status | Reasoning |
 |---|---|---|
-| Probe framework and contract | **Open** | Adoption surface; carries no attack content |
-| Verification Gap spec + reference implementation | **Open** | A metric only the vendor can compute is a sales qualifier, not a standard — and reproducibility substitutes for accreditation |
+| The engine: loading a target, building evidence, proof rules, scoring, reporting | **Open** | An auditor nobody can inspect is not believed |
 | Probes: `weak_oracle`, `determinism`, `ground_truth_rejected`, `answer_leakage` | **Open** | Fixed, model-free checks built on published techniques; see [03_PROBES.md](03_PROBES.md) |
-| Baseline mutation operators (nine) and answer relations (seventeen) | **Open** | Published, mechanical techniques; withholding them buys nothing |
-| Report renderer — tty + `--json` today; html planned | **Open** | Distribution — the artifact gets forwarded to third parties |
-| Adapters and integrations — `verifiers` `load_environment` and v1 today | **Open** | Standard-native; makes the installed base addressable |
-| Adversarial attack engine | **Closed** | The operative capability, and dual-use |
-| Maintained attack library | **Closed** | Refreshed against each model generation — the subscription |
-| Further probes and model-generated attacks, including attacks on AI judges | **Closed** | Held as options; openable later, never recallable |
-| `fix` — gated remediation | **Closed** | Requires knowing which assertion closes which exploit |
-| Certification service | **Closed** | Structurally impossible to self-issue |
-| Hosted CI, history, rollout API | **Closed** | Operated infrastructure |
+| Mutation operators (nine) and answer relations (seventeen) | **Open** | Published, mechanical techniques; withholding them buys nothing |
+| Verification Gap spec + reference implementation | **Open** | A metric only the vendor can compute is a sales qualifier, not a standard |
+| Adapters: `verifiers` (`load_environment` and v1) and Inspect | **Open** | Adapters are doors into a workflow, not a moat |
+| Report format, `--json`, exit codes, CI gating | **Open** | The report gets forwarded to third parties; a program must read everything a person can see |
+| Checks that read only what you already have locally — version history, a trace file on disk | **Open** when they land | Same job, same machine, no connector and no account |
+| The accuracy method: how precision is measured and how a published finding is re-run | **Open** | Independence means the method is checkable |
+| Certificate format and the verifier for it | **Open** when it lands | A buyer must be able to check a certificate without trusting a website |
+| Adaptive, model-driven search for cheats a fixed check cannot construct | **Closed** | Costs inference on every run, improves continuously, and is dual-use |
+| The maintained exploit library and trained detectors | **Closed** | Refreshed against each model generation; the compounding asset |
+| Connectors into systems Bohrin does not run — payments, ticketing, CRM, production databases | **Closed** | Operational reach and operational liability |
+| Holding a risky action at runtime: policy, approvals, audit trail | **Closed** | A different job from checking a grader |
+| Cause finding and regression history across a team, at scale | **Closed** | Operated infrastructure |
+| Automated remediation | **Closed** | Easy to get wrong; it is a different job |
+| Certificate issuance | **Closed** | Structurally impossible to self-issue |
 
-### How the open check set changes
+### What this means in practice
 
-The first release held two probes back as options. Two fixed, model-free probes have
-since shipped open — one tests whether a verifier refuses its own answer written another
-way, the other whether a task's answer is already written in its prompt — and they stay
-open: nothing released is ever withdrawn.
-
-From here the released check set is **complete as shipped**:
-
-- **Accepted into this repository:** changes that make the existing checks more accurate
-  (a relation that stops a correct answer being mistaken for a wrong one, a fix to a
-  wrongness ground, a clearer refusal), new adapters and integrations, report renderers,
-  and bug fixes.
-- **Not accepted into this repository:** new attack content — new probes or operators
-  that construct wrong answers beyond the released set. Anyone can still publish them as
-  their own package through the public `bohrin.probes` and `bohrin.mutators` entry
-  points, which is exactly the mechanism first-party checks use.
+- **Nothing released as open is ever withdrawn.** Not a check, not an adapter, not a format.
+- **No nag inside the free job.** No upload, no account prompt, and never a message saying a
+  finding is withheld. Anything paid is a different command or a clearly marked deeper search,
+  never a locked line in a result you already have.
+- **The open check set grows.** New fixed, model-free checks are welcome here, including checks
+  that read version history or a trace file from disk, because they are part of the same job.
+- **Optional telemetry stays optional.** There is none today; if it ever exists it is off by
+  default and documented.
 
 Two independent arguments produce this same line: distribution (a gated
 standard is not a standard) and certification credibility (an unauditable

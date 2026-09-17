@@ -243,6 +243,17 @@ wrongness is established *independently of the verifier being audited* —
 everything else is a lead, not a finding. CI enforces this from both directions,
 including a clean fixture where **any** finding fails the build.
 
+## Free forever, and what is sold
+
+Bohrin does one job completely, for free: **check a grader you own, on your machine.** No
+account, no upload, no part of that job held back, and never a message telling you a finding is
+withheld. Nothing released as open source is ever withdrawn.
+
+What is sold is not more of that job. It is different jobs: searching a grader for cheats a
+fixed list cannot construct, watching a training run, reaching into systems Bohrin does not run,
+holding a risky action before it happens, keeping history for a team, and issuing a certificate
+an outsider can rely on. See [docs/04_RELEASE.md](docs/04_RELEASE.md#the-boundary).
+
 ## Runs on your infrastructure
 
 Bohrin provisions no compute and transmits no environment data. It runs where
