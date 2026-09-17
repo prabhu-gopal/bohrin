@@ -15,6 +15,11 @@ from. The entries below are the terse canonical record.
 
 ### Changed
 
+- **Settled decisions are recorded as decisions.** `docs/04_RELEASE.md` ended with a list headed
+  "open questions for approval" whose three entries were all resolved long ago (the package name,
+  the repository history, and replacing a composition probe with `determinism`). It now records
+  them as decisions with their reasoning, so nobody reopens them.
+
 - **The boundary is stated as one complete job, not a feature list.** Checking a grader you own,
   on your machine, is free forever and complete: no account, no upload, no check that exists only
   in a paid tier, and no message saying a finding is withheld. What is sold is different jobs —
