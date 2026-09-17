@@ -5,7 +5,7 @@ date: "unreleased"
 # tag: "vX.Y.Z"        # add at release time
 breaking: false
 summary: >
-  Audits Inspect evaluations, and states what is open in Bohrin.
+  Audits Inspect evaluations, and states the one job that is free forever.
 ---
 
 ## TL;DR
@@ -42,10 +42,15 @@ boundary page also matches the code again. Nothing to do on upgrade; install the
 
 ## Changed
 
-- **The open check set is complete as shipped.** The repository accepts accuracy fixes,
-  adapters and integrations, report renderers and bug fixes. New probes and operators are
-  published as separate packages through the public `bohrin.probes` and `bohrin.mutators`
-  entry points, the same mechanism the built-in checks use. `CONTRIBUTING.md` says the same.
+- **One complete job is free forever, and the repository says so.** Checking a grader you own, on
+  your machine, is free and complete: no account, no upload, no check that exists only in a paid
+  tier, and never a message saying a finding is withheld. What is sold is different jobs: adaptive
+  search for cheats a fixed check cannot construct, watching a training run, connectors into
+  systems Bohrin does not run, holding a risky action at runtime, team history, and certificate
+  issuance. Nothing released as open source is ever withdrawn.
+- **Contributions of new fixed checks and adapters are welcome again.** `CONTRIBUTING.md` lists what
+  a new check must carry: a mechanism sentence, public evidence, a test that fails before and
+  passes after with the clean fixture staying clean, and a real target it was checked against.
 
 ## Fixed
 

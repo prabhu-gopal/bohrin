@@ -46,22 +46,34 @@ It should finish in well under a minute.
 
 ## What this repository accepts
 
-The released checks — four probes, nine operators and seventeen answer relations — are the
-open check set, and it is complete as shipped (see
-[docs/04_RELEASE.md](docs/04_RELEASE.md#how-the-open-check-set-changes)). The most useful
-contributions are:
+This repository holds one complete job: checking a grader you own, on your machine (see
+[docs/04_RELEASE.md](docs/04_RELEASE.md#the-boundary)). Contributions that make that job better
+are welcome:
 
-- **Accuracy.** A false positive report, a relation that stops a correct answer being
-  mistaken for a wrong one, or a fix to how wrongness is established. Every change here needs
-  a test that fails before it and passes after, and a real environment it was checked on.
-- **Adapters and integrations** for the places graders are written.
-- **Report renderers and bug fixes.**
+- **Accuracy.** A false positive report is the most valuable thing you can send. So is a relation
+  that stops a correct answer being mistaken for a wrong one, or a fix to how wrongness is
+  established.
+- **New fixed checks** that are deterministic and need no model: a payload that is wrong by
+  construction, a check that reads version history or a trace file you already have on disk.
+- **Adapters** for the places graders and evaluations are written.
+- **Report renderers, documentation and bug fixes.**
 
-**New probes and operators** are not merged here. Publish them as your own package: they
-register through the `bohrin.probes` and `bohrin.mutators` entry points, the same mechanism
-the built-in checks use, with no privileged path. A plugin that reports a finding must still
-establish wrongness independently of the verifier under audit, or it produces leads, not
-findings — see [docs/03_PROBES.md](docs/03_PROBES.md).
+Every check, new or changed, carries the same burden:
+
+1. **Mechanism.** One sentence on why this defect matters, not that it is unusual.
+2. **Evidence.** A public issue, a paper, or a reproducible run showing it is real.
+3. **A test that fails before your change and passes after**, plus the clean fixture staying
+   clean: any finding there fails the build.
+4. **Real data.** Say which real target you ran it against, and confirm every finding by hand.
+
+**What belongs elsewhere:** adaptive or model-driven search for cheats, connectors into systems
+Bohrin does not run, holding actions at runtime, team history, and certificate issuance. Those are
+different jobs and they are not part of this repository. You are free to publish your own plugin
+for any of them: probes, adapters, operators and relations all register through public entry
+points (`bohrin.probes`, `bohrin.adapters`, `bohrin.mutators`, `bohrin.relations`) with no
+privileged path for built-ins. A plugin that reports a finding must still establish wrongness
+independently of the verifier under audit, or it produces leads, not findings — see
+[docs/03_PROBES.md](docs/03_PROBES.md).
 
 ## Pull requests
 

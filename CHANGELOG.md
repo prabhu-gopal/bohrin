@@ -13,6 +13,16 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
+### Changed
+
+- **The boundary is stated as one complete job, not a feature list.** Checking a grader you own,
+  on your machine, is free forever and complete: no account, no upload, no check that exists only
+  in a paid tier, and no message saying a finding is withheld. What is sold is different jobs —
+  adaptive search, training runs, connectors into systems Bohrin does not run, holding actions at
+  runtime, team history and certificate issuance. `README.md`, `docs/04_RELEASE.md` and
+  `CONTRIBUTING.md` all say this, and `CONTRIBUTING.md` again accepts new fixed checks and
+  adapters, with the evidence bar each must clear.
+
 ### Added
 
 - **Inspect evaluations can be audited.** `pip install 'bohrin[inspect]'`, then
