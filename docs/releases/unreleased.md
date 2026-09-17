@@ -42,6 +42,9 @@ boundary page also matches the code again. Nothing to do on upgrade; install the
 
 ## Changed
 
+- **Settled decisions are recorded as decisions.** The release document's closing list of "open
+  questions for approval" had three entries, all long decided. They are now written as decisions
+  with the reasoning kept.
 - **One complete job is free forever, and the repository says so.** Checking a grader you own, on
   your machine, is free and complete: no account, no upload, no check that exists only in a paid
   tier, and never a message saying a finding is withheld. What is sold is different jobs: adaptive

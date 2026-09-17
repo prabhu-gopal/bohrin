@@ -189,22 +189,16 @@ that does.
 
 ---
 
-## Open questions for approval
+## Decisions already taken, recorded so they are not reopened
 
-1. ~~Package name.~~ **Decided: keep `bohrin`, yank the old releases.** The name
-   belongs to this product. PyPI *deletion* is still permitted (PEP 763, which
-   would have imposed a 72-hour deletion window, was withdrawn in September 2025)
-   — but deleting is the wrong instrument: it releases the name for anyone to
-   claim, creating a window in which the project could be taken and used for
-   dependency confusion. Yanking is reversible, keeps ownership, and marks
-   0.1.0/0.2.0 as do-not-install. The old tool lives on as `adduct`, already
-   published. The new tool ships at **1.0.0** to make the discontinuity
-   unmistakable rather than looking like an upgrade of the analyzer.
-
-2. **Repo reuse.** This repo's history is the dataset analyzer's. Keep the history
-   or start clean? The code is preserved in the `adduct` repo and on PyPI either
-   way.
-3. ~~Composition probe applicability.~~ **Resolved by measurement.** Sampling the
-   public `research-environments` catalogue found 6 of 7 environments have exactly
-   one reward function, so composition would never run. It is replaced by
-   `determinism`. See [03_PROBES.md](03_PROBES.md#why-not-composition).
+1. **Package name.** `bohrin` is kept, and the pre-pivot releases are yanked rather than
+   deleted: deleting releases the name for anyone to claim, which invites dependency
+   confusion, while yanking keeps ownership and marks `0.1.0`/`0.2.0` as do-not-install. The
+   pre-pivot tool lives on as `adduct`. This tool started at **1.0.0** so the discontinuity
+   is unmistakable.
+2. **Repository history.** Kept. The earlier history belongs to the pre-pivot tool, which is
+   preserved in its own repository and on PyPI either way.
+3. **Composition as a probe.** Replaced by `determinism`, by measurement: sampling the public
+   environments catalogue found 6 of 7 environments have exactly one reward function, so a
+   composition check would almost never run. See
+   [03_PROBES.md](03_PROBES.md#why-not-composition).
