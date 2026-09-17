@@ -13,20 +13,9 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
-### Changed
+Nothing yet.
 
-- **Settled decisions are recorded as decisions.** `docs/04_RELEASE.md` ended with a list headed
-  "open questions for approval" whose three entries were all resolved long ago (the package name,
-  the repository history, and replacing a composition probe with `determinism`). It now records
-  them as decisions with their reasoning, so nobody reopens them.
-
-- **The boundary is stated as one complete job, not a feature list.** Checking a grader you own,
-  on your machine, is free forever and complete: no account, no upload, no check that exists only
-  in a paid tier, and no message saying a finding is withheld. What is sold is different jobs —
-  adaptive search, training runs, connectors into systems Bohrin does not run, holding actions at
-  runtime, team history and certificate issuance. `README.md`, `docs/04_RELEASE.md` and
-  `CONTRIBUTING.md` all say this, and `CONTRIBUTING.md` again accepts new fixed checks and
-  adapters, with the evidence bar each must clear.
+## [1.5.0] — 2026-09-18
 
 ### Added
 
@@ -35,7 +24,9 @@ from. The entries below are the terse canonical record.
   task and its target the declared answer; scorers are called directly with the candidate as the
   model's reply, so no solver or model runs. Tasks that run in a sandbox, model-graded scorers and
   `choice` are refused, not scored. A custom scorer that reaches for a model or a sandbox while
-  grading has that submission declined, including when it catches the failure itself.
+  grading has that submission declined, including when it catches the failure itself. Checked
+  against 11 evaluations from the public `inspect_evals` repository, 30 sampled tasks each, with
+  every finding reproduced by calling the evaluation's own scorer directly.
 - **`ScoringRefused`, for an adapter declining to score one submission.** Distinct from a reward
   function raising: an audit reports a grader as crashing on a submission when other submissions to
   the task scored, and a submission the adapter declined was never graded. Declined submissions are
@@ -43,12 +34,28 @@ from. The entries below are the terse canonical record.
 
 ### Changed
 
-- **The open check set is stated as complete, and how new checks ship is written down.**
-  `docs/04_RELEASE.md` listed two open probes while four ship; it now lists all four, the nine
-  operators and seventeen relations, and says what the repository accepts: accuracy fixes,
-  adapters, renderers and bug fixes. New probes and operators are published as separate
-  packages through the public entry points rather than merged here. `CONTRIBUTING.md` says the
-  same.
+- **The boundary is one complete job, not a feature list.** Checking a grader you own, on your
+  machine, is free forever and complete: no account, no upload, no check that exists only in a paid
+  tier, and no message saying a finding is withheld. What is sold is different jobs — adaptive
+  search, training runs, connectors into systems Bohrin does not run, holding actions at runtime,
+  team history and certificate issuance. `README.md`, `docs/04_RELEASE.md` and `CONTRIBUTING.md`
+  all say this.
+- **New fixed checks and adapters are accepted again**, including checks that read only what a user
+  already has locally. `CONTRIBUTING.md` lists what each must carry: a mechanism sentence, public
+  evidence, a test that fails before and passes after with the clean fixture staying clean, and a
+  real target it was checked against.
+- **The boundary page lists what actually ships:** four probes, nine operators and seventeen answer
+  relations, and the `verifiers` and Inspect adapters.
+- **Settled decisions are recorded as decisions.** The three "open questions for approval" at the
+  end of `docs/04_RELEASE.md` were all long resolved; each is now written with the reasoning that
+  produced it.
+
+### Fixed
+
+- **A list target no longer produces a false accusation.** An Inspect sample whose target lists
+  several valid answers (`['2', '1']`) declares no single reference, because treating one item as
+  "the" answer makes every other item look like a wrong answer a grader accepted. Found on real
+  data before merge, and fixed with the same sample re-run clean.
 
 ## [1.4.0] — 2026-09-15
 
@@ -941,7 +948,8 @@ sweep measures one. No accuracy claim is made in the meantime.
   yanked and point users at `adduct`; the verifier auditor starts at 1.0.0, so that the
   discontinuity reads as a break rather than an upgrade.
 
-[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/prabhu-gopal/bohrin/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/prabhu-gopal/bohrin/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/prabhu-gopal/bohrin/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/prabhu-gopal/bohrin/compare/v1.3.0...v1.3.1
