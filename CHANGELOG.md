@@ -13,7 +13,19 @@ from. The entries below are the terse canonical record.
 
 ## [Unreleased]
 
-Nothing yet.
+### Security
+
+- **Text from an audited taskset can no longer control your terminal.** Bohrin prints strings it
+  did not write — task ids, prompts, declared answers, submitted payloads and the grader's own
+  error messages. Rich markup was already escaped, but terminal control sequences were not, and
+  Rich passes CSI sequences through: a task id containing `\x1b[2J` reached the terminal intact on
+  three report lines, including the reproduction command. A hostile taskset could clear the
+  screen, move the cursor up and erase the line reporting its own exploit, or print a forged line.
+  Every control character and bidirectional override from a taskset is now shown as a visible
+  escape such as `\x1b`, in the report and in error messages.
+- **Reproduction commands stay exact.** Ordinary arguments are quoted exactly as before. An
+  argument containing a control character is written in ANSI-C quoting (`$'...'`), which bash and
+  zsh decode back to the original bytes, so a pasted command still re-runs the same task.
 
 ## [1.5.0] — 2026-09-18
 

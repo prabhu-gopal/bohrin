@@ -10,10 +10,10 @@ is the discipline around what may be reported.
 
 from __future__ import annotations
 
-import shlex
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import replace
 
+from bohrin._text import shell_arg
 from bohrin.adapters.base import TaskSource
 from bohrin.config import ScanConfig
 from bohrin.execute.runner import ScoreOutcome, score_many
@@ -541,8 +541,8 @@ class WeakOracleProbe(Probe):
                             payload=out.candidate.payload,
                             operator=out.candidate.provenance.operator,
                             repro_args=(
-                                f"--task {shlex.quote(out.task.id)} "
-                                f"--operator {shlex.quote(out.candidate.provenance.operator)}"
+                                f"--task {shell_arg(out.task.id)} "
+                                f"--operator {shell_arg(out.candidate.provenance.operator)}"
                             ),
                         )
                     )
@@ -559,9 +559,7 @@ class WeakOracleProbe(Probe):
             # Shell-quoted: a task id is taskset-supplied and routinely contains spaces
             # (`glossary` names its tasks "Ada Lovelace"), which would split into two
             # arguments and make the printed command fail with `unrecognized arguments`.
-            repro_args = (
-                f"--task {shlex.quote(out.task.id)} --operator {shlex.quote(out.candidate.provenance.operator)}"
-            )
+            repro_args = f"--task {shell_arg(out.task.id)} --operator {shell_arg(out.candidate.provenance.operator)}"
             if out.candidate.known_wrong:
                 findings.append(
                     Exploit(task_id=out.task.id, candidate=out.candidate, verdict=verdict, repro_args=repro_args)

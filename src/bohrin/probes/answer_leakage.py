@@ -54,10 +54,10 @@ Copy and echo tasks, whose declared answer *is* the prompt, are excluded outrigh
 from __future__ import annotations
 
 import re
-import shlex
 import unicodedata
 from collections.abc import Sequence
 
+from bohrin._text import shell_arg
 from bohrin.adapters.base import TaskSource
 from bohrin.config import ScanConfig
 from bohrin.ir.evidence import AnswerInPrompt, Finding
@@ -192,7 +192,7 @@ class AnswerLeakageProbe(Probe):
                     reference=reference,
                     excerpt=_excerpt(task.prompt, reference),
                     compared_with=len(others),
-                    repro_args=f"--task {shlex.quote(task.id)} --probe {self.id}",
+                    repro_args=f"--task {shell_arg(task.id)} --probe {self.id}",
                 )
             )
 

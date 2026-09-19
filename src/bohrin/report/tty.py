@@ -7,8 +7,8 @@ scoring full marks on the reader's own task is the argument; everything else is 
 from __future__ import annotations
 
 from rich.console import Console
-from rich.markup import escape
 
+from bohrin._text import safe
 from bohrin.ir.evidence import AnswerInPrompt, Exploit, Finding, Flake, GroundTruthRejected, HarnessDisruption
 from bohrin.probes.base import ProbeResult, ProbeStatus
 from bohrin.report.model import Report
@@ -258,7 +258,7 @@ def _zero_score_caveat(report: Report) -> str | None:
 def render(report: Report, console: Console) -> None:
     """Print the audit."""
     console.print()
-    console.print(f"[bold]Bohrin[/bold]  ·  {escape(report.target)}")
+    console.print(f"[bold]Bohrin[/bold]  ·  {safe(report.target)}")
     # "8 tasks" and "8 of 541 tasks" are different claims about what was audited, and the
     # difference carries the whole weight of a clean result.
     # And "100 of 3270" and "100 random of 3270" are different claims again: the first
@@ -272,7 +272,7 @@ def render(report: Report, console: Console) -> None:
     line = f"{report.adapter} · {task_span} · {_plural(len(report.results), 'probe')}"
     if report.isolation is not None:
         line += f" · isolation: {report.isolation.effective.name.lower()}"
-    console.print(f"[dim]{escape(line)}[/dim]")
+    console.print(f"[dim]{safe(line)}[/dim]")
     if report.isolation is not None and not report.isolation.is_bounded:
         console.print(
             "  [yellow]note[/yellow] verifier code ran in-process with no isolation boundary",
@@ -288,23 +288,23 @@ def render(report: Report, console: Console) -> None:
             fraction = 0.0
         colour = "yellow" if result.status is ProbeStatus.OK else "dim"
         console.print(
-            f"  [{colour}]{result.probe_id:<14}[/{colour}] {_bar(fraction)}  {escape(_headline(result))}",
+            f"  [{colour}]{result.probe_id:<14}[/{colour}] {_bar(fraction)}  {safe(_headline(result))}",
             highlight=False,
         )
 
     console.print()
     # The gap and its coverage are rendered by GapScore.__str__ so the two cannot drift
     # apart, and so no caller can accidentally print a bare number.
-    console.print(f"  [bold]{escape(str(report.gap))}[/bold]")
+    console.print(f"  [bold]{safe(str(report.gap))}[/bold]")
     basis = _gap_basis(report)
     if basis is not None:
-        console.print(f"  [dim]{escape(basis)}[/dim]", highlight=False)
+        console.print(f"  [dim]{safe(basis)}[/dim]", highlight=False)
     sides = _sides_line(report)
     if sides is not None:
-        console.print(f"  [dim]{escape(sides)}[/dim]", highlight=False)
+        console.print(f"  [dim]{safe(sides)}[/dim]", highlight=False)
     caveat = _zero_score_caveat(report)
     if caveat is not None:
-        console.print(f"  [dim]note {escape(caveat)}[/dim]", highlight=False)
+        console.print(f"  [dim]note {safe(caveat)}[/dim]", highlight=False)
     console.print()
 
     groups = _grouped(report)
@@ -315,35 +315,35 @@ def render(report: Report, console: Console) -> None:
         tasks = len({f.task_id for f in findings})
         if isinstance(first_finding, Exploit):
             if tasks == 1:
-                console.print(f"  [red]EXPLOIT[/red] ▸ {escape(first_finding.summary)}", highlight=False)
+                console.print(f"  [red]EXPLOIT[/red] ▸ {safe(first_finding.summary)}", highlight=False)
             else:
                 # One defect, stated once. The count is the severity signal; the worked
                 # example below is the evidence. Printing the same operator N times buries
                 # a second, different defect under the first one's repetitions.
                 console.print(
-                    f"  [red]EXPLOIT[/red] ▸ {escape(label)} accepted on "
+                    f"  [red]EXPLOIT[/red] ▸ {safe(label)} accepted on "
                     f"{_plural(tasks, 'task')} [dim](reward {first_finding.verdict.reward:g})[/dim]",
                     highlight=False,
                 )
-            console.print(f"           [dim]{escape(first_finding.candidate.provenance.detail)}[/dim]", highlight=False)
+            console.print(f"           [dim]{safe(first_finding.candidate.provenance.detail)}[/dim]", highlight=False)
             payload = first_finding.candidate.payload.strip() or "(empty)"
             line = payload.splitlines()[0] if payload.splitlines() else payload
             # Mark the cut. Truncating mid-word with no ellipsis reads as a rendering
             # bug rather than an abbreviation, and the payload is the evidence.
             first = line if len(line) <= _PAYLOAD_CHARS else line[: _PAYLOAD_CHARS - 1].rstrip() + "…"
-            prefix = "submitted" if tasks == 1 else f"example (task {escape(first_finding.task_id)})"
-            console.print(f"           {prefix}: [cyan]{escape(first)}[/cyan]", highlight=False)
+            prefix = "submitted" if tasks == 1 else f"example (task {safe(first_finding.task_id)})"
+            console.print(f"           {prefix}: [cyan]{safe(first)}[/cyan]", highlight=False)
         elif isinstance(first_finding, HarnessDisruption):
             noun = "task" if tasks == 1 else "tasks"
             console.print(
                 f"  [red]CRASH[/red]   ▸ the verifier failed on a well-formed submission ({tasks} {noun})",
                 highlight=False,
             )
-            console.print(f"           [dim]{escape(first_finding.error[:160])}[/dim]", highlight=False)
+            console.print(f"           [dim]{safe(first_finding.error[:160])}[/dim]", highlight=False)
             shown_payload = first_finding.payload.strip() or "(empty)"
             head = shown_payload.splitlines()[0] if shown_payload.splitlines() else shown_payload
             head = head if len(head) <= _PAYLOAD_CHARS else head[: _PAYLOAD_CHARS - 1].rstrip() + "…"
-            console.print(f"           submitted: [cyan]{escape(head)}[/cyan]", highlight=False)
+            console.print(f"           submitted: [cyan]{safe(head)}[/cyan]", highlight=False)
         elif isinstance(first_finding, GroundTruthRejected):
             # Worded as a search budget, never as a verdict. This finding is reported
             # outside the Verification Gap because a rejection can also be a documented
@@ -364,8 +364,8 @@ def render(report: Report, console: Console) -> None:
                 highlight=False,
             )
             console.print(
-                f"           example (task {escape(first_finding.task_id)}): "
-                f"[cyan]{escape(first_finding.reference[:_PAYLOAD_CHARS])}[/cyan]",
+                f"           example (task {safe(first_finding.task_id)}): "
+                f"[cyan]{safe(first_finding.reference[:_PAYLOAD_CHARS])}[/cyan]",
                 highlight=False,
             )
         elif isinstance(first_finding, AnswerInPrompt):
@@ -384,19 +384,19 @@ def render(report: Report, console: Console) -> None:
             excerpt = first_finding.excerpt or first_finding.reference
             excerpt = excerpt if len(excerpt) <= _PAYLOAD_CHARS * 2 else excerpt[: _PAYLOAD_CHARS * 2 - 1] + "…"
             console.print(
-                f"           example (task {escape(first_finding.task_id)}): [cyan]{escape(excerpt)}[/cyan]",
+                f"           example (task {safe(first_finding.task_id)}): [cyan]{safe(excerpt)}[/cyan]",
                 highlight=False,
             )
         elif isinstance(first_finding, Flake):
             if tasks == 1:
-                console.print(f"  [yellow]FLAKE[/yellow]   ▸ {escape(first_finding.summary)}", highlight=False)
+                console.print(f"  [yellow]FLAKE[/yellow]   ▸ {safe(first_finding.summary)}", highlight=False)
             else:
                 console.print(
                     f"  [yellow]FLAKE[/yellow]   ▸ identical submissions scored inconsistently on "
                     f"{_plural(tasks, 'task')}",
                     highlight=False,
                 )
-        console.print(f"           [dim]{escape(report.command_for(first_finding))}[/dim]", highlight=False)
+        console.print(f"           [dim]{safe(report.command_for(first_finding))}[/dim]", highlight=False)
         console.print()
 
     remaining = report.findings - shown
@@ -413,13 +413,12 @@ def render(report: Report, console: Console) -> None:
             continue
         console.print(
             f"  [yellow]note[/yellow] {_plural(len(skipped), 'task')} could not be measured by "
-            f"{escape(result.probe_id)} and are excluded from its score",
+            f"{safe(result.probe_id)} and are excluded from its score",
             highlight=False,
         )
         for entry in list(skipped)[:3]:
             console.print(
-                f"           [dim]{escape(str(entry.get('task_id')))}: "
-                f"{escape(str(entry.get('reason', ''))[:120])}[/dim]",
+                f"           [dim]{safe(str(entry.get('task_id')))}: {safe(str(entry.get('reason', ''))[:120])}[/dim]",
                 highlight=False,
             )
         if len(skipped) > 3:

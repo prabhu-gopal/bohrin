@@ -12,8 +12,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from rich.console import Console
-from rich.markup import escape
 
+from bohrin._text import safe
 from bohrin.adapters.base import MissingExtraError, TasksetLoadError, TaskSource, UnknownFormatError
 from bohrin.adapters.registry import detect
 from bohrin.config import DEFAULT_REPEATS, ScanConfig, default_concurrency
@@ -224,7 +224,7 @@ def _cmd_audit(args: argparse.Namespace, console: Console, err: Console) -> int:
         )
         source = adapter.load(path, config)
     except _USER_ERRORS as exc:
-        err.print(f"[red]error[/red] {escape(str(exc))}", highlight=False)
+        err.print(f"[red]error[/red] {safe(str(exc))}", highlight=False)
         return EXIT_USER_ERROR
 
     probes = probe_registry.discover(include_excluded=args.all_probes)
@@ -256,7 +256,7 @@ def _cmd_audit(args: argparse.Namespace, console: Console, err: Console) -> int:
 
     if args.json_path:
         Path(args.json_path).write_text(json.dumps(report.to_dict(), indent=2) + "\n", encoding="utf-8")
-        console.print(f"[dim]report written to {escape(args.json_path)}[/dim]")
+        console.print(f"[dim]report written to {safe(args.json_path)}[/dim]")
 
     return _gate(args, report, err)
 
@@ -339,7 +339,7 @@ def _cmd_explain(probe_id: str, console: Console, err: Console) -> int:
     probe = probe_registry.get(probe_id)
     if probe is None:
         known = ", ".join(p.id for p in probe_registry.discover(include_excluded=True)) or "none"
-        err.print(f"[red]unknown probe:[/red] {escape(probe_id)}. Registered: {known}", highlight=False)
+        err.print(f"[red]unknown probe:[/red] {safe(probe_id)}. Registered: {known}", highlight=False)
         return EXIT_USER_ERROR
     console.print(f"[bold]{probe.id}[/bold]  [dim]({probe.family})[/dim]\n")
     console.print(probe.explain())

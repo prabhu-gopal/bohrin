@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import shlex
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from bohrin._text import shell_arg
 from bohrin.execute.isolation import Assessment, Isolation
 from bohrin.ir.evidence import AnswerInPrompt, Exploit, Finding, GroundTruthRejected, HarnessDisruption
 from bohrin.probes.base import ProbeResult, ProbeStatus
@@ -46,7 +46,7 @@ class Report:
         `--unsafe-local` is added only when the audit actually ran without a boundary,
         because printing it otherwise would teach the reader to pass it by reflex.
         """
-        parts = ["bohrin audit", shlex.quote(self.target), finding.repro_args]
+        parts = ["bohrin audit", shell_arg(self.target), finding.repro_args]
         if self.isolation is not None and self.isolation.effective is Isolation.NONE:
             parts.append("--unsafe-local")
         return " ".join(parts)

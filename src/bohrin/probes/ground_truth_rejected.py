@@ -46,8 +46,7 @@ claiming determinism.
 
 from __future__ import annotations
 
-import shlex
-
+from bohrin._text import shell_arg
 from bohrin.adapters.base import TaskSource
 from bohrin.config import ScanConfig
 from bohrin.execute.runner import score_many
@@ -177,7 +176,7 @@ class GroundTruthRejectedProbe(Probe):
                     task_id=task.id,
                     reference=task.reference or "",
                     relations_tried=tuple(tried.get(task.id, ())),
-                    repro_args=f"--task {shlex.quote(task.id)} --probe {self.id}",
+                    repro_args=f"--task {shell_arg(task.id)} --probe {self.id}",
                 )
             )
 
