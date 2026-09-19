@@ -19,8 +19,7 @@ Two properties make this the right second probe for the open tier:
 
 from __future__ import annotations
 
-import shlex
-
+from bohrin._text import shell_arg
 from bohrin.adapters.base import TaskSource
 from bohrin.config import ScanConfig
 from bohrin.execute.runner import score_many
@@ -150,7 +149,7 @@ class DeterminismProbe(Probe):
                     Flake(
                         task_id=task.id,
                         rewards=tuple(seen),
-                        repro_args=(f"--task {shlex.quote(task.id)} --probe determinism --repeats {config.repeats}"),
+                        repro_args=(f"--task {shell_arg(task.id)} --probe determinism --repeats {config.repeats}"),
                     )
                 )
 
