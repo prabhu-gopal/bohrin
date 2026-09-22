@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The specification defines every check behind the Verification Gap.** `docs/SPEC.md` now
+  states what `weak_oracle`, `determinism`, `ground_truth_rejected` and `answer_leakage` ask,
+  how each sub-score is computed, why two of them carry weight 0, and the three result states,
+  so a Verification Gap can be recomputed and argued with from the specification alone.
+
 ## [0.3.0] — 2026-09-22
 
 The first release: check the grader of an RL coding environment before you train on it.

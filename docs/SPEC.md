@@ -63,6 +63,58 @@ the grader catch? 0–100, higher is better.
 0–100, lower is better, printed with the checks it covered. Checks that could not run are left
 out, never scored as clean.
 
+```
+Verification Gap = 100 × Σ(weight × sub-score) / Σ(weight)   over checks that completed
+```
+
+## Checks behind the Verification Gap
+
+Each check submits to the grader and reports one sub-score between 0 and 1, where 0 is clean.
+This library defines the checks and scores their results (`bohrin.scoring.gap`); the weights
+are public so anyone holding a result can recompute it.
+
+| Check | Question | Sub-score | Weight | Side |
+|---|---|---|---|---|
+| `weak_oracle` | Does the grader pay for a grounded submission from the battery? | tasks where at least one grounded submission was accepted ÷ tasks measured | 1 | acceptance |
+| `determinism` | Does the grader give the same reward for the same submission? | tasks whose repeated rewards differ ÷ tasks measured | 1 | reliability |
+| `ground_truth_rejected` | Does the grader refuse every rewriting of the task's own declared answer? | tasks where no rewriting was accepted ÷ tasks scored | 0 | rejection |
+| `answer_leakage` | Is the declared answer written in the task's own prompt? | tasks where it is ÷ tasks checked | 0 | task validity |
+
+A check with weight 0 is reported beside the headline and never moves it.
+
+- **`weak_oracle`.** A task whose declared answer fails its own grader is recorded as a
+  baseline failure and left out: without a passing baseline, "the grader is weak" cannot be
+  told apart from "the submissions were in a form the grader does not read". A task on which
+  the grader pays past full marks is also left out, because there "full marks" no longer means
+  "scored like a correct answer". Tasks left out never count towards the denominator.
+- **`determinism`.** The identical submission is scored at least twice; any spread above
+  10⁻⁹ is a finding. It is reported with its detection power: at *N* repeats, a grader that
+  flips with probability *r* is observed disagreeing with probability 1 − *r*ᴺ − (1 − *r*)ᴺ.
+  No disagreement seen is never reported as "deterministic".
+- **`ground_truth_rejected`.** The declared answer is submitted under every certified rewriting
+  in `bohrin.relations`. The record states how many were tried, never that the grader rejects
+  correct answers. Weight 0, because two correct graders produce the same result: one that
+  enforces an output format the prompt documents, and one whose reward never reads the reply.
+- **`answer_leakage`.** Executes nothing. The match is whole-token, after Unicode (NFKC), case
+  and whitespace normalisation. An answer with fewer than four letters or digits is not
+  checked. An answer that also appears in the prompt of another task whose declared answer is
+  provably different is shared vocabulary, not a leak. Tasks whose answer *is* the prompt are
+  excluded. Weight 0, because an extractive task is meant to contain its answer.
+
+A well-formed submission that makes the grader crash or time out is recorded only when another
+submission on the same task scored normally, which isolates the submission as the trigger. It
+is reported, never scored.
+
+### Result states
+
+Every check ends in one of three states, and they are never collapsed:
+
+| State | Meaning | Counted |
+|---|---|---|
+| `ok` | the check ran and measured | yes |
+| `not_applicable` | the check does not apply to these tasks | no |
+| `error` | the check could not run | no |
+
 A clean result bounds what was tried. It is not a proof that a grader is sound.
 
 ## How it is tested
