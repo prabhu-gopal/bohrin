@@ -66,4 +66,3 @@ pip install pypi-attestations
 pypi-attestations verify pypi bohrin
 ```
 
-A tool selling verifiable attestation should be able to produce one for itself.
