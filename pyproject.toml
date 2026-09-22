@@ -31,7 +31,7 @@ classifiers = [
 # Dependency policy: nothing is declared that is not imported by a line of code.
 # `grep -rn "^import X\|^from X" src/bohrin/` must be non-empty for every entry below.
 dependencies = [
-  "libcst>=1.4",             # mutation operators — see docs/01_ARCHITECTURE.md
+  "libcst>=1.9.0",             # mutation operators — see docs/01_ARCHITECTURE.md
 ]
 
 [project.optional-dependencies]
