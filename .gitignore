@@ -25,8 +25,7 @@ coverage.xml
 .idea/
 .DS_Store
 
-# Private working notes, kept out of the repository. `docs/` is the public design
-# documentation and is committed.
+# Private working notes, kept out of the repository.
 /parent/
 
 # LaTeX build intermediates (the paper lives in /parent/)

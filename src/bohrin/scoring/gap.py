@@ -6,9 +6,7 @@ Reported 0-100. Low means the verifier is trustworthy; high means the reported p
 is substantially fiction.
 
 The specification, the weights and this implementation are all public, because anyone
-receiving a Bohrin result — including a lab handed a certificate — has to be able to
-recompute it. No accrediting body exists for this domain, so reproducible methodology is
-the only available substitute for one.
+receiving a Bohrin result has to be able to recompute it.
 """
 
 from __future__ import annotations
@@ -22,8 +20,9 @@ from bohrin.ir.result import ProbeResult, ProbeStatus
 #: The published weight of each check in the headline. Equal weighting for the checks that
 #: can be scored soundly, until there is measured evidence on which best predicts real harm —
 #: inventing weights would be a claim that cannot be supported. The two checks at zero are
-#: reported beside the headline and never counted in it; see ``docs/03_PROBES.md`` for why
-#: each would otherwise accuse correct verifiers.
+#: reported beside the headline and never counted in it, because a correct grader produces
+#: the same result: one enforcing a documented output format refuses its own bare answer, and
+#: an extractive task contains its answer in the prompt by design.
 WEIGHTS: Mapping[str, float] = MappingProxyType(
     {
         "weak_oracle": 1.0,

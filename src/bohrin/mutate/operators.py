@@ -8,7 +8,7 @@ Every operator here either establishes a :class:`~bohrin.ir.task.Ground`, emits 
 explicitly ungrounded candidate that can only ever become a lead, or declines to emit at
 all. Nothing here may claim a ground it cannot support: a ground is a claim about the
 candidate's *behaviour*, and a difference in *source* is not evidence of one. See
-``docs/03_PROBES.md`` and :mod:`bohrin.mutate.equivalence`.
+``docs/SPEC.md`` and :mod:`bohrin.mutate.equivalence`.
 """
 
 from __future__ import annotations
