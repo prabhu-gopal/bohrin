@@ -6,7 +6,7 @@ publishes to PyPI, so a moved tag on any of them could publish a package this re
 built. That is not hypothetical: in March 2025 the tags of a widely used action were rewritten to
 point at code that dumped CI secrets into build logs.
 
-Dependabot keeps these pins current, updating the commit and the version comment together.
+To update a pin, change the commit and the version comment together.
 """
 
 from __future__ import annotations
