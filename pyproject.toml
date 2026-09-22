@@ -31,7 +31,7 @@ classifiers = [
 # Dependency policy: nothing is declared that is not imported by a line of code.
 # `grep -rn "^import X\|^from X" src/bohrin/` must be non-empty for every entry below.
 dependencies = [
-  "libcst>=1.4",             # mutation operators — see docs/01_ARCHITECTURE.md
+  "libcst>=1.4",             # code-level mutation operators
 ]
 
 [project.optional-dependencies]
@@ -51,7 +51,7 @@ Changelog = "https://github.com/prabhu-gopal/bohrin/blob/main/CHANGELOG.md"
 
 # ---------------------------------------------------------------------------------------
 # Plugin seams. These group names are PUBLIC API: renaming one breaks every third-party
-# plugin at once. See docs/01_ARCHITECTURE.md.
+# plugin at once.
 #
 # First-party and third-party entries use the identical mechanism — there is no privileged
 # path, and nothing in this repository checks a licence.
