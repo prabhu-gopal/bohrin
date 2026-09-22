@@ -135,6 +135,38 @@ taskset should rest on a seeded uniform sample, with the seed recorded.
 the relevant payload at all is a separate and qualitative limit: a clean result bounds what
 the battery could construct, and is not a proof that the verifier is sound.
 
+## The Coverage Score
+
+The Gap asks how often the reported pass rate is fiction. The Coverage Score asks the question
+a grader's author reads as a grade: **of the known ways this task can be passed without doing
+it, what fraction does this grader catch?** Reported 0–100, higher is better, from
+`scoring.coverage.coverage_score`.
+
+The unit is a **task and a category**. Each operator declares the category its candidates
+count towards, and the categories are published with a version, `BATTERY_VERSION`:
+
+| Category | The way of passing without doing the work |
+|---|---|
+| `empty_and_echo` | no answer at all: an empty reply, the question repeated back, or a refusal |
+| `denial` | an explicit denial of the declared answer |
+| `multiple_answers` | several different answers stated at once, the declared one among them |
+| `malformed_output` | a reply a policy produces when generation goes wrong, holding no answer |
+| `wrong_answer` | a definite answer, or a program, provably different from the declared one |
+
+Rules, each of which exists to stop the number overstating what was checked:
+
+- A category is **measured** on a task when at least one grounded candidate of it was tried,
+  and **caught** only when the grader accepted none of them. One accepted candidate is enough
+  for the category to get through on that task.
+- **Leads never count**, in either direction. A candidate whose wrongness could not be
+  established says nothing about the grader.
+- **Nothing measured is not 100.** A result with no grounded attempts is `not measured`.
+- The score always carries its sample (`caught` of `measured`), a 95% Wilson interval, the
+  categories it covered, and the battery version. Two scores are comparable only over the same
+  categories and version.
+- A candidate from an operator that declares no category counts as `other`, and is never
+  claimed as coverage of a published category.
+
 ## What the gap is not
 
 - **Not a benchmark score.** There is no leaderboard.

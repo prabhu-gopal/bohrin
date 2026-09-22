@@ -27,6 +27,10 @@ class MutationOperator(ABC):
     #: One line explaining what this operator produces and why it is wrong.
     rationale: str = ""
 
+    #: The Coverage Score category this operator's candidates count towards, one of
+    #: :data:`bohrin.scoring.coverage.CATEGORIES`. Empty counts as ``"other"``.
+    category: str = ""
+
     #: True when the operator needs the reference to parse as Python.
     requires_code: bool = False
 
