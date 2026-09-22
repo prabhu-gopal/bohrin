@@ -84,8 +84,7 @@ jobs:
         with:
           name: dist
           path: dist/
-      # Attestations on by default here — see the note on the TestPyPI job. A tool whose
-      # product is a verifiable attestation cannot ship its own artifacts unsigned.
+      # Attestations on by default here — see the note on the TestPyPI job.
       - name: Publish
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
 
