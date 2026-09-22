@@ -89,12 +89,11 @@ class GroundTruthRejected:
     verifier is broken, because three different situations produce an identical result:
 
     * the comparison really is broken, and correct answers are being thrown away;
-    * the verifier enforces an **output contract the prompt documents** — ``reverse_text``
-      wants the answer inside ``<reversed_text>`` tags and stores the bare reversal, so
-      refusing the stored value is that verifier working correctly;
-    * the reward **never reads the reply at all** — ``code_golf`` scores
-      ``trace.metrics.get("passed")``, a value set elsewhere in the episode, so nothing
-      submitted offline can ever pass and nothing was really "refused".
+    * the verifier enforces an **output contract the prompt documents** — a task that wants
+      the answer inside tags but stores the bare answer, so refusing the stored value is that
+      verifier working correctly;
+    * the reward **never reads the reply at all** — it scores a value set elsewhere in the
+      episode, so nothing submitted offline can ever pass and nothing was really "refused".
 
     Only the first is a defect. That is why this record carries a weight of zero and
     contributes nothing to the Verification Gap: a number that pooled all three would report
