@@ -1,0 +1,106 @@
+name: Release
+
+# Tag-triggered publish. Never publish from a laptop: the tag is the only thing that can
+# ship a version, so what is on PyPI always corresponds to a commit anyone can check out.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      test_pypi:
+        description: "Publish to TestPyPI instead of PyPI"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Build
+        run: uv build
+
+      - name: Show what is in the distributions
+        # If `bohrin/` is not inside the wheel, pyproject.toml is wrong and the upload
+        # would silently ship an empty package.
+        run: |
+          ls -R dist/
+          python -m zipfile -l dist/*.whl | head -20
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.test_pypi
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/bohrin
+    permissions:
+      # Required for Trusted Publishing *and* for PEP 740 attestations: it mints a
+      # short-lived OIDC token instead of storing a long-lived PyPI API token in GitHub
+      # Secrets, and it is what the attestation is signed against.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      # The PyPA action rather than `uv publish`, for one reason: it generates PEP 740
+      # digital attestations by default under Trusted Publishing, and `uv publish` does
+      # not. Without them an installer can confirm only that PyPI served the file, not
+      # that this repository's CI built it from this tag.
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: pypi
+      url: https://pypi.org/p/bohrin
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      # Attestations on by default here — see the note on the TestPyPI job. A tool whose
+      # product is a verifiable attestation cannot ship its own artifacts unsigned.
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  github-release:
+    name: Attach distributions to the GitHub release
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: dist/*
+          generate_release_notes: true

@@ -1,0 +1,25 @@
+# Dependency updates, opened as pull requests so they go through the same review and the
+# same seven required checks as any other change. Nothing here can merge itself.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    commit-message:
+      # Matches this repo's convention: a commit message says what changed and why, and
+      # never carries a tool's default template.
+      prefix: "Update"
+
+  # The actions in .github/workflows are a supply chain too: a compromised or abandoned
+  # action runs with the release job's `id-token: write`, which is the credential that
+  # publishes to PyPI.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "Update"

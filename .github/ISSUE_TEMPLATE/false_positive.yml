@@ -1,0 +1,55 @@
+name: False positive
+description: A candidate is called wrong (it carries a ground) but it is actually a correct answer.
+title: "[false positive] "
+labels: ["false-positive", "calibration"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This is the most valuable report you can send us.**
+
+        A candidate may be called wrong only when its wrongness is established independently
+        of the grader. If one of Bohrin's grounded candidates is really a correct answer for
+        your task, a correct grader would be accused of accepting wrong work. We cannot find
+        those on synthetic data — we need yours.
+
+        You do **not** need to share your environment. The operator, the task's declared
+        answer, the candidate, and why it is correct are enough to act on.
+
+  - type: input
+    id: operator-id
+    attributes:
+      label: Operator ID
+      description: The `provenance.operator` of the candidate, e.g. `constant_return`.
+      placeholder: "constant_return"
+    validations:
+      required: true
+
+  - type: textarea
+    id: the-candidate
+    attributes:
+      label: The task's declared answer, and the candidate
+      description: The reference answer, the candidate's payload, and its ground.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: why-wrong
+    attributes:
+      label: Why is this candidate actually correct?
+      description: What does Bohrin not know about your task? This is the part we cannot guess.
+      placeholder: |
+        The candidate is the constant 0, but for this task 0 IS the correct answer written
+        another way, so a correct grader is right to accept it.
+    validations:
+      required: true
+
+  - type: input
+    id: bohrin-version
+    attributes:
+      label: Bohrin version
+      description: "Output of `python -c 'import bohrin; print(bohrin.__version__)'`"
+      placeholder: "0.3.0"
+    validations:
+      required: true

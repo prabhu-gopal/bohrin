@@ -1,0 +1,48 @@
+name: Security
+
+# Deliberately a separate workflow from `ci.yml`, and deliberately not in the required
+# checks. Two reasons:
+#
+#   * a newly published CVE in a transitive dependency would otherwise turn every open
+#     pull request red for a reason unrelated to the change under review;
+#   * `ci.yml`'s job names are pinned by branch protection, so adding jobs there risks
+#     the failure mode where a renamed check sits pending forever and blocks every merge.
+#
+# It still runs on every push and pull request, and on a schedule so a CVE disclosed
+# after a quiet week is not discovered at release time.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: dependency and static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Known vulnerabilities in dependencies
+        # `--skip-editable` skips bohrin itself, which is installed from this checkout and
+        # is not resolvable on PyPI at an unreleased version. Deliberately *not* `--strict`:
+        # that turns any skip into an error, so the self-skip would fail the job on every
+        # run. Without it pip-audit still exits non-zero when a real vulnerability is found
+        # — verified against a known-vulnerable pin before this was committed.
+        run: uv run --with pip-audit pip-audit --skip-editable
+
+      - name: Static analysis
+        # `try/except/continue` is reported as B112 and is load-bearing here: a third-party
+        # operator or relation that raises must never take down discovery or the catalogue.
+        # Skipped by id rather than by suppressing the whole run, so a genuinely new
+        # finding still fails this job.
+        run: uv run --with bandit bandit -r src/bohrin --severity-level medium --skip B112

@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+*.so
+
+# Environments
+.venv/
+venv/
+.env
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Private working notes, kept out of the repository. `docs/` is the public design
+# documentation and is committed.
+/parent/
+
+# LaTeX build intermediates (the paper lives in /parent/)
+*.aux
+*.out
+*.toc
+*.log
+*.synctex.gz
+
+# Local working playbook.
+/CLAUDE.md
