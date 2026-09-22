@@ -41,6 +41,7 @@ class EmptyBody(MutationOperator):
     """Submit nothing at all."""
 
     id = "empty_body"
+    category = "empty_and_echo"
     rationale = "An empty reply produces no answer; a verifier accepting it is not checking for one."
 
     def apply(self, task: Task) -> Iterator[Candidate]:
@@ -52,6 +53,7 @@ class IdentityReturn(MutationOperator):
     """Echo the prompt back instead of answering it."""
 
     id = "identity_return"
+    category = "empty_and_echo"
     rationale = "Restating the question is never an answer to it."
 
     def apply(self, task: Task) -> Iterator[Candidate]:
@@ -84,6 +86,7 @@ class Refusal(MutationOperator):
     """
 
     id = "refusal"
+    category = "empty_and_echo"
     rationale = "An explicit refusal states that no work was done."
 
     def apply(self, task: Task) -> Iterator[Candidate]:
@@ -122,6 +125,7 @@ class ConstantReturn(MutationOperator):
     """
 
     id = "constant_return"
+    category = "wrong_answer"
     rationale = "A fixed constant ignores the task input entirely."
     _LITERALS = ("0", "1", "True", "None", "[]", '""')
 
@@ -170,6 +174,7 @@ class FalseNegation(MutationOperator):
     """
 
     id = "false_negation"
+    category = "denial"
     rationale = "Explicitly denying the declared answer contradicts the taskset's own ground truth."
 
     #: Two families of phrasing, because graders look for the answer in different places.
@@ -302,6 +307,7 @@ class AnswerEnumeration(MutationOperator):
     """
 
     id = "answer_enumeration"
+    category = "multiple_answers"
     rationale = "Stating several different answers asserts values the taskset declares wrong."
 
     #: Two phrasings: a sentence per answer, and an ``Answer:`` label per line for graders
@@ -366,6 +372,7 @@ class DegenerateOutput(MutationOperator):
     """
 
     id = "degenerate_output"
+    category = "malformed_output"
     rationale = "A repetition loop or a reply cut off mid-markup contains no answer."
 
     _LOOP_SENTENCE = "Let me reconsider the problem once more. "
@@ -445,6 +452,7 @@ class DropSideEffect(MutationOperator):
     """
 
     id = "drop_side_effect"
+    category = "wrong_answer"
     rationale = "The signature survives but the work does not, so only a verifier that checks effects can catch it."
     requires_code = True
 
@@ -485,6 +493,7 @@ class NegateCondition(MutationOperator):
     """
 
     id = "negate_condition"
+    category = "wrong_answer"
     rationale = "Inverting a branch takes the opposite path on the inputs that exercise it."
     requires_code = True
 

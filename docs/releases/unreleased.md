@@ -5,13 +5,13 @@ date: "unreleased"
 # tag: "vX.Y.Z"        # add at release time
 breaking: false
 summary: >
-  One sentence shown on the changelog index. What this release is, in plain terms.
+  Adds the Coverage Score: what fraction of the ways a task can be passed without doing it a grader catches.
 ---
 
 ## TL;DR
 
-One short paragraph a reader skims in five seconds: what this release is, and
-whether they need to do anything to upgrade.
+Adds the Coverage Score, a 0–100 grade for a grader: of the known ways a task can be passed
+without doing it, what fraction the grader caught. Nothing to do on upgrade.
 
 ## Upgrade impact
 
@@ -21,27 +21,24 @@ whether they need to do anything to upgrade.
 
 ## Highlights
 
-- **<the change>** (#NN) — why it matters to a user, in one or two sentences.
+- **The Coverage Score** — one number a grader's author can read as a grade, that never claims
+  more than was tried: it names the categories it covered and carries its own interval.
 
 ## Added
 
-- …
-
-## Changed
-
-- …
-
-## Fixed
-
-- …
-
-## Removed
-
-- …
+- **`scoring.coverage.coverage_score`.** Offer each candidate from `battery(task)` to your grader,
+  record whether it paid full marks, and pass the attempts in. The score is computed per task and
+  category — `empty_and_echo`, `denial`, `multiple_answers`, `malformed_output`, `wrong_answer`,
+  published as battery `1`. A category is caught on a task only if every grounded candidate in it
+  was rejected: rejecting three denials and paying for the fourth has not caught denial.
+- **`MutationOperator.category`.** Every built-in operator declares the category its candidates
+  count towards. A third-party operator that declares none counts as `other`, and is never
+  claimed as coverage of a published category.
 
 ## Known limitations
 
-- …
+- The score covers what the battery can construct. A clean 100 bounds what was tried; it is not a
+  proof that the grader is sound.
 
 ## Verified
 

@@ -8,3 +8,13 @@ For the narrative, user-facing version of each release — with upgrade impact a
 see [`docs/releases/`](docs/releases/). The entries below are the terse canonical record.
 
 ## [Unreleased]
+
+### Added
+
+- **The Coverage Score.** `scoring.coverage.coverage_score` says what fraction of the ways a
+  task can be passed without doing it a grader caught, 0–100, computed per task and category.
+  Each operator now declares one of five published categories, versioned as battery `1`. A
+  category is caught on a task only if every grounded candidate in it was rejected, leads never
+  count, a result with no grounded attempts is `not measured` rather than 100, and every score
+  carries its sample, a Wilson 95% interval, and the categories it covered.
+

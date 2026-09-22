@@ -28,6 +28,7 @@ bohrin/
 │   │   └── builtin.py        # the seventeen built-ins
 │   │
 │   └── scoring/
+│       ├── coverage.py       # Coverage Score and the published categories
 │       ├── gap.py            # Verification Gap, coverage, sides, published weights
 │       └── interval.py       # the Wilson interval on every rate
 │
