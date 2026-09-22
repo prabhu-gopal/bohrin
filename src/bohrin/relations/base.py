@@ -22,7 +22,7 @@ declare itself meaning-preserving when that is true *by construction* — a rewr
 equivalence follows from the form of the answer, not from a guess about the verifier.
 ``70`` and ``\\boxed{70}`` are the same answer presented two ways; ``70`` and ``70.5`` are
 not. Get this wrong in the permissive direction and Bohrin accuses a correct verifier of
-rejecting a correct answer, which is the Phase-0 failure wearing different clothes.
+rejecting a correct answer — a false accusation, with the sign reversed.
 
 Consequently a relation is *partial*: it declares the answers it applies to, and returns
 nothing for the rest. ``trailing_zero`` means something for ``70`` and nothing for

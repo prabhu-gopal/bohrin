@@ -162,9 +162,7 @@ class FalseNegation(MutationOperator):
     denial — the denial contains the answer too. Substring containment is one of the
     commonest grader shapes in the ecosystem, and no existing operator constructs a payload
     for it: `empty_body` and `refusal` submit nothing recognisable, and `constant_return`
-    submits a literal that a substring grader also rejects. Measured on the public
-    `verifiers` corpus, this payload scores **full reward** on ``glossary``, ``deepwiki``
-    and ``color_codeword``.
+    submits a literal that a substring grader also rejects.
 
     **Where it must stay silent.** Denying an answer only contradicts the taskset when
     there *is* a declared answer, so no reference means no candidate. And the denial must
