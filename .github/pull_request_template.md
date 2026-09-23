@@ -9,7 +9,7 @@
 ## Checklist
 
 - [ ] Commits are signed off (`git commit -s`) — see [CONTRIBUTING.md](../CONTRIBUTING.md)
-- [ ] `ruff check .`, `mypy`, and `pytest` pass locally
+- [ ] `ruff check .`, `ruff format --check .`, `mypy`, and `pytest` pass locally
 - [ ] Added a test that fails before this change and passes after
 - [ ] Updated `CHANGELOG.md` under `## [Unreleased]` if this is user-visible
 
