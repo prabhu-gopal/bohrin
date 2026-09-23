@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
 
 import libcst as cst
 
@@ -263,10 +263,16 @@ def _siblings(ref: str, prompt: str = "") -> tuple[str, str] | None:
         except InvalidOperation:
             return None
         places = len(ref.split(".", 1)[1]) if "." in ref else 0
-        step = max(Decimal(7), 2 * abs(value))
-        quantum = Decimal(1).scaleb(-places)
-        first = format((value + step).quantize(quantum), "f")
-        second = format((value + 2 * step).quantize(quantum), "f")
+        # The default context keeps 28 significant digits, and ``quantize`` raises past that,
+        # so an answer of 28 digits or more -- common for counting problems -- crashed the whole
+        # battery. Sized to the answer, the arithmetic is exact: a sibling is at most five times
+        # the answer (one digit longer), plus the smallest step, 7.
+        with localcontext() as context:
+            context.prec = len(ref) + 5
+            step = max(Decimal(7), 2 * abs(value))
+            quantum = Decimal(1).scaleb(-places)
+            first = format((value + step).quantize(quantum), "f")
+            second = format((value + 2 * step).quantize(quantum), "f")
         digits = re.compile(rf"(?<![\d.]){re.escape(ref.lstrip('-'))}(?![\d]|\.\d)")
         if digits.search(first) or digits.search(second):
             return None

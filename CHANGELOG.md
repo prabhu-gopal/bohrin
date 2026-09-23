@@ -13,6 +13,16 @@ All notable changes to this project are documented here. The format follows
   how each sub-score is computed, why two of them carry weight 0, and the three result states,
   so a Verification Gap can be recomputed and argued with from the specification alone.
 
+### Fixed
+
+- **`battery()` no longer crashes on a task whose declared answer is a long number.** An
+  answer of 28 or more significant digits — common for counting problems — or a decimal with
+  that many places raised `decimal.InvalidOperation` while building the several-answers
+  candidate, and the exception ended the whole battery for that task. The siblings are now
+  computed at a precision sized to the answer, so they are exact at any length. Found by
+  running the battery over 40 long answers (integers of 21 to 119 digits, long decimals, long
+  negatives): 35 crashed it before the fix, none after.
+
 ## [0.3.0] — 2026-09-22
 
 The first release: check the grader of an RL coding environment before you train on it.
