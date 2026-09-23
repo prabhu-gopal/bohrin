@@ -5,15 +5,16 @@ build-backend = "hatchling.build"
 [project]
 name = "bohrin"
 dynamic = ["version"]
-description = "The open standard for checking a grader: known-wrong candidates, certified answer rewritings, and the Verification Gap."
+description = "Check the checker: an open standard for testing the graders of RL environments, with proof before every accusation."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Bohrin" }]
 keywords = [
-  "reinforcement-learning", "rl-environments", "reward-hacking",
-  "verifier", "rlvr", "evaluation", "mutation-testing", "benchmarks",
+  "reinforcement-learning", "rl-environments", "reward-hacking", "rlvr",
+  "verifier", "grader", "reward-function", "evaluation", "llm-evaluation",
+  "benchmarks", "mutation-testing", "ai-safety", "coding-agents",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -99,7 +100,7 @@ path = "src/bohrin/version.py"
 packages = ["src/bohrin"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/", "tests/", "docs/", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE"]
+include = ["src/", "tests/", "docs/", "README.md", "CHANGELOG.md", "CITATION.cff", "LICENSE", "NOTICE"]
 
 # ---------------------------------------------------------------------------------------
 # Tooling. The same configuration runs locally and in every CI job.

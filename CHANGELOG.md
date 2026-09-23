@@ -12,6 +12,15 @@ All notable changes to this project are documented here. The format follows
   states what `weak_oracle`, `determinism`, `ground_truth_rejected` and `answer_leakage` ask,
   how each sub-score is computed, why two of them carry weight 0, and the three result states,
   so a Verification Gap can be recomputed and argued with from the specification alone.
+- **`CITATION.cff`**, so the project can be cited from GitHub's "Cite this repository" button
+  or any reference manager. A test keeps its version in step with the package.
+
+### Changed
+
+- **The README says what Bohrin is for, not only what it does today:** why graders need
+  checking, the principles every check is held to (no accusation without proof, every number
+  with its uncertainty, what was not checked said out loud, an open method), and the scope.
+  The PyPI description and keywords match it.
 
 ### Fixed
 

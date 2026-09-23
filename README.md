@@ -1,24 +1,36 @@
 # bohrin
 
 [![CI](https://github.com/prabhu-gopal/bohrin/actions/workflows/ci.yml/badge.svg)](https://github.com/prabhu-gopal/bohrin/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/bohrin.svg)](https://pypi.org/project/bohrin/)
+[![Python](https://img.shields.io/pypi/pyversions/bohrin.svg)](https://pypi.org/project/bohrin/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-**Check the grader of an RL coding environment before you train on it.**
+**Check the checker.** Bohrin is an open standard and Python library for testing the graders
+of reinforcement-learning environments: the verifiers, reward functions and test suites that
+decide whether a model's work counts. It finds where a grader pays for work that was not done,
+and it proves every such finding without trusting the grader it is testing.
 
-In a coding environment, a grader decides whether each submission solved the task, and it is
-the only thing the model learns from. If it pays for code that does not do the work, the model
-learns to not do the work.
+## Why this exists
 
-Bohrin gives you the submissions a correct grader must reject — each one wrong by construction —
+Every AI system has something that decides whether it did well. In training it is a grader. At
+release it is a benchmark. For a coding agent it is a test suite. Those checkers decide what
+models learn, which scores get published and what code ships. They are trusted by everyone and
+checked by almost no one.
+
+When a grader can be passed without doing the task, a model trained against it learns to pass
+it that way. This is **reward hacking**, and it is not rare: published audits of widely used
+agent benchmarks have reached near-perfect scores without solving a single task, and studies
+of frontier models have caught them rewriting tests, exiting before the checks run and
+special-casing the visible inputs. The fix starts before training, with the grader.
+
+## What it does today
+
+Bohrin gives you the submissions a correct grader must reject, each one wrong by construction,
 and scores how many your grader caught.
-
-## Install
 
 ```console
 $ pip install bohrin
 ```
-
-## Use
 
 ```python
 from bohrin.ir.task import Task
@@ -51,10 +63,8 @@ COVERAGE SCORE: 75 / 100   95% CI 30–95   3 of 4 caught   categories: 4 of 5 (
 ```
 
 That grader rejects an empty submission, a truncated reply and a constant, and pays for the
-reference with every function body replaced by `pass` — it runs, so the grader never notices it
-returns nothing.
-
-## What is tried
+reference with every function body replaced by `pass`. The replaced code runs, so the grader
+never notices that it returns nothing.
 
 | Category | Submissions |
 |---|---|
@@ -64,9 +74,63 @@ returns nothing.
 | `denial` | an explicit denial of the declared answer |
 | `multiple_answers` | several answers at once, the declared one among them |
 
-A submission is called wrong only when that is established without asking your grader. One that
-cannot be shown to be wrong — a refusal on a task with no declared answer, say — is a **lead**:
-tried and shown to you, never counted. See [docs/SPEC.md](docs/SPEC.md) for the exact rules.
+Two numbers come out of it:
+
+- **The Coverage Score** (0–100, higher is better): of the known ways a task can be passed
+  without doing it, the share your grader caught, with its sample and a 95% Wilson interval.
+- **The Verification Gap** (0–100, lower is better): how often a grader paid for work that was
+  wrong or disagreed with itself, printed with the checks it covered.
+
+## Principles
+
+These hold for every check Bohrin contains now and every check it adds later.
+
+1. **No accusation without proof.** A submission is called wrong only when that is established
+   without asking the grader under test: it does no work by construction, it differs provably
+   from the declared answer, or it contradicts the task's own ground truth. Anything else is a
+   **lead**: tried and shown to you, never counted.
+2. **Every number carries its uncertainty.** A score is printed with its sample, its interval
+   and the version of the checks behind it, because `2 of 2` and `300 of 300` must never read
+   the same.
+3. **What was not checked is said out loud.** A check that could not run is reported as not
+   measured, never as clean. A clean result means these checks found nothing, not that the
+   grader is safe.
+4. **The method is open.** The rules, the grounds and the scoring are in
+   [docs/SPEC.md](docs/SPEC.md), so anyone receiving a Bohrin result can recompute it and argue
+   with it.
+5. **Nothing here is new, on purpose.** Mutation testing, metamorphic testing and adversarial
+   search are decades old. What Bohrin adds is the discipline: proof before accusation, and a
+   standard others can measure against.
+
+## Scope
+
+Bohrin starts with the graders of **RL coding environments**, which decide whether a program,
+a patch or a change to a repository solved its task. The same rules are written to carry
+further: to benchmarks, to the tests coding agents change, and to any checker whose verdict
+someone else relies on. They extend one kind of checker at a time, and only as far as proof
+can follow.
+
+## Extending it
+
+Operators (new known-wrong submissions) and relations (new certified rewritings of a correct
+answer) register through the public `bohrin.mutators` and `bohrin.relations` entry points,
+from your own package, with no fork. Third-party code is held to exactly the same rules as
+built-in code. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Contributing
+
+The most valuable contribution is a **false positive**: a submission Bohrin calls wrong that is
+actually correct for your task.
+[Report one here](https://github.com/prabhu-gopal/bohrin/issues/new?template=false_positive.yml).
+You do not need to share your environment.
+
+Security issues: see [SECURITY.md](SECURITY.md). Bohrin makes no network calls and sends no
+telemetry.
+
+## Citing
+
+If Bohrin helps your research, please cite it using [CITATION.cff](CITATION.cff), or GitHub's
+"Cite this repository" button.
 
 ## License
 

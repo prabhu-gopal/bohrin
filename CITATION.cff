@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use Bohrin in your research, please cite it as below."
+title: "Bohrin: an open standard for checking the graders of reinforcement-learning environments"
+type: software
+authors:
+  - name: "Bohrin"
+repository-code: "https://github.com/prabhu-gopal/bohrin"
+url: "https://bohrin.com"
+license: Apache-2.0
+version: 0.3.0
+date-released: "2026-09-22"
+abstract: >-
+  Bohrin tests the graders of reinforcement-learning environments: the verifiers, reward
+  functions and test suites that decide whether a model's work counts. It constructs
+  submissions a correct grader must reject, each wrong by construction, and reports what a
+  grader accepted as a Coverage Score and a Verification Gap with their uncertainty. A
+  submission is called wrong only when that is established without asking the grader under
+  test.
+keywords:
+  - reward hacking
+  - reinforcement learning
+  - RL environments
+  - RLVR
+  - verifiers
+  - graders
+  - evaluation
+  - mutation testing
