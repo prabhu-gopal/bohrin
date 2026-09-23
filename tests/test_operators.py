@@ -15,6 +15,7 @@ import pytest
 from _fixtures import task
 from bohrin.ir.task import Ground
 from bohrin.mutate import discover
+from bohrin.mutate.battery import battery
 from bohrin.mutate.equivalence import (
     code_equivalent,
     collides_under,
@@ -239,6 +240,33 @@ def test_siblings_are_written_like_the_answer_and_provably_different(
 )
 def test_it_stays_silent_where_no_sibling_can_be_proven_different(reference: str, prompt: str) -> None:
     assert list(AnswerEnumeration().apply(task(reference, prompt=prompt))) == []
+
+
+@pytest.mark.parametrize(
+    "reference",
+    ["9" * 28, "1" * 40, "12345678901234567890.123456789", "0." + "1" * 30, "7" * 200],
+)
+def test_long_numeric_answers_get_exact_siblings(reference: str) -> None:
+    """Past 28 significant digits, the default decimal precision, this raised and took the
+    whole battery down with it. The siblings must also be exact, not rounded: checked here
+    against integer arithmetic on the answer scaled to an integer."""
+    siblings = _siblings(reference)
+    assert siblings is not None
+    places = len(reference.split(".", 1)[1]) if "." in reference else 0
+    scaled = int(reference.replace(".", ""))
+    step = max(7 * 10**places, 2 * abs(scaled))
+    for sibling, multiple in zip(siblings, (1, 2), strict=True):
+        assert int(sibling.replace(".", "")) == scaled + multiple * step
+        assert (len(sibling.split(".", 1)[1]) if "." in sibling else 0) == places
+    assert battery(task(reference)).candidates
+
+
+def test_a_long_negative_answer_is_declined_not_crashed_on() -> None:
+    """Its first sibling would be the answer without its minus sign, which a grader dropping
+    signs reads as the answer, so the operator stays silent -- and the battery still runs."""
+    reference = "-" + "9" * 30
+    assert _siblings(reference) is None
+    assert battery(task(reference)).candidates
 
 
 def test_the_declared_answer_is_never_first_or_last() -> None:
