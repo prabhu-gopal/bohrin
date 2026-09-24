@@ -77,6 +77,17 @@ All notable changes to this project are documented here. The format follows
   with its uncertainty, what was not checked said out loud, an open method), and the scope.
   The PyPI description and keywords match it.
 
+### Fixed
+
+- **An interface is no longer reported as paying for empty code.** On a task whose reference is
+  an interface, an abstract base class or a protocol (every function body only a docstring,
+  `pass`, `...` or `raise NotImplementedError`), `drop_side_effect` claimed the emptied version
+  was structurally wrong. But the reference does no work either, and a correct grader of the
+  interface is right to accept it. The operator now stays silent unless at least one function in
+  the reference does work of its own. Found while reviewing the documentation. Before the fix, 3
+  of 4 such references drew a grounded candidate (the `...` case was already caught), and none do
+  after it.
+
 ### Removed
 
 - **The answer-level operators and rewritings.** The operators `empty_body`,
