@@ -215,7 +215,8 @@ tutorial's grader, is [examples/reproduce_BF-QA8M7NM39K.py](examples/reproduce_B
   `uv run` or `pipx run` can run it as it is. The `script` block declares `requires-python`,
   and a `[tool.bohrin]` table declares `schema = "https://bohrin.com/schema/reproduction/v1"`,
   the `finding` ID, the `probe`, the `submission` digests (as in the finding record) and
-  `runs`, at least 3.
+  `runs`, at least 3. TOML has no null, so a workspace lists the files it deletes under
+  `deleted` instead of giving them a null digest.
 - Needs nothing from Bohrin and makes no network call: it imports neither `bohrin` nor any
   networking module.
 - Embeds the exact submission, and checks it against the declared digest before running

@@ -30,7 +30,7 @@ from bohrin.evidence.reproduction import (
     reproduction_result_schema,
     script_metadata,
 )
-from bohrin.ir.task import Ground, Shape, Source
+from bohrin.ir.task import Ground, Shape, Source, Workspace
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "docs" / "examples"
 SCRIPT = EXAMPLES / "reproduce_BF-QA8M7NM39K.py"
@@ -266,3 +266,36 @@ def test_the_schema_refuses_a_result_the_reader_refuses(report: str) -> None:
     assert list(_VALIDATOR.iter_errors(json.loads(report)))
     with pytest.raises((ValueError, KeyError)):
         parse_result(report, 0)
+
+
+# --------------------------------------------------------------------------- workspace submissions
+
+
+def test_a_script_can_declare_a_workspace_that_deletes_files() -> None:
+    """TOML has no null, so deletions are listed under ``deleted`` and read back as the record's nulls."""
+    submission = Submission.of(Workspace({"tests/test_a.py": None, "src/a.py": "x = 1\n"}, commands=("true",)))
+    finding = Finding(**{**_finding_fields(), "submission": submission, "shape": Shape.WORKSPACE})
+    digest = submission.to_json()["files"]["src/a.py"]
+    header = (
+        "# /// script\n"
+        '# requires-python = ">=3.11"\n'
+        "#\n"
+        "# [tool.bohrin]\n"
+        f'# schema = "{SCRIPT_SCHEMA}"\n'
+        f'# finding = "{finding.id}"\n'
+        f'# probe = "{finding.probe}"\n'
+        "# runs = 3\n"
+        "#\n"
+        "# [tool.bohrin.submission]\n"
+        '# kind = "workspace"\n'
+        '# deleted = ["tests/test_a.py"]\n'
+        '# commands = ["true"]\n'
+        "# parameters = []\n"
+        "#\n"
+        "# [tool.bohrin.submission.files]\n"
+        f'# "src/a.py" = "{digest}"\n'
+        "# ///\n"
+        f'print("{RESULT_SCHEMA}")\n'
+    )
+    assert check_script(header, finding) == []
+    assert check_script(header.replace('# deleted = ["tests/test_a.py"]\n', "# deleted = []\n"), finding) != []
