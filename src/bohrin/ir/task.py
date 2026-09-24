@@ -81,6 +81,9 @@ class Source:
 
     text: str
 
+    def __post_init__(self) -> None:
+        _unicode(self.text, "source text")
+
     @property
     def key(self) -> str:
         """What makes two submissions the same one: surrounding whitespace is not part of a program."""
@@ -113,6 +116,12 @@ class Workspace:
     parameters: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        for path, content in self.files.items():
+            _unicode(path, "a workspace path")
+            if content is not None:
+                _unicode(content, f"the content of {path!r}")
+        for command in self.commands:
+            _unicode(command, "a workspace command")
         for name in self.parameters:
             if not _IDENTIFIER.fullmatch(name):
                 raise ValueError(f"parameter {name!r} is not an identifier")
@@ -134,10 +143,24 @@ class Workspace:
         return "workspace:" + json.dumps(body, sort_keys=True)
 
 
+#: A Windows drive prefix, such as ``C:``. A path starting with one is not relative to the root.
+_DRIVE = re.compile(r"[A-Za-z]:")
+
+
+def _unicode(text: str, where: str) -> None:
+    """Refuse text that cannot be written as UTF-8, such as a lone surrogate, where it enters."""
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ValueError(f"{where} is not valid Unicode: {exc.reason} at position {exc.start}") from exc
+
+
 def _check_path(path: str, parameters: tuple[str, ...]) -> None:
     """Refuse a path that is empty, absolute, escapes the root, or names an undeclared parameter."""
     if not path or path.startswith("/") or "\\" in path:
         raise ValueError(f"workspace path {path!r} must be relative, with forward slashes")
+    if _DRIVE.match(path):
+        raise ValueError(f"workspace path {path!r} starts with a drive letter, so it is not relative")
     if any(part in ("", ".", "..") for part in path.split("/")):
         raise ValueError(f"workspace path {path!r} has an empty, '.' or '..' segment")
     undeclared = sorted(set(_PLACEHOLDER.findall(path)) - set(parameters))

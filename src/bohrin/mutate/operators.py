@@ -63,6 +63,10 @@ class _WorkFinder(cst.CSTVisitor):
         body = node.body
         lines = body.body if isinstance(body, cst.IndentedBlock) else [body]
         for line in lines:
+            # A nested function or class is not work in itself: its own methods and functions are
+            # visited separately, and count as work only if their bodies do something.
+            if isinstance(line, cst.FunctionDef | cst.ClassDef):
+                continue
             if not (
                 isinstance(line, cst.SimpleStatementLine | cst.SimpleStatementSuite) and all(map(_inert, line.body))
             ):

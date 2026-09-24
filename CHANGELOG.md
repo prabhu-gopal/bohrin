@@ -67,6 +67,9 @@ All notable changes to this project are documented here. The format follows
   battery runs only the operators for a task's shape. The battery's rules reach workspaces too:
   duplicates are tried once, and a grounded workspace that writes the reference into any file
   is suppressed.
+  Paths that start with a drive letter are refused too, and text that is not valid Unicode (a
+  lone surrogate) is refused where it enters a submission rather than failing later inside a
+  hash.
 - **The specification defines every check behind the Verification Gap.** `docs/SPEC.md` now
   states what `weak_oracle`, `determinism`, `ground_truth_rejected` and `answer_leakage` ask,
   how each sub-score is computed, why two of them carry weight 0, and the three result states,
@@ -100,6 +103,10 @@ All notable changes to this project are documented here. The format follows
   the reference does work of its own. Found while reviewing the documentation. Before the fix, 3
   of 4 such references drew a grounded candidate (the `...` case was already caught), and none do
   after it.
+
+- **Empty nested definitions no longer count as work.** A reference whose only content is an
+  empty nested function or class drew a grounded candidate from `drop_side_effect`, although it
+  does no work; a nested function that does work still counts.
 
 ### Removed
 

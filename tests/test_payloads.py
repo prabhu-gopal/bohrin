@@ -9,6 +9,7 @@ for a task's shape run on it.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
@@ -134,3 +135,27 @@ def test_a_workspace_that_writes_the_reference_is_suppressed() -> None:
 def test_equal_workspaces_are_tried_once() -> None:
     same = Workspace({"solution.py": "def solve(items):\n    pass\n"})
     assert len(battery(task(REFERENCE), [_Proposes(_HOLLOW, same)]).candidates) == 1
+
+
+# --------------------------------------------------------------------------- text and paths
+
+
+@pytest.mark.parametrize("path", ["C:/Windows/x.py", "c:/x.py", "D:relative.py"])
+def test_a_windows_drive_path_is_not_relative(path: str) -> None:
+    with pytest.raises(ValueError, match="drive"):
+        Workspace({path: ""})
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda: Source("x = '\ud800'"),
+        lambda: Workspace({"a.py": "x = '\udfff'"}),
+        lambda: Workspace({"\ud800.py": ""}),
+        lambda: Workspace(commands=("echo \ud800",)),
+    ],
+)
+def test_text_that_is_not_valid_unicode_is_refused_where_it_enters(make: Any) -> None:
+    """A lone surrogate cannot be written as UTF-8; refuse it at the door, not deep inside a hash."""
+    with pytest.raises(ValueError, match="Unicode"):
+        make()
