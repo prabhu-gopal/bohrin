@@ -97,4 +97,7 @@ jobs:
           weaknesses = weakness_list()
           assert len(weaknesses.weaknesses) >= 38, 'the weakness list did not ship in the wheel'
           print(f'weakness list v{weaknesses.version}: {len(weaknesses.weaknesses)} classes')
+          from bohrin.spec import probes
+          assert {p.operator for p in probes()} == {o.id for o in operators}, 'the probe manifests did not ship'
+          print(f'{len(probes())} probe manifests')
           "

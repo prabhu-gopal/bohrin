@@ -1,0 +1,35 @@
+# Probe manifests: what every built-in probe tries, as data.
+#
+# A probe exists twice: as code (the operator that generates its submissions) and as this
+# manifest, which a third-party tool or the conformance suite can read without importing Bohrin.
+# tests/test_probes.py checks that each operator emits exactly what its manifest promises.
+#
+# * `id` is `<namespace>/<slug>@<major>`. The major version changes when what the probe tries
+#   changes. Third parties publish probes under their own namespace, never `bohrin/`.
+# * `expect` is what a correct grader does with the submission: `reject` (a negative control),
+#   `accept` (a positive control) or `consistent` (the same verdict on a repeat).
+# * `ground` is the ground a negative control rests on; positive controls have none.
+# * `template.parameters` names what an instantiation must supply (a test root, a reward path).
+#   Nothing in this library fills them in.
+# * `maturity` starts at `experimental`. A probe becomes `stable` only after a public sample with
+#   no confirmed false accusation and a 95% lower bound on precision of at least 95%.
+
+[[probe]]
+id = "bohrin/empty-implementation@1"
+operator = "drop_side_effect"
+weakness = ["BGW-101"]
+title = "The reference with every function body replaced by pass"
+shapes = ["program"]
+ground = "structural"
+expect = "reject"
+maturity = "experimental"
+battery = 2
+guards = [
+    "The reference does not parse, or defines no function: nothing is submitted.",
+    "The emptied program compiles to the same bytecode as the reference, because its bodies were already empty: nothing is submitted.",
+]
+sources = ["https://arxiv.org/abs/2604.17596", "https://link.springer.com/article/10.1007/s10664-018-9653-2"]
+
+[probe.template]
+solution = "reference-emptied"
+parameters = []

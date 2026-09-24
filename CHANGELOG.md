@@ -19,6 +19,12 @@ All notable changes to this project are documented here. The format follows
 - **Identifier formats** (`bohrin.spec.ids`, and "Identifiers" in `docs/SPEC.md`) for weakness
   classes (`BGW-`), registry records (`BVR-`), probes (`bohrin/<slug>@<major>`), findings
   (`BF-`), schemas and conformance levels.
+- **Probe manifests** (`src/bohrin/spec/probes.toml`, `bohrin.spec.probes`): every built-in
+  probe described as data a third-party tool can read without importing Bohrin: ID
+  (`bohrin/empty-implementation@1`), weaknesses, shapes, template and its parameters, ground,
+  expected verdict, maturity, battery, guards and sources. The loader refuses a manifest that
+  names an unknown weakness, a negative control without a ground, or a template path outside
+  its root, and a test ties each manifest to what its operator actually emits.
 - **`bohrin.ir.task.Shape`**: the ways a grader is called — `program`, `io`, `workspace`,
   `container`, `history`, and `numeric`, `proof` and `query`.
 - **Workspace submissions and task shapes.** `bohrin.ir.task.Workspace` describes file
