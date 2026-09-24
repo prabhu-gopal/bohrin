@@ -130,7 +130,7 @@ a 95% Wilson interval and the categories measured. A score over nothing is "not 
 **Verification Gap.** A second number: how often a grader paid for wrong work or disagreed with
 itself, over the checks that ran.
 
-**Finding.** One result, in a fixed record format with a stable ID such as `BF-130XFM28BK`. The
+**Finding.** One result, in a fixed record format with a stable ID such as `BF-W6YDC0TBE4`. The
 same defect gets the same ID on every run. Its **level** says how far the evidence goes:
 `proven`, `proven-experimental`, `suspected`, `lead`, `observation` or `excluded`.
 
@@ -139,7 +139,7 @@ submission to your environment, runs your grader on the reference and on the sub
 times each, and prints one line saying whether the finding was reproduced. It needs nothing from
 Bohrin, so anyone can check a finding themselves. A finding whose script does not reproduce it
 stops being proven. See [SPEC.md](SPEC.md#reproduction-scripts) and the
-[example](examples/reproduce_BF-QA8M7NM39K.py).
+[example](examples/reproduce_BF-GZW6R2M9CJ.py).
 
 **Differentiating input.** An input on which the reference and the submission give different
 outputs. It proves a program wrong without asking the grader.

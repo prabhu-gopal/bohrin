@@ -35,7 +35,9 @@ from importlib.resources import files
 from types import MappingProxyType
 from typing import Any
 
-from bohrin.evidence.finding import PROVEN, Finding, Scored
+from bohrin.evidence import _strict as strict
+from bohrin.evidence.finding import PROVEN, Finding, Scored, _read_scored, _read_submission
+from bohrin.spec.ids import FINDING_ID
 
 SCRIPT_SCHEMA = "https://bohrin.com/schema/reproduction/v1"
 RESULT_SCHEMA = "https://bohrin.com/schema/reproduction-result/v1"
@@ -67,6 +69,7 @@ _NETWORK = frozenset(
 _RESULT_FIELDS = frozenset(
     {"$schema", "finding", "submission", "runs", "baseline_runs", "outcome", "python", "platform", "error"}
 )
+_RESULT_REQUIRED = frozenset({"$schema", "finding", "submission", "runs", "baseline_runs", "outcome"})
 
 
 @cache
@@ -198,30 +201,29 @@ def parse_result(stdout: str, exit_code: int) -> ReproductionResult:
         data = json.loads(lines[-1])
     except json.JSONDecodeError as exc:
         raise ValueError(f"the last line is not JSON: {exc}") from exc
-    if not isinstance(data, dict) or data.get("$schema") != RESULT_SCHEMA:
+    record = strict.obj(data, "result", _RESULT_FIELDS, _RESULT_REQUIRED)
+    if record["$schema"] != RESULT_SCHEMA:
         raise ValueError(f"the last line is not a {RESULT_SCHEMA} result")
-    unknown = sorted(set(data) - _RESULT_FIELDS)
-    if unknown:
-        raise ValueError(f"fields not defined by {RESULT_SCHEMA}: {unknown}")
-    try:
-        runs = tuple(Scored(reward=float(r["reward"]), passed=bool(r["passed"])) for r in data["runs"])
-        baseline = tuple(Scored(reward=float(r["reward"]), passed=bool(r["passed"])) for r in data["baseline_runs"])
-        result = ReproductionResult(
-            finding=data["finding"],
-            submission=data["submission"],
-            runs=runs,
-            baseline_runs=baseline,
-            outcome=judge(runs, baseline, data.get("error", "")),
-            python=data.get("python", ""),
-            platform=data.get("platform", ""),
-            error=data.get("error", ""),
-        )
-    except (KeyError, TypeError) as exc:
-        raise ValueError(f"the result is missing or mistypes {exc}") from exc
-    if result.outcome == "error" and not result.error:
+    declared = strict.string(record["outcome"], "outcome")
+    if declared not in OUTCOMES:
+        raise ValueError(f"outcome must be one of {sorted(OUTCOMES)}")
+    runs = strict.array(record["runs"], "runs", _read_scored)
+    baseline = strict.array(record["baseline_runs"], "baseline_runs", _read_scored)
+    error = strict.string(record.get("error", ""), "error")
+    result = ReproductionResult(
+        finding=strict.string(record["finding"], "finding", pattern=FINDING_ID),
+        submission=_read_submission(record["submission"]).to_json(),
+        runs=runs,
+        baseline_runs=baseline,
+        outcome=judge(runs, baseline, error),
+        python=strict.string(record.get("python", ""), "python"),
+        platform=strict.string(record.get("platform", ""), "platform"),
+        error=error,
+    )
+    if result.outcome == "error" and not result.error.strip():
         raise ValueError("an error outcome must say what went wrong")
-    if data.get("outcome") != result.outcome:
-        raise ValueError(f"the script reported {data.get('outcome')!r}, but its runs show {result.outcome!r}")
+    if declared != result.outcome:
+        raise ValueError(f"the script reported {declared!r}, but its runs show {result.outcome!r}")
     if exit_code != OUTCOMES[result.outcome][0]:
         raise ValueError(f"exit code {exit_code} does not match the outcome {result.outcome!r}")
     return result

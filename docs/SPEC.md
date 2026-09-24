@@ -194,20 +194,38 @@ in the published schema, and a record that breaks one is refused:
   solutions pass it and the submission fails it. Presumed-correct solutions can only ever stop
   a finding this way, never cause one. A finding proven by observation is `proven-experimental`.
 - A lead or an excluded result states why.
-- Fields the schema does not define are refused.
+- Fields the schema does not define are refused, and every field must be exactly the type the
+  schema gives it: `"false"` is not `false`, `null` is not an absent field, `NaN` is not a number.
+  Text that must say something (a requirement, a reason) may not be only whitespace.
 
-A finding's **ID** is `BF-` followed by the first 50 bits of the SHA-256 of the canonical JSON of
-`[probe, task, grader fingerprint, submission]`, written in Crockford base32. It depends only on
-what was tried and where, never on when or on which machine, so the same defect keeps the same
-ID on every run. When an ID is read back, case and hyphens are ignored, and `I`, `L` and `O` are
-read as `1`, `1` and `0`.
+The code that reads a record and the published schema refuse exactly the same records, field by
+field; a test breaks every field of a complete record in every way and checks that they agree. A
+few rules compare two fields, which JSON Schema cannot express, so only the reader enforces them:
+a differentiating input's two outputs must differ, and (for reproduction results) the outcome a
+script claims must be the one its runs show.
+
+A finding's **ID** depends only on what was tried and where, never on when or on which machine,
+so the same defect keeps the same ID on every run and anyone can recompute it in any language:
+
+1. Take the JSON array `[probe, task ID, grader fingerprint, submission]`, where `submission` is
+   the record's `submission` object.
+2. Serialise it with the [JSON Canonicalization Scheme (RFC 8785)](https://www.rfc-editor.org/rfc/rfc8785):
+   no whitespace, object keys sorted by UTF-16 code units, strings as UTF-8.
+3. Take the SHA-256 of those bytes, and its first 50 bits.
+4. Write the 50 bits as ten characters of [Crockford base32](https://www.crockford.com/base32.html)
+   (`0123456789ABCDEFGHJKMNPQRSTVWXYZ`), five bits each, most significant first, after `BF-`.
+
+For example, probe `bohrin/empty-implementation@1`, task `task-1`, grader fingerprint
+`grader-digest` and the source submission `def solve(items):\n    pass\n` give `BF-W6YDC0TBE4`.
+When an ID is read back, case and hyphens are ignored, and `I`, `L` and `O` are read as `1`,
+`1` and `0`.
 
 ## Reproduction scripts
 
 Every proven finding carries a **reproduction script**: plain Python that applies the exact
 submission to its reader's own environment, runs their grader and reports what happened. It is
 the evidence a stranger actually checks, so its shape is fixed. A complete example, for the
-tutorial's grader, is [examples/reproduce_BF-QA8M7NM39K.py](examples/reproduce_BF-QA8M7NM39K.py).
+tutorial's grader, is [examples/reproduce_BF-GZW6R2M9CJ.py](examples/reproduce_BF-GZW6R2M9CJ.py).
 
 **The script**
 
