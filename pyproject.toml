@@ -61,37 +61,10 @@ Changelog = "https://github.com/prabhu-gopal/bohrin/blob/main/CHANGELOG.md"
 # Every registered operator either establishes a wrongness ground or emits leads only; see
 # src/bohrin/mutate/operators.py.
 [project.entry-points."bohrin.mutators"]
-empty_body       = "bohrin.mutate.operators:EmptyBody"
-identity_return  = "bohrin.mutate.operators:IdentityReturn"
-refusal          = "bohrin.mutate.operators:Refusal"
-constant_return  = "bohrin.mutate.operators:ConstantReturn"
 drop_side_effect = "bohrin.mutate.operators:DropSideEffect"
-negate_condition = "bohrin.mutate.operators:NegateCondition"
-answer_enumeration = "bohrin.mutate.operators:AnswerEnumeration"
-degenerate_output = "bohrin.mutate.operators:DegenerateOutput"
-false_negation   = "bohrin.mutate.operators:FalseNegation"
 
-# Certified meaning-preserving rewritings of an answer. Ordering is fixed in
-# `bohrin.relations._BUILTIN_ORDER`, not by this table: adding a third-party relation must
-# not be able to reorder the search order of an existing rendering list.
-[project.entry-points."bohrin.relations"]
-verbatim               = "bohrin.relations.builtin:Verbatim"
-stripped               = "bohrin.relations.builtin:Stripped"
-boxed                  = "bohrin.relations.builtin:Boxed"
-boxed_math             = "bohrin.relations.builtin:BoxedMath"
-boxed_text             = "bohrin.relations.builtin:BoxedText"
-inline_math            = "bohrin.relations.builtin:InlineMath"
-prose                  = "bohrin.relations.builtin:Prose"
-prose_boxed            = "bohrin.relations.builtin:ProseBoxed"
-emphasis               = "bohrin.relations.builtin:Emphasis"
-decimal_point          = "bohrin.relations.builtin:DecimalPoint"
-trailing_zeros_dropped = "bohrin.relations.builtin:TrailingZerosDropped"
-latex_fraction         = "bohrin.relations.builtin:LatexFraction"
-trailing_period        = "bohrin.relations.builtin:TrailingPeriod"
-trailing_newline       = "bohrin.relations.builtin:TrailingNewline"
-display_fraction       = "bohrin.relations.builtin:DisplayFraction"
-braced_sqrt_argument   = "bohrin.relations.builtin:BracedSqrtArgument"
-final_answer_label     = "bohrin.relations.builtin:FinalAnswerLabel"
+# `bohrin.relations` is the seam for certified meaning-preserving rewritings of a correct
+# solution. Nothing is built in; the group name is public API all the same.
 
 [tool.hatch.version]
 path = "src/bohrin/version.py"

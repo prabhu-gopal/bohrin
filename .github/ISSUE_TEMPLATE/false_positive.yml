@@ -20,8 +20,8 @@ body:
     id: operator-id
     attributes:
       label: Operator ID
-      description: The `provenance.operator` of the candidate, e.g. `constant_return`.
-      placeholder: "constant_return"
+      description: The `provenance.operator` of the candidate, e.g. `drop_side_effect`.
+      placeholder: "drop_side_effect"
     validations:
       required: true
 

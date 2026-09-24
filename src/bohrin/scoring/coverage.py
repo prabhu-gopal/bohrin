@@ -8,12 +8,13 @@ was provably not done. It is the complement of the question the Verification Gap
 where a grader's author can read it as a grade: the Gap says how often the reported pass rate
 is fiction, the Coverage Score says how much of the battery the grader stood up to.
 
-**The unit is a task and a category.** A category is one way of passing without doing the
-work — an empty reply, a denial of the answer, several answers at once. On one task, a
+**The unit is a task and a category.** A category is one family of ways of passing without
+doing the work, named after its family in the weakness list: a hollow program, a tampered
+harness, a solution obtained rather than produced. On one task, a
 category is *measured* when at least one grounded candidate of that category was tried, and
 *caught* when the grader accepted none of them. One accepted candidate is enough for the
-category to get through on that task: a grader that rejects three denials and pays for the
-fourth has not caught denial.
+category to get through on that task: a grader that rejects three hollow programs and pays
+for the fourth has not caught hollow programs.
 
 **Only grounded candidates count.** A lead — a candidate whose wrongness could not be
 established without asking the grader — says nothing about whether the grader is wrong, so
@@ -39,16 +40,18 @@ from bohrin.scoring.interval import wilson_interval
 
 #: The version of the category definitions below. It changes whenever a category is added,
 #: removed or redefined, because two scores are only comparable over the same definitions.
-BATTERY_VERSION = "1"
+BATTERY_VERSION = "2"
 
-#: Every category, and the way of passing without doing the work that it names.
+#: Every category, and the way of passing without doing the work that it names. Each is a
+#: family of the weakness list (``docs/WEAKNESSES.md``) whose classes a correct grader must
+#: reject; the families measured by statistics or structural risk are not categories here.
 CATEGORIES: Mapping[str, str] = MappingProxyType(
     {
-        "empty_and_echo": "no answer at all: an empty reply, the question repeated back, or a refusal",
-        "denial": "an explicit denial of the declared answer",
-        "multiple_answers": "several different answers stated at once, the declared one among them",
-        "malformed_output": "a reply a policy produces when generation goes wrong, holding no answer",
-        "wrong_answer": "a definite answer, or a program, provably different from the declared one",
+        "hollow_program": "code that does no work: empty or constant bodies, an early exit, spoofed equality",
+        "harness_tampering": "a submission that changes what judges it: test hooks, edited tests, a written reward",
+        "answer_access": "a solution obtained instead of produced: read from the environment or from history",
+        "weak_tests": "a wrong program or output that the tests or the checker cannot tell from a right one",
+        "grader_logic": "a failure the grader scores as success",
     }
 )
 

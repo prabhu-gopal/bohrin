@@ -8,11 +8,10 @@ of them can only ever remove a ground.
 from __future__ import annotations
 
 import json
-import re
 
 import pytest
 
-from _fixtures import task
+from _fixtures import REFERENCE, TRIVIAL_REFERENCE, task
 from bohrin.ir.task import Ground
 from bohrin.mutate import discover
 from bohrin.mutate.battery import battery
@@ -23,14 +22,7 @@ from bohrin.mutate.equivalence import (
     reads_as_refusal,
     reads_as_structured_state,
 )
-from bohrin.mutate.operators import (
-    AnswerEnumeration,
-    ConstantReturn,
-    DegenerateOutput,
-    DropSideEffect,
-    FalseNegation,
-    _siblings,
-)
+from bohrin.mutate.operators import DropSideEffect
 
 # ------------------------------------------------------------------------- the registry
 
@@ -38,17 +30,7 @@ from bohrin.mutate.operators import (
 def test_operators_are_discoverable_and_explain_themselves() -> None:
     ops = discover()
 
-    assert {op.id for op in ops} >= {
-        "empty_body",
-        "identity_return",
-        "refusal",
-        "constant_return",
-        "false_negation",
-        "answer_enumeration",
-        "degenerate_output",
-        "drop_side_effect",
-        "negate_condition",
-    }
+    assert [op.id for op in ops] == ["drop_side_effect"]
     assert all(op.rationale for op in ops), "an operator must explain why its output is wrong"
 
 
@@ -171,133 +153,22 @@ def test_a_long_spec_is_still_state() -> None:
     assert reads_as_structured_state(spec) is True
 
 
-# ------------------------------------------------------------------ constant_return
+# ------------------------------------------------------------------ drop_side_effect
 
 
-def test_constant_return_never_proposes_a_literal_that_is_the_answer() -> None:
-    payloads = [c.payload for c in ConstantReturn().apply(task("0"))]
+def test_emptying_every_body_is_structurally_wrong() -> None:
+    (candidate,) = DropSideEffect().apply(task(REFERENCE))
 
-    assert "0" not in payloads
-    assert payloads, "other literals are still legitimate candidates"
-
-
-def test_operators_needing_a_reference_decline_without_one() -> None:
-    t = task(None, prompt="Do something.")
-
-    assert list(ConstantReturn().apply(t)) == []
-    assert list(DropSideEffect().apply(t)) == []
+    assert candidate.ground is Ground.STRUCTURAL
+    assert "def solve(items):" in candidate.payload, "the signature survives"
+    assert "total" not in candidate.payload, "the work does not"
 
 
-# ------------------------------------------------------------------- false_negation
+@pytest.mark.parametrize("reference", [None, "", "70", "not python at all (", TRIVIAL_REFERENCE])
+def test_it_stays_silent_where_emptying_proves_nothing(reference: str | None) -> None:
+    """No reference, no function, unparseable source, or bodies that are already empty."""
+    assert list(DropSideEffect().apply(task(reference))) == []
 
 
-def test_every_denial_contradicts_rather_than_restates_the_answer() -> None:
-    candidates = list(FalseNegation().apply(task("A")))
-
-    assert len(candidates) == len(FalseNegation._FORMS)
-    assert any(c.payload.startswith("A ") for c in candidates), "no form puts the answer first"
-    assert all(c.ground is Ground.INVARIANT for c in candidates)
-    assert all(" not " in c.payload or "wrong" in c.payload for c in candidates)
-
-
-# --------------------------------------------------------------- answer_enumeration
-
-_OPTIONS = "Which is it?\n\n(A) red\n(B) green\n(C) blue\n(D) yellow"
-_STATED = re.compile(r"(?:answer is|Answer:)\s*([^\s.]+(?:\.\d+)?)")
-
-
-@pytest.mark.parametrize(
-    ("reference", "prompt", "expected"),
-    [
-        ("70", "", ("210", "350")),
-        ("0", "", ("7", "14")),
-        ("0.50", "", ("7.50", "14.50")),
-        ("-3", "", ("4", "11")),
-        ("B", _OPTIONS, ("A", "C")),
-        ("c", _OPTIONS, ("B", "D")),
-        ("B", "Option A: x\nOption B: y\nOption C: z", ("A", "C")),
-    ],
-)
-def test_siblings_are_written_like_the_answer_and_provably_different(
-    reference: str, prompt: str, expected: tuple[str, str]
-) -> None:
-    assert _siblings(reference, prompt) == expected
-    assert all(provably_distinct(s, reference) for s in expected)
-
-
-@pytest.mark.parametrize(
-    ("reference", "prompt"),
-    [
-        ("Paris", ""),
-        ("x + 1", ""),
-        ("[1, 2]", ""),
-        ("", ""),
-        ("I cannot help with that.", ""),
-        ("D", _OPTIONS),
-        ("A", _OPTIONS),
-        ("B", "Pick the best answer."),
-    ],
-)
-def test_it_stays_silent_where_no_sibling_can_be_proven_different(reference: str, prompt: str) -> None:
-    assert list(AnswerEnumeration().apply(task(reference, prompt=prompt))) == []
-
-
-@pytest.mark.parametrize(
-    "reference",
-    ["9" * 28, "1" * 40, "12345678901234567890.123456789", "0." + "1" * 30, "7" * 200],
-)
-def test_long_numeric_answers_get_exact_siblings(reference: str) -> None:
-    """Past 28 significant digits, the default decimal precision, this raised and took the
-    whole battery down with it. The siblings must also be exact, not rounded: checked here
-    against integer arithmetic on the answer scaled to an integer."""
-    siblings = _siblings(reference)
-    assert siblings is not None
-    places = len(reference.split(".", 1)[1]) if "." in reference else 0
-    scaled = int(reference.replace(".", ""))
-    step = max(7 * 10**places, 2 * abs(scaled))
-    for sibling, multiple in zip(siblings, (1, 2), strict=True):
-        assert int(sibling.replace(".", "")) == scaled + multiple * step
-        assert (len(sibling.split(".", 1)[1]) if "." in sibling else 0) == places
-    assert battery(task(reference)).candidates
-
-
-def test_a_long_negative_answer_is_declined_not_crashed_on() -> None:
-    """Its first sibling would be the answer without its minus sign, which a grader dropping
-    signs reads as the answer, so the operator stays silent -- and the battery still runs."""
-    reference = "-" + "9" * 30
-    assert _siblings(reference) is None
-    assert battery(task(reference)).candidates
-
-
-def test_the_declared_answer_is_never_first_or_last() -> None:
-    for candidate in AnswerEnumeration().apply(task("70")):
-        assert _STATED.findall(candidate.payload) == ["210", "70", "350"]
-        assert candidate.ground is Ground.INVARIANT
-
-
-# ---------------------------------------------------------------- degenerate_output
-
-
-def test_the_degenerate_payloads_stay_inside_what_a_policy_can_produce() -> None:
-    payloads = [c.payload for c in DegenerateOutput().apply(task("42"))]
-
-    assert len(payloads) == 2
-    assert all(len(p) <= DegenerateOutput.LOOP_CHARS for p in payloads)
-    assert all("42" not in p for p in payloads), "a payload containing the answer could not be called wrong"
-
-
-def test_degenerate_payloads_are_grounded_only_where_an_answer_is_declared() -> None:
-    assert all(c.ground is Ground.STRUCTURAL for c in DegenerateOutput().apply(task("42")))
-    assert all(c.ground is None for c in DegenerateOutput().apply(task(None)))
-
-
-# ------------------------------------------------------------------------- one cell
-
-
-@pytest.mark.parametrize(
-    ("left", "right"),
-    [("0", "[[0]]"), ("0", "[0]"), ("[0]", "[[0]]"), ("7", "[[7]]"), ("[[ 3 ]]", "3"), ("(5,)", "[5]")],
-)
-def test_one_cell_spellings_collide(left: str, right: str) -> None:
-    assert collides_under(left, right) is not None
-    assert not provably_distinct(left, right)
+def test_the_battery_grounds_it_on_a_real_program() -> None:
+    assert [c.provenance.operator for c in battery(task(REFERENCE)).grounded] == ["drop_side_effect"]

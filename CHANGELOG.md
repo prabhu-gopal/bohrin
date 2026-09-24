@@ -30,20 +30,28 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The battery is for coding graders only, and is battery 2.** Coverage Score categories are
+  now the weakness-list families a correct grader must reject — `hollow_program`,
+  `harness_tampering`, `answer_access`, `weak_tests` and `grader_logic` — so scores from
+  battery 1 and battery 2 are not comparable. The battery currently submits into
+  `hollow_program` (the reference with every function body emptied); a score states how many
+  of the five categories it measured.
 - **The README says what Bohrin is for, not only what it does today:** why graders need
   checking, the principles every check is held to (no accusation without proof, every number
   with its uncertainty, what was not checked said out loud, an open method), and the scope.
   The PyPI description and keywords match it.
 
-### Fixed
+### Removed
 
-- **`battery()` no longer crashes on a task whose declared answer is a long number.** An
-  answer of 28 or more significant digits — common for counting problems — or a decimal with
-  that many places raised `decimal.InvalidOperation` while building the several-answers
-  candidate, and the exception ended the whole battery for that task. The siblings are now
-  computed at a precision sized to the answer, so they are exact at any length. Found by
-  running the battery over 40 long answers (integers of 21 to 119 digits, long decimals, long
-  negatives): 35 crashed it before the fix, none after.
+- **The answer-level operators and rewritings.** The operators `empty_body`,
+  `identity_return`, `refusal`, `constant_return`, `false_negation`, `answer_enumeration` and
+  `degenerate_output` scored a text reply rather than code, and `negate_condition` could only
+  ever produce leads; all eight are removed with their entry points. The seventeen built-in
+  answer rewritings in `bohrin.relations` are removed too. The `bohrin.mutators` and
+  `bohrin.relations` entry-point groups are unchanged, and the rules that stop a correct grader
+  being accused — suppression of a submission that is the reference, withdrawal of grounds on
+  refusal and grader-state answers — still apply to every operator, including third-party
+  ones. 0.3.0 keeps the answer-level battery for anyone who needs it.
 
 ## [0.3.0] — 2026-09-22
 

@@ -8,8 +8,8 @@ syntactic comparison is not good enough.
 ``"1"`` and ``"1.0"`` are different strings and the same answer. A verifier that
 accepts ``"1"`` for a task whose reference is ``"1.0"`` is not weak; it is doing
 numeric comparison, which is correct. Reporting it as an exploit is the exact failure
-this codebase forbids, and it is what ``constant_return`` would do if it guarded only with
-``lit == ref``.
+this codebase forbids, and it is what an operator proposing constants would do if it
+guarded only with ``literal == reference``.
 
 This module supplies the two soundness checks that close it:
 
@@ -106,8 +106,8 @@ def _singleton(text: str) -> object | None:
     all of them. Measured, not supposed: a public grid-answer environment parses
     space-separated digit rows as a grid — the format its own prompts use — so the reply
     ``0`` *is* the grid ``[[0]]`` there, and the verifier rewarding it is correct. Before
-    this rung existed ``constant_return`` claimed ``0`` was provably distinct from
-    ``[[0]]`` and reported that verifier as exploited, on two tasks.
+    this rung existed, a constant candidate ``0`` was claimed provably distinct from
+    ``[[0]]`` and that verifier was reported as exploited, on two tasks.
 
     Deliberately conservative in the direction this module always leans: it can only
     remove a finding. What it costs is recall on a grader that *should* insist on the
@@ -217,8 +217,8 @@ def reads_as_refusal(text: str) -> bool:
 def reads_as_structured_state(text: str) -> bool:
     """Whether a declared "answer" is a JSON object, and so grader state rather than a reply.
 
-    Two grounds rest on the declared answer being *the answer*: ``false_negation`` claims a
-    denial of it contradicts the taskset, and ``constant_return`` claims a literal provably
+    Two grounds rest on the declared answer being *the answer*: an invariant ground claims a
+    denial of it contradicts the taskset, and a differential ground claims a literal provably
     distinct from it is wrong. Neither holds when the field is configuration the grader
     reads, not a reply it expects.
 
@@ -334,8 +334,8 @@ def code_equivalent(left: str, right: str) -> bool:
     #
     # Returning False here cannot reintroduce those. The candidates it un-suppresses carry
     # their own independent grounds: an empty reply is *structurally* wrong whatever the
-    # reference is, and `constant_return` is guarded by `provably_distinct`, which compares
-    # the payloads as answers rather than as programs. TCE is the wrong instrument for a
+    # reference is, and a differential ground on a constant is guarded by `provably_distinct`,
+    # which compares the payloads as answers rather than as programs. TCE is the wrong instrument for a
     # reference that was never code; it is not the only instrument.
     if _is_inert(right_code):
         return False

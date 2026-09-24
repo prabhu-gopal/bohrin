@@ -86,14 +86,13 @@ jobs:
           from bohrin.ir.task import Task
           from bohrin.mutate import discover
           from bohrin.mutate.battery import battery
-          from bohrin.relations import renderings
           print('bohrin', bohrin.__version__)
           operators = discover()
-          assert len(operators) >= 9, f'expected the built-in operators, found {[o.id for o in operators]}'
-          assert renderings('70')[0] == ('verbatim', '70'), 'the relation catalogue did not load'
-          result = battery(Task(id='0', prompt='What is 7 x 10?', reference='70', reward_fns=('r',)))
+          assert 'drop_side_effect' in {o.id for o in operators}, f'the built-in operators did not load: {operators}'
+          reference = 'def add(a, b):\n    return a + b\n'
+          result = battery(Task(id='0', prompt='Write add(a, b).', reference=reference, reward_fns=('r',)))
           assert result.grounded, 'the battery produced no grounded candidate'
-          print(f'{len(operators)} operators, {len(result.candidates)} candidates for a numeric task')
+          print(f'{len(operators)} operators, {len(result.candidates)} candidates for a coding task')
           from bohrin.spec import weakness_list
           weaknesses = weakness_list()
           assert len(weaknesses.weaknesses) >= 38, 'the weakness list did not ship in the wheel'
