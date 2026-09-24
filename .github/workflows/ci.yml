@@ -107,3 +107,5 @@ jobs:
           assert reproduction_result_schema()['\$id'] == RESULT_SCHEMA, 'the reproduction schema did not ship'
           print('reproduction schema', RESULT_SCHEMA)
           "
+          printf '%s\n' '{"task_id": "t0", "model": "a", "score": 1}' '{"task_id": "t1", "model": "a", "score": 0}' > /tmp/results.jsonl
+          /tmp/fresh/bin/bohrin power /tmp/results.jsonl

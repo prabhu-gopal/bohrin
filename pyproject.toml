@@ -45,6 +45,9 @@ dev = [
   "types-jsonschema>=4.23",
 ]
 
+[project.scripts]
+bohrin = "bohrin.cli:run"
+
 [project.urls]
 Homepage = "https://bohrin.com"
 Documentation = "https://github.com/prabhu-gopal/bohrin/tree/main/docs"

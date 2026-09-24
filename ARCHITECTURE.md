@@ -53,6 +53,12 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
   (`reproduction.py`, `reproduction-result.v1.json`): the static check of a script, the reading
   of its result, and invariant I7, a finding whose script does not reproduce it loses its proof.
   `docs/examples/` holds a complete script that the tests run.
+- **`stats/`**: `bohrin power`. `estimates.py` (standard errors, clustered and paired, and the
+  minimum detectable difference, each tied to its published equation), `results.py` (the results
+  file format and its strict reader, with `results-row.v1.json`), and `power.py` (the analysis,
+  the aggregation audit, the report and `power-report.v1.json`).
+- **`cli.py`**: the `bohrin` command (also `python -m bohrin`), with the exit codes every verb
+  shares.
 - **`_plugins.py`**: entry-point discovery, shared by operators and relations.
 
 `tests/` mirrors the package. `tests/_fixtures.py` holds graders with known behaviour, correct and

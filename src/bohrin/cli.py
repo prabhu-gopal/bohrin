@@ -1,0 +1,118 @@
+"""The ``bohrin`` command.
+
+Every verb follows the same contract: a report on standard output (or, with ``--json``, only the
+JSON document), errors and warnings on standard error, never a required prompt, and the same exit
+codes everywhere:
+
+====  ==========================================================
+0     clean: nothing found in what was checked
+1     findings
+2     cannot run: the input could not be read
+64    usage error
+====  ==========================================================
+
+Every command here needs no account and makes no network call.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from collections.abc import Sequence
+from pathlib import Path
+from typing import NoReturn
+
+from bohrin.stats.power import analyse, render
+from bohrin.stats.results import read_results
+from bohrin.version import __version__
+
+CLEAN, FINDINGS, CANNOT_RUN, USAGE = 0, 1, 2, 64
+
+
+class _Parser(argparse.ArgumentParser):
+    """``argparse`` exits with 2 on a usage error; Bohrin's contract reserves 2 for 'cannot run'."""
+
+    def error(self, message: str) -> NoReturn:
+        """Print the usage and the problem, and exit with the usage-error code."""
+        self.print_usage(sys.stderr)
+        self.exit(USAGE, f"{self.prog}: {message}\n")
+
+
+def _fraction(text: str) -> float:
+    value = float(text)
+    if not 0 < value < 1:
+        raise argparse.ArgumentTypeError("give it as a fraction between 0 and 1, for example 0.02 for 2 points")
+    return value
+
+
+def _parser() -> _Parser:
+    parser = _Parser(
+        prog="bohrin",
+        description="Check the checker: find where a grader pays for work that was not done.",
+        epilog="The specification: https://github.com/prabhu-gopal/bohrin/blob/main/docs/SPEC.md",
+    )
+    parser.add_argument("--version", action="version", version=f"bohrin {__version__}")
+    verbs = parser.add_subparsers(dest="verb", metavar="COMMAND")
+    power = verbs.add_parser(
+        "power",
+        help="check whether an evaluation is big enough to support what it is used to claim",
+        description=(
+            "Read a JSON Lines results file (task_id, model, score; optionally max_score, cluster, sample) and "
+            "report each model's score with its interval, the smallest difference the evaluation can detect, "
+            "paired comparisons between models, and an audit of how the scores were aggregated."
+        ),
+    )
+    power.add_argument("file", type=Path, help="the results file, one JSON object per line")
+    power.add_argument(
+        "--min-difference",
+        type=_fraction,
+        metavar="FRACTION",
+        help="the smallest difference you need to detect, such as 0.02; without it, size is reported but not judged",
+    )
+    power.add_argument("--json", action="store_true", help="print only the JSON report")
+    return parser
+
+
+def _power(args: argparse.Namespace) -> int:
+    path: Path = args.file
+    try:
+        with path.open(encoding="utf-8") as handle:
+            rows = read_results(handle)
+    except OSError as exc:
+        print(f"bohrin: cannot open {path}: {exc.strerror}. Check the path and try again.", file=sys.stderr)
+        return CANNOT_RUN
+    except UnicodeDecodeError:
+        print(f"bohrin: {path} is not UTF-8 text. A results file is JSON Lines, one object per line.", file=sys.stderr)
+        return CANNOT_RUN
+    except ValueError as exc:
+        print(
+            f"bohrin: cannot read {path}: {exc}. Each line needs task_id, model and score; "
+            "see 'bohrin power' in docs/SPEC.md.",
+            file=sys.stderr,
+        )
+        return CANNOT_RUN
+    report = analyse(rows, source=path.name, min_difference=args.min_difference)
+    if args.json:
+        print(json.dumps(report.to_json(), indent=2))
+    else:
+        print(render(report))
+    return FINDINGS if report.findings else CLEAN
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run ``bohrin`` with ``argv`` (default: the process's arguments) and return its exit code."""
+    parser = _parser()
+    args = parser.parse_args(argv)
+    if args.verb == "power":
+        return _power(args)
+    parser.print_help()
+    return USAGE if argv else CLEAN
+
+
+def run() -> NoReturn:
+    """The console-script entry point."""
+    sys.exit(main())
+
+
+__all__ = ["CANNOT_RUN", "CLEAN", "FINDINGS", "USAGE", "main", "run"]

@@ -19,6 +19,19 @@ All notable changes to this project are documented here. The format follows
 - **Identifier formats** (`bohrin.spec.ids`, and "Identifiers" in `docs/SPEC.md`) for weakness
   classes (`BGW-`), registry records (`BVR-`), probes (`bohrin/<slug>@<major>`), findings
   (`BF-`), schemas and conformance levels.
+- **`bohrin power`**, and the `bohrin` command itself (also `python -m bohrin`). It reads a
+  JSON Lines results file (`task_id`, `model`, `score`; optionally `max_score`, `cluster`,
+  `sample`) and, with no account and no network, reports:
+  - each model's score, with a Wilson interval for pass/fail scores or a normal interval (clustered
+    when tasks share a source);
+  - paired comparisons between models;
+  - the smallest difference the evaluation can detect with 80% power;
+  - an aggregation audit: errored samples dropped from a denominator, scores outside full marks,
+    tasks a model lacks, duplicated samples, partial credit.
+
+  `--min-difference` judges the size against the difference you need. `--json` prints only the
+  report (`https://bohrin.com/schema/power-report/v1`). Exit codes: 0 clean, 1 findings, 2 cannot
+  read, 64 usage.
 - **Reproduction scripts** (`bohrin.evidence.reproduction`, the result schema
   `https://bohrin.com/schema/reproduction-result/v1`, and "Reproduction scripts" in
   `docs/SPEC.md`). Every proven finding's script is a standalone PEP 723 script: it needs nothing

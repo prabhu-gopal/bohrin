@@ -116,6 +116,18 @@ further: to benchmarks, to the tests coding agents change, and to any checker wh
 someone else relies on. They extend one kind of checker at a time, and only as far as proof
 can follow.
 
+## Is your evaluation big enough?
+
+`bohrin power` reads a results file you already have (one JSON object per line, with `task_id`,
+`model` and `score`) and tells you, with no account and no network, each model's score with its
+uncertainty, the smallest difference your evaluation can detect, whether two models are really
+different, and whether any scores were aggregated wrongly, for example errored samples silently
+dropped from the denominator.
+
+```console
+$ bohrin power results.jsonl --min-difference 0.02
+```
+
 ## Documentation
 
 | Start with | If you want to |
