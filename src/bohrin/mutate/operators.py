@@ -35,6 +35,7 @@ class _BodyStripper(cst.CSTTransformer):
         self.changed = False
 
     def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
+        """Replace this function's body; its signature, decorators and name are kept."""
         self.changed = True
         return updated_node.with_changes(body=cst.IndentedBlock(body=[cst.SimpleStatementLine(body=[cst.Pass()])]))
 
@@ -60,6 +61,7 @@ class DropSideEffect(MutationOperator):
     shapes = (Shape.PROGRAM,)
 
     def apply(self, task: Task) -> Iterator[Candidate]:
+        """The reference with every function body emptied, or nothing if that proves nothing."""
         source = task.reference or ""
         module = _parse(source)
         if module is None:

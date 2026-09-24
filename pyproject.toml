@@ -75,7 +75,10 @@ path = "src/bohrin/version.py"
 packages = ["src/bohrin"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/", "tests/", "docs/", "README.md", "CHANGELOG.md", "CITATION.cff", "LICENSE", "NOTICE"]
+include = [
+  "src/", "tests/", "docs/", "README.md", "ARCHITECTURE.md", "CONTRIBUTING.md", "CHANGELOG.md",
+  "SECURITY.md", "CODE_OF_CONDUCT.md", "CITATION.cff", "LICENSE", "NOTICE",
+]
 
 # ---------------------------------------------------------------------------------------
 # Tooling. The same configuration runs locally and in every CI job.
