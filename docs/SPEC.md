@@ -37,6 +37,29 @@ path, and this library never fills them in.
 A probe's **maturity** starts at `experimental`. It becomes `stable` only after a public sample
 with no confirmed false accusation and a 95% lower bound on precision of at least 95%.
 
+### Positive controls: correct work a grader must accept
+
+A grader tightened to stop cheating is exactly the kind that starts rejecting correct code, so the
+battery also submits correct programs: the reference, and rewritings of it that are **proved**,
+by machine, to do the same thing. A rewriting that cannot be proved is not submitted.
+
+| Probe | Relation | Submission | Proved by | Weakness |
+|---|---|---|---|---|
+| `bohrin/oracle@1` | `oracle` | the reference, unchanged: the baseline | identity | BGW-124 |
+| `bohrin/comment-free-oracle@1` | `comment_free` | the reference with its comments removed | the same syntax tree | BGW-120 |
+| `bohrin/reformatted-oracle@1` | `reformatted` | the reference re-laid out by Python's own unparser | the same syntax tree | BGW-120 |
+| `bohrin/renamed-oracle@1` | `renamed_locals` | the reference with local variables renamed; never parameters or function names | the same bytecode, up to the names of locals | BGW-120 |
+
+- **If the grader rejects the baseline**, the task is a baseline failure: excluded from every
+  rate, never scored.
+- **Renaming is refused** in a function that reads its own local names at run time (`locals()`,
+  `vars()`, `eval`, `exec`, frame introspection), because bytecode cannot see that; also in one
+  with nested scopes, imports, `match`, `global` or `nonlocal`.
+- **A rewriting identical to another**, or to the reference once surrounding blank lines are
+  ignored, is not submitted twice.
+- **Positive controls are never merged with the Coverage Score.** They measure correct-work
+  acceptance beside it, so a grader that rejects everything is exposed rather than scoring 100.
+
 The categories of battery 2 are the weakness families whose classes a correct grader must
 reject:
 

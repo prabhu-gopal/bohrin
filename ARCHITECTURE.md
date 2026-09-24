@@ -39,8 +39,11 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
     stop a false accusation. **If you change what counts as wrong, it is here.**
   - `equivalence.py`: decides when two submissions are really the same (the normalisation ladder
     and Trivial Compiler Equivalence). Every function here can only remove a ground.
-- **`relations/`**: the entry-point seam for certified meaning-preserving rewritings of a correct
-  solution (positive controls). No rewriting is built in.
+- **`relations/`**: positive controls, correct work a grader must accept. `positive_controls(task)`
+  gives the reference (the baseline) and every certified rewriting of it; `builtin.py` holds the
+  rewritings (comment-free, reformatted, renamed locals) and `certify.py` the mechanical proofs
+  (same syntax tree; same bytecode up to local names). Third parties add rewritings through the
+  `bohrin.relations` entry point.
 - **`scoring/`**: `coverage.py` (the Coverage Score, `BATTERY_VERSION`, `CATEGORIES`), `gap.py`
   (the Verification Gap), `interval.py` (Wilson intervals).
 - **`spec/`**: the standard as data.

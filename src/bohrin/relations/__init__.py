@@ -1,18 +1,28 @@
-"""Certified meaning-preserving rewritings of a correct solution.
+"""Positive controls: the reference solution, and certified rewritings of it that a grader must accept.
 
 The catalogue is discovered exactly like mutation operators: through an entry-point group,
 with no privileged path for built-ins. A third party adds a relation — a formatting
 convention, a certified refactoring — by publishing a package, not by patching Bohrin.
+
+:func:`positive_controls` gives a task's controls: the reference unchanged first (the baseline;
+if a grader rejects it, the task is excluded, never scored), then each certified rewriting that
+differs from it and from the rewritings before it.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from bohrin._plugins import RELATIONS, load_plugin_classes
+from bohrin.ir.task import Source, Task
 from bohrin.relations.base import Relation
 
-#: Built-ins in the order they are tried. There are none: the catalogue is whatever is
-#: registered under the entry-point group, in id order.
-_BUILTIN_ORDER: tuple[str, ...] = ()
+#: Built-ins in the order they are tried: the least change first, so when two rewritings coincide
+#: the credit goes to the smaller one. Appended to, never reordered.
+_BUILTIN_ORDER: tuple[str, ...] = ("comment_free", "reformatted", "renamed_locals")
+
+#: The relation name of the reference itself, the baseline every control is compared with.
+BASELINE = "oracle"
 
 
 def discover() -> list[Relation]:
@@ -55,4 +65,36 @@ def renderings(answer: str) -> list[tuple[str, str]]:
     return out
 
 
-__all__ = ["Relation", "discover", "renderings"]
+@dataclass(frozen=True, slots=True)
+class Control:
+    """A correct submission a correct grader must accept."""
+
+    payload: Source
+    #: The relation that produced it, or :data:`BASELINE` for the reference itself.
+    relation: str
+    #: Why it is correct: the relation's certification.
+    certification: str
+
+    @property
+    def baseline(self) -> bool:
+        """Whether this is the reference itself, which decides if the task can be scored at all."""
+        return self.relation == BASELINE
+
+
+def positive_controls(task: Task) -> tuple[Control, ...]:
+    """The task's reference, then every certified rewriting of it; nothing when there is no reference."""
+    reference = task.reference
+    if not reference:
+        return ()
+    controls = [Control(Source(reference), BASELINE, "the task's own reference solution")]
+    certifications = {relation.id: relation.certification for relation in discover()}
+    seen = {reference.strip()}
+    for relation_id, rendered in renderings(reference):
+        # Surrounding blank lines are not a different program; sending one twice learns nothing.
+        if rendered.strip() not in seen:
+            seen.add(rendered.strip())
+            controls.append(Control(Source(rendered), relation_id, certifications[relation_id]))
+    return tuple(controls)
+
+
+__all__ = ["BASELINE", "Control", "Relation", "discover", "positive_controls", "renderings"]

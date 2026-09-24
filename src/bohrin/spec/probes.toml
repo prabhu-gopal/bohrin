@@ -34,3 +34,75 @@ sources = ["https://arxiv.org/abs/2604.17596", "https://link.springer.com/articl
 [probe.template]
 solution = "reference-emptied"
 parameters = []
+
+# --------------------------------------------------------------------------- positive controls
+# A correct grader must accept these. They are never merged with the Coverage Score: they measure
+# correct-work acceptance beside it, so a grader that rejects everything is exposed.
+
+[[probe]]
+id = "bohrin/oracle@1"
+operator = "oracle"
+weakness = ["BGW-124"]
+title = "The task's reference solution, unchanged"
+shapes = ["program"]
+expect = "accept"
+maturity = "experimental"
+battery = 2
+guards = ["If the grader rejects it, the task is a baseline failure: excluded from every rate, never scored."]
+sources = ["https://arxiv.org/abs/2305.01210"]
+
+[probe.template]
+solution = "reference"
+parameters = []
+
+[[probe]]
+id = "bohrin/comment-free-oracle@1"
+operator = "comment_free"
+weakness = ["BGW-120"]
+title = "The reference with its comments removed"
+shapes = ["program"]
+expect = "accept"
+maturity = "experimental"
+battery = 2
+guards = ["Emitted only when the syntax tree is unchanged, and only when the reference has a comment."]
+sources = ["https://openai.com/index/introducing-swe-bench-verified/", "https://arxiv.org/abs/2212.10264"]
+
+[probe.template]
+solution = "reference-rewritten"
+parameters = []
+
+[[probe]]
+id = "bohrin/reformatted-oracle@1"
+operator = "reformatted"
+weakness = ["BGW-120"]
+title = "The reference re-laid out by Python's own unparser"
+shapes = ["program"]
+expect = "accept"
+maturity = "experimental"
+battery = 2
+guards = ["Emitted only when the syntax tree is unchanged and the layout actually differs."]
+sources = ["https://openai.com/index/introducing-swe-bench-verified/", "https://arxiv.org/abs/2212.10264"]
+
+[probe.template]
+solution = "reference-rewritten"
+parameters = []
+
+[[probe]]
+id = "bohrin/renamed-oracle@1"
+operator = "renamed_locals"
+weakness = ["BGW-120"]
+title = "The reference with its local variables renamed"
+shapes = ["program"]
+expect = "accept"
+maturity = "experimental"
+battery = 2
+guards = [
+    "Parameters and function names are never renamed.",
+    "A function that reads its own local names at run time (locals(), vars(), eval, exec, frame introspection), or has nested scopes, imports or match statements, is left unrenamed.",
+    "Emitted only when the program compiles to the same bytecode up to the names of locals.",
+]
+sources = ["https://arxiv.org/abs/2212.10264", "https://arxiv.org/abs/2606.08960"]
+
+[probe.template]
+solution = "reference-rewritten"
+parameters = []
