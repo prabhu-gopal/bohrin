@@ -110,3 +110,26 @@ jobs:
           printf '%s\n' '{"task_id": "t0", "model": "a", "score": 1}' '{"task_id": "t1", "model": "a", "score": 0}' > /tmp/results.jsonl
           /tmp/fresh/bin/bohrin power /tmp/results.jsonl
           /tmp/fresh/bin/bohrin verify --since HEAD "$GITHUB_WORKSPACE"
+
+  # The Action this repository publishes, run on this repository: installs Bohrin from the checkout
+  # and runs bohrin verify on the pull request. Not a required check; it exercises the Action.
+  verify-action:
+    name: bohrin verify action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Run the Action from this checkout
+        id: verify
+        uses: ./
+        with:
+          package: .
+          upload-sarif: "false"
+
+      - name: Check it wrote valid SARIF
+        env:
+          SARIF: ${{ steps.verify.outputs.sarif-file }}
+        run: python -c "import json, os; log = json.load(open(os.environ['SARIF'])); assert log['version'] == '2.1.0'; print(len(log['runs'][0]['results']), 'results')"

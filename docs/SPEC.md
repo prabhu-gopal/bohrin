@@ -369,6 +369,14 @@ Reading history is safe in a hostile repository: only read-only git plumbing run
 programs a repository can name switched off, and the working tree is read directly, never
 diffed by git.
 
+**On a pull request.** `--sarif FILE` also writes the facts as
+[SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html), which GitHub code
+scanning shows as annotations on the lines they are about: a fact as a warning, an observation as
+a note. Each result is fingerprinted by its rule, file and subject (never by its message), so a
+fact keeps its annotation when its counts change. The GitHub Action in this repository
+(`action.yml`) runs `bohrin verify` on every pull request and uploads the SARIF; it needs the
+checkout's full history (`fetch-depth: 0`) and `security-events: write`.
+
 ## Identifiers
 
 Every artefact has a permanent identifier, following conventions the security field already

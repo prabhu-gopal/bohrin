@@ -15,8 +15,8 @@ import ast
 import configparser
 import re
 import tomllib
-from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass, replace
 
 from bohrin.history import oracle
 
@@ -57,6 +57,10 @@ class Fact:
     message: str
     #: ``observation`` for what an honest change also does routinely (a CLI adds ``sys.exit``).
     kind: str = "fact"
+    #: The line in the new version the fact is about, when the file still exists.
+    line: int | None = None
+    #: The test or function the fact is about, when it is about one.
+    subject: str = ""
 
 
 def is_test_file(path: str) -> bool:
@@ -296,11 +300,14 @@ def _test_by_test(tests: Mapping[str, tuple[ast.Module | None, ast.Module | None
     """What happened to each test's oracle: weakened, loosened, swallowed, rewritten or mocked."""
     out: list[Fact] = []
     lost: dict[str, int] = {}
+    lost_at: dict[str, int] = {}
     for path, name, before, after in _pairs(tests):
         if before is not None and ast.dump(before) == ast.dump(after):
             continue
+        start = len(out)
         if before is not None and _checks(after) < _checks(before):
             lost[path] = lost.get(path, 0) + _checks(before) - _checks(after)
+            lost_at[path] = min(lost_at.get(path, after.lineno), after.lineno)
         if before is not None:
             was, now = oracle.strength(before), oracle.strength(after)
             if was in oracle.STRONG and now in oracle.WEAK:
@@ -370,11 +377,68 @@ def _test_by_test(tests: Mapping[str, tuple[ast.Module | None, ast.Module | None
                     "observation",
                 )
             )
+        out[start:] = [replace(fact, line=after.lineno, subject=name) for fact in out[start:]]
     for path, count in sorted(lost.items()):
         out.append(
-            Fact("checks-removed", "BGW-109", path, f"{_plural(count, 'assertion')} removed from tests in {path}")
+            Fact(
+                "checks-removed",
+                "BGW-109",
+                path,
+                f"{_plural(count, 'assertion')} removed from tests in {path}",
+                line=lost_at[path],
+            )
         )
     return out
+
+
+def _is_skip(node: ast.AST) -> bool:
+    name = _dotted(node.func) if isinstance(node, ast.Call) else _dotted(node)
+    return name in _UNCONDITIONAL_SKIPS | _CONDITIONAL_SKIPS
+
+
+def _is_unchecked_test(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name.startswith("test") and not _checks(node)
+    )
+
+
+def _is_report_hook(node: ast.AST) -> bool:
+    hook = isinstance(node, ast.FunctionDef) and node.name in _REPORT_HOOKS
+    patch = isinstance(node, ast.Name | ast.Attribute) and _dotted(node).endswith("TestReport")
+    return hook or patch
+
+
+def _is_stub(node: ast.AST) -> bool:
+    return isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and _stub(node)
+
+
+#: For each file-level rule, which node in the new version the fact is about.
+_LOCATORS: dict[str, Callable[[ast.AST], bool]] = {
+    "skips-added": _is_skip,
+    "conditional-skips-added": _is_skip,
+    "trivial-checks-added": lambda node: isinstance(node, ast.Assert | ast.Call) and bool(_trivial_checks(node)),
+    "tests-without-checks": _is_unchecked_test,
+    "report-hook-added": _is_report_hook,
+    "timer-reassigned": lambda node: isinstance(node, ast.Assign | ast.AugAssign) and bool(_timer_assignments(node)),
+    "exit-added": lambda node: isinstance(node, ast.Call | ast.Raise) and bool(_exits(node)),
+    "always-equal-added": lambda node: isinstance(node, ast.FunctionDef) and bool(_always_equal(node)),
+    "replaced-by-stub": _is_stub,
+}
+
+
+def _first_line(rule: str, tree: ast.Module | None, text: str) -> int:
+    """The first line in the new version a file-level fact is about; line 1 when none is closer."""
+    if rule == "selection-changed":
+        keys = [
+            n
+            for n, content in enumerate(text.splitlines(), start=1)
+            if content.split("=")[0].strip() in _SELECTION_KEYS
+        ]
+        return min(keys, default=1)
+    matches = _LOCATORS.get(rule)
+    if tree is None or matches is None:
+        return 1
+    return min((node.lineno for node in ast.walk(tree) if hasattr(node, "lineno") and matches(node)), default=1)
 
 
 def _plural(count: int, word: str) -> str:
@@ -564,9 +628,16 @@ def facts(before: Mapping[str, str | None], after: Mapping[str, str | None]) -> 
                         path,
                         f"pytest {key} changed in {path}: {old_selection.get(key, '(unset)')!r} → "
                         f"{new_selection.get(key, '(unset)')!r}",
+                        subject=key,
                     )
                 )
-    return out, unreadable
+    located = []
+    for fact in out:
+        if fact.line is None and after.get(fact.path) is not None:
+            tree = trees[fact.path][1] if fact.path in trees else None
+            fact = replace(fact, line=_first_line(fact.rule, tree, after[fact.path] or ""))
+        located.append(fact)
+    return located, unreadable
 
 
 #: A subject line that claims the work is done: "Fix …", "Resolves #12", "Implemented …".

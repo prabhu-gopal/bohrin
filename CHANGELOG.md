@@ -19,6 +19,12 @@ All notable changes to this project are documented here. The format follows
 - **Identifier formats** (`bohrin.spec.ids`, and "Identifiers" in `docs/SPEC.md`) for weakness
   classes (`BGW-`), registry records (`BVR-`), probes (`bohrin/<slug>@<major>`), findings
   (`BF-`), schemas and conformance levels.
+- **SARIF output and a GitHub Action for `bohrin verify`.** `--sarif FILE` writes the facts as
+  SARIF 2.1.0 (validated against the OASIS schema), with a line for each fact, facts as warnings
+  and observations as notes, and fingerprints that keep a fact's annotation when its counts
+  change. `action.yml` runs `verify` on a pull request and uploads the SARIF to code scanning, so
+  facts appear on the lines they are about; its actions are pinned by commit, and its inputs reach
+  the shell only through environment variables.
 - **`bohrin verify`**: facts about what a change did to the tests and the code, from the syntax
   trees of each file at a commit and in the working tree, beside any commit message that claims
   success. It reports:
