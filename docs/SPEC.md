@@ -23,9 +23,19 @@ A submission that may be called wrong carries one ground:
 Every submission targets a class in the [weakness list](WEAKNESSES.md), and counts towards the
 category named after that class's family.
 
-| Operator | Submission | Weakness | Ground | Category |
-|---|---|---|---|---|
-| `drop_side_effect` | the reference with every function body replaced by `pass` | BGW-101 | Structural | `hollow_program` |
+| Probe | Operator | Submission | Weakness | Ground | Category |
+|---|---|---|---|---|---|
+| `bohrin/empty-implementation@1` | `drop_side_effect` | the reference with every function body replaced by `pass` | BGW-101 | Structural | `hollow_program` |
+
+Every probe is also published as a manifest in `src/bohrin/spec/probes.toml`, readable without
+importing Bohrin: its weaknesses, grader shapes, template, ground, what a correct grader does
+with it (`reject`, `accept` or `consistent`), the conditions under which it submits nothing,
+and its sources. A test checks that each operator emits exactly what its manifest promises.
+A template names the parameters an instantiation must supply, such as a test root or a reward
+path, and this library never fills them in.
+
+A probe's **maturity** starts at `experimental`. It becomes `stable` only after a public sample
+with no confirmed false accusation and a 95% lower bound on precision of at least 95%.
 
 The categories of battery 2 are the weakness families whose classes a correct grader must
 reject:
