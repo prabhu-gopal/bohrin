@@ -241,6 +241,9 @@ tutorial's grader, is [examples/reproduce_BF-GZW6R2M9CJ.py](examples/reproduce_B
   anything.
 - Runs the grader **exactly as its owner's harness does**, not in a hardened mode, because
   hardening would hide the very defects a tamper probe proves.
+- Runs **each grading in its own process, with a time limit**, so that nothing the submission
+  does (exit, crash, hang, change global state) can stop the script from reporting or carry
+  into the next run. A run that reports no reward counts as not paid: the script fails closed.
 - Runs the reference and the submission at least 3 times each.
 - Prints one line of JSON last (`https://bohrin.com/schema/reproduction-result/v1`), and exits
   with the code for its outcome:

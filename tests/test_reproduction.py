@@ -134,6 +134,7 @@ def test_the_inline_metadata_is_read_the_way_pep_723_specifies() -> None:
         ("never reports a result", "https://bohrin.com/schema/reproduction-result/v1", "result"),
         ("no inline metadata", "# /// script\n", "# script\n"),
         ("no requires-python", '# requires-python = ">=3.11"\n', ""),
+        ("grades in its own process", "import subprocess\n", ""),
     ],
 )
 def test_a_script_breaking_one_rule_is_reported(problem: str, old: str, new: str) -> None:
@@ -296,6 +297,7 @@ def test_a_script_can_declare_a_workspace_that_deletes_files() -> None:
         "# [tool.bohrin.submission.files]\n"
         f'# "src/a.py" = "{digest}"\n'
         "# ///\n"
+        "import subprocess\n"
         f'print("{RESULT_SCHEMA}")\n'
     )
     assert check_script(header, finding) == []
@@ -334,3 +336,43 @@ def test_a_passed_written_as_a_string_is_not_read_as_true() -> None:
     line["runs"] = [{"reward": 0.0, "passed": "false"}] * 3
     with pytest.raises(ValueError, match="true or false"):
         parse_result(json.dumps(line), 0)
+
+
+# --------------------------------------------------------------------------- a submission cannot stop the script
+
+
+def _variant(tmp_path: Path, submission: str) -> Path:
+    """The example script with another submission embedded, digest and all."""
+    import hashlib
+
+    digest = "sha256:" + hashlib.sha256(submission.encode("utf-8")).hexdigest()
+    text = SCRIPT.read_text(encoding="utf-8")
+    old = 'SUBMISSION = "def add(a, b):\\n    pass\\n"'
+    assert old in text
+    old_digest = _SUBMISSION.to_json()["sha256"]
+    text = text.replace(old, "SUBMISSION = " + repr(submission)).replace(old_digest, digest)
+    (tmp_path / "toy_grader.py").write_text((EXAMPLES / "toy_grader.py").read_text(encoding="utf-8"), encoding="utf-8")
+    script = tmp_path / SCRIPT.name
+    script.write_text(text, encoding="utf-8")
+    return script
+
+
+@pytest.mark.parametrize(
+    "submission",
+    [
+        "import sys\nsys.exit(0)\n",
+        "import os\nos._exit(0)\n",
+        "raise SystemExit(0)\n",
+        "def add(a, b):\n    import os\n    os._exit(0)\n",
+        "raise RuntimeError('crash')\n",
+    ],
+    ids=["sys.exit", "os._exit", "SystemExit", "os._exit inside add", "crash"],
+)
+def test_a_submission_that_exits_or_crashes_cannot_stop_the_script_reporting(tmp_path: Path, submission: str) -> None:
+    """Before each grading ran in its own process, sys.exit(0) ended the script silently with exit code 0."""
+    done = _run(_variant(tmp_path, submission), cwd=tmp_path)
+    result = parse_result(done.stdout, done.returncode)
+
+    assert result.outcome == "not-reproduced", "no reward reported is not paid: the script fails closed"
+    assert done.returncode == OUTCOMES["not-reproduced"][0]
+    assert all(run.passed for run in result.baseline_runs), "the reference still ran normally"
