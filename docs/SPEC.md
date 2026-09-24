@@ -41,14 +41,44 @@ reject:
 A Coverage Score names how many of these categories it measured. A category with no
 submission in the battery is not measured, and is never counted as caught.
 
+## Submissions and grader shapes
+
+A submission is one of two kinds:
+
+| Kind | What it is |
+|---|---|
+| `source` | program text: a solution, a module |
+| `workspace` | file changes (new content for a path, or its deletion) and commands, applied to a repository or container |
+
+**A workspace is a template, never an instantiation.** A path may name a parameter, such as
+`{test_root}/conftest.py`, and every parameter a path names is declared with the submission.
+Filling one in needs knowledge of a particular environment (its test root, its reward path,
+its parser), so this library never does it. Paths are relative and can never leave the root
+they are applied to.
+
+Every task has a **shape**, the way its grader is called, and an operator names the shapes it
+applies to:
+
+| Shape | The grader |
+|---|---|
+| `program` | takes the task and a program, and returns a reward |
+| `io` | runs a program on inputs and compares its output with a checker |
+| `workspace` | applies a patch to a repository and runs a test command |
+| `container` | lets the agent act in a container; a script there writes the reward |
+| `history` | a change in a repository with a claim of success, read from version history |
+| `numeric`, `proof`, `query` | compare output within a tolerance, check a proof, execute a query |
+
 ## Rules applied to every submission
 
 Each rule can only remove a ground, never add one.
 
-- **Duplicates** are tried once.
-- **A grounded submission that is the declared answer** — the same answer written another way
-  (`1` for `1.0`, `[0]` for `0`), or code that compiles to the same bytecode as the reference —
-  is dropped.
+- **Only operators for the task's shape run.** An operator that names no shape runs on all of
+  them.
+- **Duplicates** are tried once: programs equal after stripping surrounding whitespace, or
+  workspaces with the same file changes and commands.
+- **A grounded submission that is, or writes, the declared answer** — the same answer written
+  another way (`1` for `1.0`, `[0]` for `0`), code that compiles to the same bytecode as the
+  reference, or a workspace that writes either into any file — is dropped.
 - **On a task whose declared answer is a refusal**, every ground is withdrawn: declining is the
   correct response there.
 - **On a task whose declared answer is a JSON object** (grader state, not an answer), the

@@ -16,7 +16,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from bohrin.ir.task import Candidate, Ground, Provenance, Task
+from bohrin.ir.task import Candidate, Ground, Provenance, Source, Task
 from bohrin.mutate.base import MutationOperator
 from bohrin.mutate.battery import battery
 from bohrin.mutate.equivalence import collides_under, provably_distinct
@@ -62,7 +62,7 @@ class _Constants(MutationOperator):
     def apply(self, task: Task) -> Iterator[Candidate]:
         for literal in ("0", "[]"):
             yield Candidate(
-                literal, Provenance(self.id, "constant", f"{literal} is not the answer"), Ground.DIFFERENTIAL
+                Source(literal), Provenance(self.id, "constant", f"{literal} is not the answer"), Ground.DIFFERENTIAL
             )
 
 
@@ -70,11 +70,11 @@ def test_the_battery_suppresses_a_constant_that_is_the_one_cell_answer() -> None
     task = Task(id="0", prompt="Output the grid.", reference="[[0]]", reward_fns=("g",))
     result = battery(task, [_Constants()])
 
-    assert [c.payload for c in result.candidates] == ["[]"], "only the colliding constant is removed"
+    assert [c.payload for c in result.candidates] == [Source("[]")], "only the colliding constant is removed"
     assert result.suppressed == 1
 
 
 def test_the_battery_keeps_a_constant_that_cannot_equal_the_grid() -> None:
     task = Task(id="0", prompt="Output the grid.", reference="[[1, 2], [3, 4]]", reward_fns=("g",))
 
-    assert "0" in {c.payload for c in battery(task, [_Constants()]).grounded}
+    assert Source("0") in {c.payload for c in battery(task, [_Constants()]).grounded}

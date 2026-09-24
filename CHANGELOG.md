@@ -21,6 +21,14 @@ All notable changes to this project are documented here. The format follows
   (`BF-`), schemas and conformance levels.
 - **`bohrin.ir.task.Shape`**: the ways a grader is called — `program`, `io`, `workspace`,
   `container`, `history`, and `numeric`, `proof` and `query`.
+- **Workspace submissions and task shapes.** `bohrin.ir.task.Workspace` describes file
+  changes and commands as a template: a path may name a declared parameter such as
+  `{test_root}`, and the library never fills one in. Paths that are absolute, contain `..`, or
+  name an undeclared parameter are refused. `Task.shape` (default `program`) says how a task's
+  grader is called, and `MutationOperator.shapes` says which shapes an operator applies to; the
+  battery runs only the operators for a task's shape. The battery's rules reach workspaces too:
+  duplicates are tried once, and a grounded workspace that writes the reference into any file
+  is suppressed.
 - **The specification defines every check behind the Verification Gap.** `docs/SPEC.md` now
   states what `weak_oracle`, `determinism`, `ground_truth_rejected` and `answer_leakage` ask,
   how each sub-score is computed, why two of them carry weight 0, and the three result states,
@@ -30,6 +38,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **A candidate's payload is typed** (breaking): `Candidate.payload` is a `Source(text)` for
+  program text or a `Workspace(files, commands, parameters)` for changes to a repository or
+  container, instead of a bare string. Read program text as `candidate.payload.text`.
 - **The battery is for coding graders only, and is battery 2.** Coverage Score categories are
   now the weakness-list families a correct grader must reject — `hollow_program`,
   `harness_tampering`, `answer_access`, `weak_tests` and `grader_logic` — so scores from

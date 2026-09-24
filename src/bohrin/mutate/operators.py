@@ -17,13 +17,15 @@ from collections.abc import Iterator
 
 import libcst as cst
 
-from bohrin.ir.task import Candidate, Ground, Provenance, Task
+from bohrin.ir.task import Candidate, Ground, Provenance, Shape, Source, Task
 from bohrin.mutate.base import MutationOperator
 from bohrin.mutate.equivalence import code_equivalent
 
 
 def _cand(op: str, base: str, detail: str, payload: str, ground: Ground | None) -> Candidate:
-    return Candidate(payload=payload, provenance=Provenance(operator=op, base=base, detail=detail), ground=ground)
+    return Candidate(
+        payload=Source(payload), provenance=Provenance(operator=op, base=base, detail=detail), ground=ground
+    )
 
 
 class _BodyStripper(cst.CSTTransformer):
@@ -55,6 +57,7 @@ class DropSideEffect(MutationOperator):
     category = "hollow_program"
     rationale = "The signature survives but the work does not, so only a verifier that checks effects can catch it."
     requires_code = True
+    shapes = (Shape.PROGRAM,)
 
     def apply(self, task: Task) -> Iterator[Candidate]:
         source = task.reference or ""

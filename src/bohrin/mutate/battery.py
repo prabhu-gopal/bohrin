@@ -4,10 +4,13 @@ Operators propose candidates. This module decides which of them may be *called w
 applies the rules every operator is held to — first-party and third-party alike, since a
 third-party operator reaches the same seam with no privileged path and no review:
 
-* **Duplicates are dropped.** Two payloads equal after stripping are one submission to any
-  verifier, and sending both spends a grader call for no information.
-* **A grounded candidate that is the reference is suppressed.** Under any reading a correct
-  verifier may apply — as an answer (every normalisation in the equivalence ladder) or as a
+* **Only operators for the task's shape run.** An operator declares the grader shapes it
+  applies to; one written for program graders says nothing about a container.
+* **Duplicates are dropped.** Two programs equal after stripping, or two workspaces with the
+  same file changes and commands, are one submission to any verifier, and sending both
+  spends a grader call for no information.
+* **A grounded submission that is, or writes, the reference is suppressed.** Under any
+  reading a correct verifier may apply — as an answer (every normalisation in the equivalence ladder) or as a
   program (Trivial Compiler Equivalence) — such a candidate is the known-good answer, and
   reporting its acceptance would accuse a verifier of accepting its own answer — ``1``
   against a reference of ``1.0`` is the canonical case.
@@ -27,7 +30,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
-from bohrin.ir.task import Candidate, Ground, Task
+from bohrin.ir.task import Candidate, Ground, Payload, Source, Task
 from bohrin.mutate import discover
 from bohrin.mutate.base import MutationOperator
 from bohrin.mutate.equivalence import code_equivalent, collides_under, reads_as_refusal, reads_as_structured_state
@@ -60,12 +63,27 @@ def is_the_reference(payload: str, reference: str) -> bool:
     return collides_under(payload, reference) is not None or code_equivalent(payload, reference)
 
 
+def _carries_the_reference(payload: Payload, reference: str) -> bool:
+    """Whether a submission is, or writes, the known-good answer.
+
+    A workspace that writes the reference into any file is suppressed too. That can only
+    remove a ground: a workspace whose ground is real never needs a file that *is* the
+    known-good solution.
+    """
+    if isinstance(payload, Source):
+        return is_the_reference(payload.text, reference)
+    return any(content is not None and is_the_reference(content, reference) for content in payload.files.values())
+
+
 def battery(task: Task, operators: Sequence[MutationOperator] | None = None) -> Battery:
     """Every candidate the operators propose for ``task``, with the rules above applied.
 
-    ``operators`` defaults to every registered operator, in id order.
+    ``operators`` defaults to every registered operator, in id order. Either way, only those
+    whose shapes include ``task.shape`` run.
     """
-    ops = list(operators) if operators is not None else discover()
+    ops = [
+        op for op in (operators if operators is not None else discover()) if not op.shapes or task.shape in op.shapes
+    ]
     reference = task.reference or ""
     refusal_task = bool(reference) and reads_as_refusal(reference)
     state_task = bool(reference) and reads_as_structured_state(reference)
@@ -76,10 +94,10 @@ def battery(task: Task, operators: Sequence[MutationOperator] | None = None) -> 
     withdrawn = 0
     for op in ops:
         for cand in op.apply(task):
-            key = cand.payload.strip()
+            key = cand.payload.key
             if key in seen:
                 continue
-            if cand.known_wrong and reference and is_the_reference(cand.payload, reference):
+            if cand.known_wrong and reference and _carries_the_reference(cand.payload, reference):
                 suppressed += 1
                 continue
             if cand.known_wrong and (

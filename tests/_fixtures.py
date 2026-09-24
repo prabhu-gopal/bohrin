@@ -17,7 +17,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from bohrin.ir.task import Task
+from bohrin.ir.task import Candidate, Shape, Source, Task
 
 #: A grader: given the task and the submitted payload, does it pay full marks?
 Grader = Callable[[Task, str], bool]
@@ -31,8 +31,16 @@ REFERENCE = """def solve(items):
 """
 
 
-def task(reference: str | None = "70", prompt: str = "What is the value?", task_id: str = "t0") -> Task:
-    return Task(id=task_id, prompt=prompt, reference=reference, reward_fns=("r",))
+def task(
+    reference: str | None = "70", prompt: str = "What is the value?", task_id: str = "t0", shape: Shape = Shape.PROGRAM
+) -> Task:
+    return Task(id=task_id, prompt=prompt, reference=reference, reward_fns=("r",), shape=shape)
+
+
+def text(candidate: Candidate) -> str:
+    """The program text a candidate submits. Every candidate these tests grade is source."""
+    assert isinstance(candidate.payload, Source), f"expected source, got {candidate.payload!r}"
+    return candidate.payload.text
 
 
 #: Graders that are **correct but not exact-string**, as ``(name, reference, equal)``.
@@ -105,4 +113,5 @@ __all__ = [
     "Grader",
     "behavioural_grader",
     "task",
+    "text",
 ]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from bohrin.ir.task import Candidate, Verdict
+from bohrin.ir.task import Candidate, Payload, Verdict
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,8 +125,8 @@ class HarnessDisruption:
     "triggering timeouts, crashing the harness, exhausting memory or disk" — and scores such
     attempts fail-closed *while still logging them as exploit attempts*.
 
-    **The burden of well-formedness is on the checker.** Every payload is a plain string; an
-    ordinary string must never crash a well-written reward function, so a crash is the
+    **The burden of well-formedness is on the checker.** Every payload is an ordinary program
+    or set of file changes, which must never crash a well-written grader, so a crash is the
     verifier's defect. To keep that honest, this is only recorded for a task where **some
     other candidate scored successfully** — that isolates the payload as the trigger. A task
     where every attempt failed is a setup, network or environment problem, and is recorded as
@@ -141,7 +141,7 @@ class HarnessDisruption:
     #: The exception or timeout the reward function raised.
     error: str
     #: The submission that triggered it, so the reader can judge well-formedness.
-    payload: str
+    payload: Payload
     operator: str = ""
 
     @property
