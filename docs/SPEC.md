@@ -202,6 +202,58 @@ what was tried and where, never on when or on which machine, so the same defect 
 ID on every run. When an ID is read back, case and hyphens are ignored, and `I`, `L` and `O` are
 read as `1`, `1` and `0`.
 
+## Reproduction scripts
+
+Every proven finding carries a **reproduction script**: plain Python that applies the exact
+submission to its reader's own environment, runs their grader and reports what happened. It is
+the evidence a stranger actually checks, so its shape is fixed. A complete example, for the
+tutorial's grader, is [examples/reproduce_BF-QA8M7NM39K.py](examples/reproduce_BF-QA8M7NM39K.py).
+
+**The script**
+
+- Is a standalone script with [PEP 723](https://peps.python.org/pep-0723/) inline metadata, so
+  `uv run` or `pipx run` can run it as it is. The `script` block declares `requires-python`,
+  and a `[tool.bohrin]` table declares `schema = "https://bohrin.com/schema/reproduction/v1"`,
+  the `finding` ID, the `probe`, the `submission` digests (as in the finding record) and
+  `runs`, at least 3.
+- Needs nothing from Bohrin and makes no network call: it imports neither `bohrin` nor any
+  networking module.
+- Embeds the exact submission, and checks it against the declared digest before running
+  anything.
+- Runs the grader **exactly as its owner's harness does**, not in a hardened mode, because
+  hardening would hide the very defects a tamper probe proves.
+- Runs the reference and the submission at least 3 times each.
+- Prints one line of JSON last (`https://bohrin.com/schema/reproduction-result/v1`), and exits
+  with the code for its outcome:
+
+| Outcome | Exit | Means | The finding becomes |
+|---|---|---|---|
+| `reproduced` | 0 | the reference passed every run, and the submission was paid full marks every run | unchanged |
+| `not-reproduced` | 1 | the reference passed every run, and the submission was never paid | a lead |
+| `flaky` | 2 | the grader's verdict varied across runs | a lead |
+| `baseline-failed` | 3 | the reference did not pass its own grader | excluded |
+| `error` | 4 | the grader could not be run; the result says why | excluded |
+
+**Reading a result.** The reader never trusts the script's own verdict. It recomputes the
+outcome from the recorded runs, and refuses a result whose claimed outcome or exit code
+disagrees with them, that ran a different submission, or that is about another finding. A
+reproduction can take a finding's proof away; it can never give a finding proof it did not
+have, and it never changes a finding that was not proven (`bohrin.evidence.reproduction`).
+
+**Why three runs, and why the reference too.** A single passing run cannot tell a defect from a
+flaky grader: mature crash reporters do not report a crash they cannot reliably reproduce, and
+record how reliably each reproducer triggers
+([ClusterFuzz](https://google.github.io/clusterfuzz/using-clusterfuzz/workflows/triaging-new-crashes/),
+[syzkaller](https://github.com/google/syzkaller/blob/master/docs/reproducing_crashes.md)).
+Running the reference in the same script shows the grader works in the reader's environment, so
+a failure to reproduce is never mistaken for a broken setup. When the grader's owner runs the
+script, the result is *reproduced* in the sense of
+[ACM's artifact review](https://www.acm.org/publications/policies/artifact-review-and-badging-current):
+obtained by a different team, using the author's artifact.
+
+Writing a script for a particular environment is up to the tool that found the finding; this
+section defines what every such script must be.
+
 ## Identifiers
 
 Every artefact has a permanent identifier, following conventions the security field already

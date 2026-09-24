@@ -14,6 +14,7 @@ says why.
 | report a submission wrongly called wrong | [the false-positive form](https://github.com/prabhu-gopal/bohrin/issues/new?template=false_positive.yml) | how-to |
 | know the exact rules behind a number | [SPEC.md](SPEC.md) | reference |
 | look up a weakness class | [WEAKNESSES.md](WEAKNESSES.md) (generated from `src/bohrin/spec/weaknesses.toml`) | reference |
+| see what a reproduction script looks like, and run one | [examples/reproduce_BF-QA8M7NM39K.py](examples/reproduce_BF-QA8M7NM39K.py), described in [SPEC.md](SPEC.md#reproduction-scripts) | reference |
 | read or validate a finding record | `src/bohrin/evidence/finding.v1.json`, described in [SPEC.md](SPEC.md#findings) | reference |
 | see what a probe tries, as data | `src/bohrin/spec/probes.toml`, described in [SPEC.md](SPEC.md#what-is-tried) | reference |
 | contribute | [CONTRIBUTING.md](../CONTRIBUTING.md) | process |

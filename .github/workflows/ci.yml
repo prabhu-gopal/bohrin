@@ -103,4 +103,7 @@ jobs:
           from bohrin.evidence import SCHEMA, finding_schema
           assert finding_schema()['\$id'] == SCHEMA, 'the finding schema did not ship'
           print('finding schema', SCHEMA)
+          from bohrin.evidence.reproduction import RESULT_SCHEMA, reproduction_result_schema
+          assert reproduction_result_schema()['\$id'] == RESULT_SCHEMA, 'the reproduction schema did not ship'
+          print('reproduction schema', RESULT_SCHEMA)
           "
