@@ -90,16 +90,19 @@ def behavioural_grader(reference: str, inputs: tuple[object, ...]) -> Callable[[
     rejects any changed source outright, while a behavioural one accepts every program that
     behaves like the reference — which is precisely correct.
 
-    Executes fixture-local code only, on inputs this module supplies.
+    Correct means correct against the whole battery, so it has none of the gaps the probes target:
+    it compares each output's exact type and ``repr``, never the submission's own ``__eq__``
+    (BGW-103), and a submission that raises ``SystemExit`` is a failure, not the end of the grader
+    (BGW-102). Executes fixture-local code only, on inputs this module supplies.
     """
 
-    def outputs(source: str) -> list[object] | None:
+    def outputs(source: str) -> list[tuple[str, str]] | None:
         namespace: dict[str, Any] = {}
         try:
             exec(compile(source, "<fixture>", "exec"), namespace)
             solve = namespace["solve"]
-            return [solve(value) for value in inputs]
-        except Exception:
+            return [(type(result).__qualname__, repr(result)) for result in (solve(value) for value in inputs)]
+        except BaseException:  # a submission's SystemExit ends its own run, never the grader
             return None
 
     expected = outputs(reference)
