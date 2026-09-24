@@ -276,6 +276,56 @@ obtained by a different team, using the author's artifact.
 Writing a script for a particular environment is up to the tool that found the finding; this
 section defines what every such script must be.
 
+## `bohrin power`
+
+Is an evaluation big enough to support what it is used to claim? `bohrin power FILE` reads a
+results file a team already has and needs no account and no network. It is arithmetic, so it
+cannot accuse anyone; everything it reports is a statistic or a fact about the file.
+
+**The input** is JSON Lines, one object per line (`https://bohrin.com/schema/results-row/v1`):
+
+| Field | Required | Meaning |
+|---|---|---|
+| `task_id` | yes | the task |
+| `model` | yes | the model or configuration scored |
+| `score` | yes | the reward, or `null` when the sample errored and got no score |
+| `max_score` | no | full marks for the task; default 1 |
+| `cluster` | no | tasks that share a source (a repository, a passage) share a cluster |
+| `sample` | no | which repeat of the task this is |
+
+Other fields are ignored, so an existing results file can usually be read as it is. A malformed
+line is refused with its line number, never skipped.
+
+**What it reports**, for each model and each pair of models:
+
+- **The score with an interval suited to the sample.** Repeated samples of a task are averaged
+  first, and scores are scaled by full marks. Pass/fail scores get the Wilson score interval,
+  which keeps its coverage on small evaluations where the normal approximation fails
+  ([Bowyer et al. 2025](https://arxiv.org/abs/2503.01747)). Other scores get the normal
+  approximation, with a note when there are fewer than a few hundred tasks. When tasks come in
+  clusters, the standard error is clustered, so related tasks are not counted as independent
+  evidence ([Miller 2024](https://arxiv.org/abs/2411.00640), eq. 4).
+- **Paired comparisons.** Two models are compared task by task over the tasks both were run on
+  (Miller, eq. 7). A difference is called distinguishable only when its whole 95% interval lies
+  on one side of zero.
+- **The smallest detectable difference**: the true difference found with 80% power at the 5%
+  level, `(1.96 + 0.84) × standard error of the difference` (Miller, eq. 10). For one model it
+  assumes a second, independent model of similar spread; between two models it is the paired
+  figure.
+- **An aggregation audit:**
+  - errored samples: counted as failures in the headline score, with the score they would give
+    if dropped from the denominator shown beside it (BGW-128);
+  - scores outside 0 to full marks (BGW-128);
+  - tasks one model lacks (BGW-128);
+  - the same sample reported twice (BGW-128);
+  - partial credit (BGW-122).
+- **Whether it is too small** (BGW-133), only when you say what difference you need:
+  `--min-difference 0.02`. Without it, size is reported but not judged.
+
+`--json` prints only the report (`https://bohrin.com/schema/power-report/v1`). The exit code is 0
+when nothing was found, 1 when the audit found something, 2 when the file cannot be read, and 64
+on a usage error.
+
 ## Identifiers
 
 Every artefact has a permanent identifier, following conventions the security field already

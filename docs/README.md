@@ -12,6 +12,7 @@ says why.
 | add a probe | [how-to/add-a-probe.md](how-to/add-a-probe.md) | how-to |
 | add or change a weakness class | [how-to/add-a-weakness.md](how-to/add-a-weakness.md) | how-to |
 | report a submission wrongly called wrong | [the false-positive form](https://github.com/prabhu-gopal/bohrin/issues/new?template=false_positive.yml) | how-to |
+| find out whether an evaluation is big enough, or scored correctly | `bohrin power FILE`, described in [SPEC.md](SPEC.md#bohrin-power) | reference |
 | know the exact rules behind a number | [SPEC.md](SPEC.md) | reference |
 | look up a weakness class | [WEAKNESSES.md](WEAKNESSES.md) (generated from `src/bohrin/spec/weaknesses.toml`) | reference |
 | see what a reproduction script looks like, and run one | [examples/reproduce_BF-GZW6R2M9CJ.py](examples/reproduce_BF-GZW6R2M9CJ.py), described in [SPEC.md](SPEC.md#reproduction-scripts) | reference |

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bohrin.com/schema/power-report/v1",
+  "title": "Bohrin power report",
+  "description": "What `bohrin power --json` prints: each model's score with its interval, detectable differences, paired comparisons, and the aggregation audit. Scores and differences are on a 0 to 1 scale.",
+  "type": "object",
+  "required": ["$schema", "source", "tasks", "clusters", "models", "comparisons", "findings", "notes"],
+  "properties": {
+    "$schema": {"const": "https://bohrin.com/schema/power-report/v1"},
+    "source": {"type": "string"},
+    "tasks": {"type": "integer", "minimum": 1},
+    "clusters": {"type": "integer", "minimum": 0},
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["model", "tasks", "samples", "errored", "score", "score_errors_dropped", "interval_95", "method", "min_detectable_difference"],
+        "properties": {
+          "model": {"type": "string", "minLength": 1},
+          "tasks": {"type": "integer", "minimum": 1},
+          "samples": {"type": "integer", "minimum": 1},
+          "errored": {"type": "integer", "minimum": 0},
+          "score": {"type": "number"},
+          "score_errors_dropped": {"type": ["number", "null"]},
+          "interval_95": {"$ref": "#/$defs/interval"},
+          "method": {"type": "string", "minLength": 1},
+          "min_detectable_difference": {"type": ["number", "null"], "minimum": 0}
+        },
+        "additionalProperties": false
+      }
+    },
+    "comparisons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["first", "second", "tasks", "difference", "interval_95", "min_detectable_difference", "distinguishable"],
+        "properties": {
+          "first": {"type": "string", "minLength": 1},
+          "second": {"type": "string", "minLength": 1},
+          "tasks": {"type": "integer", "minimum": 1},
+          "difference": {"type": "number"},
+          "interval_95": {"$ref": "#/$defs/interval"},
+          "min_detectable_difference": {"type": ["number", "null"], "minimum": 0},
+          "distinguishable": {"type": "boolean"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["weakness", "message"],
+        "properties": {
+          "weakness": {"enum": ["BGW-122", "BGW-128", "BGW-133"]},
+          "message": {"type": "string", "minLength": 1},
+          "model": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "notes": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "interval": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}
+      ]
+    }
+  }
+}

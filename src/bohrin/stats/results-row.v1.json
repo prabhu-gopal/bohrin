@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bohrin.com/schema/results-row/v1",
+  "title": "Bohrin results row",
+  "description": "One line of a JSON Lines results file: one model's score on one task, for one sample. Other fields are allowed and ignored, so an existing results file can be read as it is.",
+  "type": "object",
+  "required": ["task_id", "model", "score"],
+  "properties": {
+    "task_id": {"type": "string", "minLength": 1},
+    "model": {"type": "string", "minLength": 1},
+    "score": {
+      "description": "The reward the grader gave, or null when the sample errored and got no score.",
+      "type": ["number", "null"]
+    },
+    "max_score": {"description": "Full marks for this task. Defaults to 1.", "type": "number", "exclusiveMinimum": 0},
+    "cluster": {"description": "Tasks that share a source (a repository, a passage) share a cluster.", "type": "string", "minLength": 1},
+    "sample": {"description": "Which repeat of the task this is, when a task is scored more than once.", "type": "integer", "minimum": 0}
+  }
+}
