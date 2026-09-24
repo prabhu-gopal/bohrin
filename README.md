@@ -92,9 +92,9 @@ Two numbers come out of it:
 These hold for every check Bohrin contains now and every check it adds later.
 
 1. **No accusation without proof.** A submission is called wrong only when that is established
-   without asking the grader under test: it does no work by construction, it differs provably
-   from the declared answer, or it contradicts the task's own ground truth. Anything else is a
-   **lead**: tried and shown to you, never counted.
+   without asking the grader under test: it does no work by construction, it behaves
+   differently from the reference on an input anyone can run, or it breaks a property the task
+   itself declares. Anything else is a **lead**: tried and shown to you, never counted.
 2. **Every number carries its uncertainty.** A score is printed with its sample, its interval
    and the version of the checks behind it, because `2 of 2` and `300 of 300` must never read
    the same.

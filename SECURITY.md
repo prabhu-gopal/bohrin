@@ -43,11 +43,14 @@ than that, we will say so publicly and explain why.
 
 ## Scope notes
 
-**Bohrin executes no grader code.** It constructs candidate submissions from a task's prompt
-and declared answer. To decide whether a candidate is the declared answer written another way,
-it parses the answer as JSON or a Python literal and compiles it with `compile`. It never
-executes it. It parses a reference that is Python source with LibCST, likewise without
-executing it. Anything that makes Bohrin execute text taken from a task is a vulnerability.
+**Bohrin executes no grader code, and no code taken from a task.** It builds candidate
+submissions from a task's reference solution by parsing it with LibCST. To decide whether a
+candidate is the reference written another way, it compiles both with `compile` and compares
+the bytecode, or parses a bare value as JSON or a Python literal. It never runs any of them,
+and it has no module that opens a network connection or starts a process (a test checks this).
+The data it reads is its own: the weakness list, the probe manifests and the finding schema that
+ship inside the package. Anything that makes Bohrin execute text taken from a task is a
+vulnerability.
 
 - **No telemetry.** Bohrin uploads nothing and makes no network call of its own.
 - **Third-party plugins are code you chose to install.** Operators and relations register
