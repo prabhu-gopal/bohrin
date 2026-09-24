@@ -10,9 +10,25 @@
     "finding": {"type": "string", "pattern": "^BF-[0-9A-HJKMNP-TV-Z]{10}$"},
     "submission": {
       "description": "The submission the script actually ran, as digests, in the same form as a finding record's submission.",
-      "type": "object",
-      "required": ["kind"],
-      "properties": {"kind": {"enum": ["source", "workspace"]}}
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "sha256"],
+          "properties": {"kind": {"const": "source"}, "sha256": {"$ref": "#/$defs/digest"}},
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "files", "commands", "parameters"],
+          "properties": {
+            "kind": {"const": "workspace"},
+            "files": {"type": "object", "additionalProperties": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}},
+            "commands": {"type": "array", "items": {"type": "string"}},
+            "parameters": {"type": "array", "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"}}
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "runs": {"type": "array", "items": {"$ref": "#/$defs/run"}},
     "baseline_runs": {"type": "array", "items": {"$ref": "#/$defs/run"}},
@@ -29,10 +45,11 @@
     },
     {
       "if": {"properties": {"outcome": {"const": "error"}}},
-      "then": {"required": ["error"], "properties": {"error": {"minLength": 1}}}
+      "then": {"required": ["error"], "properties": {"error": {"pattern": "\\S"}}}
     }
   ],
   "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "run": {
       "type": "object",
       "required": ["reward", "passed"],

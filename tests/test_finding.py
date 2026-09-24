@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
+from _parity import disagreements
 from bohrin.evidence import (
     SCHEMA,
     DifferentiatingInput,
@@ -29,6 +30,7 @@ from bohrin.evidence import (
     finding_schema,
     normalise_finding_id,
 )
+from bohrin.evidence.canonical import canonical_json
 from bohrin.ir.task import Ground, Shape, Source, Workspace
 
 _EMPTIED = Submission.of(Source("def solve(items):\n    pass\n"))
@@ -73,7 +75,7 @@ def _observation(presumed: tuple[bool, ...] = (True, True, True), **changes: Any
 
 def test_the_id_is_pinned_so_it_can_never_change_silently() -> None:
     """A published ID is permanent. Changing how it is derived would re-number every finding."""
-    assert finding_id("bohrin/empty-implementation@1", "task-1", "grader-digest", _EMPTIED) == "BF-130XFM28BK"
+    assert finding_id("bohrin/empty-implementation@1", "task-1", "grader-digest", _EMPTIED) == "BF-W6YDC0TBE4"
 
 
 def test_the_same_inputs_give_the_same_id_and_any_change_gives_another() -> None:
@@ -95,16 +97,16 @@ def test_ids_use_only_crockford_symbols() -> None:
         assert len(body) == 10 and not set(body) & set("ILOU")
 
 
-@pytest.mark.parametrize("typed", ["bf-130xfm28bk", "BF-130X-FM28-BK", " BF-130XFM28BK "])
+@pytest.mark.parametrize("typed", ["bf-w6ydc0tbe4", "BF-W6YD-C0TB-E4", " BF-W6YDC0TBE4 "])
 def test_an_id_is_read_the_way_people_type_it(typed: str) -> None:
-    assert normalise_finding_id(typed) == "BF-130XFM28BK"
+    assert normalise_finding_id(typed) == "BF-W6YDC0TBE4"
 
 
 def test_misreadable_letters_are_read_as_the_digits_they_resemble() -> None:
     assert normalise_finding_id("BF-OOOOOIIILL") == "BF-0000011111"
 
 
-@pytest.mark.parametrize("typed", ["130XFM28BK", "BF-130XFM28B", "BF-130XFM28BU", "BVR-2026-00042"])
+@pytest.mark.parametrize("typed", ["W6YDC0TBE4", "BF-W6YDC0TBE", "BF-W6YDC0TBEU", "BVR-2026-00042"])
 def test_what_is_not_an_id_is_refused(typed: str) -> None:
     with pytest.raises(ValueError):
         normalise_finding_id(typed)
@@ -294,3 +296,111 @@ def test_the_schema_refuses_exactly_what_the_code_refuses(
     assert list(_VALIDATOR.iter_errors(data)), f"the schema accepted: {rule}"
     with pytest.raises((ValueError, TypeError)):
         Finding.from_json(data)
+
+
+# --------------------------------------------------------------------------- schema parity, exhaustively
+
+
+def _full(**changes: Any) -> dict[str, Any]:
+    """A record with every optional field present, so every field is exercised."""
+    submission = changes.pop("submission", _EMPTIED)
+    fields: dict[str, Any] = {
+        "level": "proven-experimental",
+        "ground": Ground.DIFFERENTIAL,
+        "submission": submission,
+        "id": finding_id("bohrin/empty-implementation@1", "task-1", "g", submission),
+        "differentiating_input": DifferentiatingInput(input="[1]", reference_output="1", submission_output="None"),
+        "differentiating_observation": _observation(),
+        "run": Run(
+            tool="example",
+            tool_version="1.0",
+            environment_digest=_DIGEST,
+            conditions={"cpu": 2, "memory_gb": 4.5, "egress": "blocked", "gpu": False},
+            provenance="provenance.json",
+        ),
+    }
+    fields.update(changes)
+    return _proven(**fields).to_json()
+
+
+_WORKSPACE = Submission.of(
+    Workspace(
+        {"{test_root}/conftest.py": "# hook\n", "tests/test_a.py": None}, commands=("true",), parameters=("test_root",)
+    )
+)
+
+
+@pytest.mark.parametrize(
+    "valid",
+    [_full(), _full(submission=_WORKSPACE, shape=Shape.WORKSPACE), _full(level="lead", reason="why", reproduce=None)],
+    ids=["source", "workspace", "lead"],
+)
+def test_the_code_and_the_schema_agree_on_every_single_point_breakage(valid: dict[str, Any]) -> None:
+    """Each field replaced by each wrong JSON type, each field removed, an unknown field added anywhere."""
+
+    def accepts(record: dict[str, Any]) -> bool:
+        try:
+            Finding.from_json(record)
+        except (ValueError, TypeError):
+            return False
+        return True
+
+    assert disagreements(valid, finding_schema(), accepts) == []
+
+
+def test_a_string_is_never_read_as_true() -> None:
+    """``bool("false")`` is True in Python; a reader that coerced would turn a failure into a pass."""
+    data = _proven().to_json()
+    data["verdict"]["passed"] = "false"
+    with pytest.raises(ValueError, match="true or false"):
+        Finding.from_json(data)
+
+
+@pytest.mark.parametrize("reward", [float("nan"), float("inf")])
+def test_a_reward_that_is_not_json_is_refused(reward: float) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        Scored(reward=reward, passed=True)
+
+
+def test_some_rules_compare_two_fields_and_only_the_code_can_check_them() -> None:
+    """JSON Schema cannot compare fields; these rules live in the reader and are listed in SPEC."""
+    data = _proven(
+        ground=Ground.DIFFERENTIAL,
+        differentiating_input=DifferentiatingInput(input="[1]", reference_output="1", submission_output="2"),
+    ).to_json()
+    data["differentiating_input"]["submission_output"] = "1"
+    assert list(_VALIDATOR.iter_errors(data)) == [], "the schema cannot see that the outputs are equal"
+    with pytest.raises(ValueError, match="different outputs"):
+        Finding.from_json(data)
+
+
+# --------------------------------------------------------------------------- canonical JSON (RFC 8785)
+
+
+def test_keys_are_sorted_by_utf16_code_units_as_rfc_8785_section_3_2_3_shows() -> None:
+    """The emoji sorts before U+FB33 in UTF-16; a code-point sort would get this wrong."""
+    data = {
+        "€": "Euro Sign",
+        "\r": "Carriage Return",
+        "דּ": "Hebrew Letter Dalet With Dagesh",
+        "1": "One",
+        "\U0001f600": "Emoji: Grinning Face",
+        "\u0080": "Control",
+        "ö": "Latin Small Letter O With Diaeresis",
+    }
+    expected = (
+        '{"\\r":"Carriage Return","1":"One","\u0080":"Control","ö":"Latin Small Letter O With Diaeresis",'
+        '"€":"Euro Sign","\U0001f600":"Emoji: Grinning Face","דּ":"Hebrew Letter Dalet With Dagesh"}'
+    )
+    assert canonical_json(data) == expected.encode("utf-8")
+
+
+def test_strings_are_escaped_as_rfc_8785_section_3_2_2_2_shows() -> None:
+    value = '€$\u000f\nA\'B"\\\\"/'
+    assert canonical_json(value) == '"€$\\u000f\\nA\'B\\"\\\\\\\\\\"/"'.encode()
+
+
+@pytest.mark.parametrize("value", [1.5, float("nan"), 2**60, {1: "x"}, "\ud800"])
+def test_values_canonical_json_cannot_represent_exactly_are_refused(value: Any) -> None:
+    with pytest.raises((TypeError, ValueError, UnicodeEncodeError)):
+        canonical_json(value)

@@ -5,7 +5,7 @@
 #
 # [tool.bohrin]
 # schema = "https://bohrin.com/schema/reproduction/v1"
-# finding = "BF-QA8M7NM39K"
+# finding = "BF-GZW6R2M9CJ"
 # probe = "bohrin/empty-implementation@1"
 # runs = 3
 #
@@ -13,13 +13,13 @@
 # kind = "source"
 # sha256 = "sha256:60a654efdbfdbd6b99d73610003be0292733d39aed50c04b60887ab167db3ddd"
 # ///
-"""Reproduce BF-QA8M7NM39K: the grader pays full marks for `add` with its body replaced by `pass`.
+"""Reproduce BF-GZW6R2M9CJ: the grader pays full marks for `add` with its body replaced by `pass`.
 
 This script needs nothing from Bohrin and makes no network call. It runs your grader, unchanged,
 on the task's reference and on the submission below, three times each, and prints one line of
 JSON saying what happened. Read it before you run it: it is short on purpose.
 
-    uv run reproduce_BF-QA8M7NM39K.py        # or: python reproduce_BF-QA8M7NM39K.py
+    uv run reproduce_BF-GZW6R2M9CJ.py        # or: python reproduce_BF-GZW6R2M9CJ.py
 
 Exit code: 0 reproduced, 1 not reproduced, 2 flaky, 3 the reference failed, 4 could not run.
 """
@@ -31,7 +31,7 @@ import json
 import platform
 import sys
 
-FINDING = "BF-QA8M7NM39K"
+FINDING = "BF-GZW6R2M9CJ"
 RUNS = 3
 FULL_MARKS = 1.0
 

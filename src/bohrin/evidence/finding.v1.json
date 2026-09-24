@@ -90,8 +90,8 @@
       "type": "object",
       "required": ["requirement", "observation", "reference_passed", "presumed_correct_passed", "submission_passed"],
       "properties": {
-        "requirement": {"type": "string", "minLength": 1},
-        "observation": {"type": "string", "minLength": 1},
+        "requirement": {"type": "string", "pattern": "\\S"},
+        "observation": {"type": "string", "pattern": "\\S"},
         "reference_passed": {"type": "boolean"},
         "presumed_correct_passed": {"type": "array", "items": {"type": "boolean"}},
         "submission_passed": {"type": "boolean"}
@@ -157,7 +157,7 @@
     },
     {
       "if": {"properties": {"level": {"enum": ["lead", "excluded"]}}},
-      "then": {"required": ["reason"], "properties": {"reason": {"minLength": 1}}}
+      "then": {"required": ["reason"], "properties": {"reason": {"pattern": "\\S"}}}
     }
   ],
   "$defs": {

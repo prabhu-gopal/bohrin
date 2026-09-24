@@ -21,14 +21,16 @@ the same defect gets the same ID on every run.
 from __future__ import annotations
 
 import hashlib
-import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, ClassVar
 
+from bohrin.evidence import _strict as strict
+from bohrin.evidence.canonical import canonical_json
 from bohrin.ir.task import Ground, Payload, Shape, Source
-from bohrin.spec.ids import is_finding_id, is_probe_id, is_weakness_id
+from bohrin.spec.ids import FINDING_ID, PROBE_ID, WEAKNESS_ID, is_finding_id, is_probe_id, is_weakness_id
 
 SCHEMA = "https://bohrin.com/schema/finding/v1"
 
@@ -55,6 +57,17 @@ def _sha256(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+#: A parameter a workspace template names, such as ``test_root``.
+_PARAMETER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+#: Text with at least one character that is not whitespace.
+_MEANINGFUL = re.compile(r"(?s).*\S.*")
+
+
+def _meaningful(text: str, where: str) -> None:
+    if _MEANINGFUL.fullmatch(text) is None:
+        raise ValueError(f"{where}: must say something, not only whitespace")
+
+
 @dataclass(frozen=True, slots=True)
 class Submission:
     """What was submitted, as digests. Built from a payload with :meth:`of`."""
@@ -72,10 +85,20 @@ class Submission:
             raise ValueError(f"unknown submission kind {self.kind!r}")
         if (self.kind == "source") != (self.sha256 is not None):
             raise ValueError("a source submission carries a digest, and only a source submission does")
+        if self.sha256 is not None:
+            strict.string(self.sha256, "submission.sha256", pattern=strict.DIGEST)
+        for path, digest in self.files.items():
+            strict.string(path, "submission.files", empty=False)
+            if digest is not None:
+                strict.string(digest, f"submission.files[{path!r}]", pattern=strict.DIGEST)
+        for command in self.commands:
+            strict.string(command, "submission.commands")
+        for name in self.parameters:
+            strict.string(name, "submission.parameters", pattern=_PARAMETER)
         object.__setattr__(self, "files", MappingProxyType(dict(sorted(self.files.items()))))
 
     def __hash__(self) -> int:
-        return hash(json.dumps(self.to_json(), sort_keys=True))
+        return hash(canonical_json(self.to_json()))
 
     @classmethod
     def of(cls, payload: Payload) -> Submission:
@@ -105,11 +128,12 @@ def finding_id(probe: str, task_id: str, grader_fingerprint: str, submission: Su
     """The ``BF-`` ID of a finding: the same inputs give the same ID on every run and machine.
 
     ``grader_fingerprint`` identifies the grader under audit, such as a digest of its source; it is
-    supplied by whatever ran the grader. Fifty bits of a SHA-256 over the four inputs, written as
-    ten Crockford base32 characters.
+    supplied by whatever ran the grader. The ID is the first fifty bits of the SHA-256 of the
+    RFC 8785 canonical JSON of ``[probe, task_id, grader_fingerprint, submission]``, written as ten
+    Crockford base32 characters, so anyone can recompute it in any language.
     """
-    canonical = json.dumps([probe, task_id, grader_fingerprint, submission.to_json()], sort_keys=True)
-    bits = int.from_bytes(hashlib.sha256(canonical.encode("utf-8")).digest()[:7], "big") >> 6
+    canonical = canonical_json([probe, task_id, grader_fingerprint, submission.to_json()])
+    bits = int.from_bytes(hashlib.sha256(canonical).digest()[:7], "big") >> 6
     return "BF-" + "".join(_CROCKFORD[(bits >> shift) & 31] for shift in range(45, -1, -5))
 
 
@@ -135,6 +159,10 @@ class Scored:
     reward: float
     passed: bool
 
+    def __post_init__(self) -> None:
+        strict.number(self.reward, "reward")
+        strict.boolean(self.passed, "passed")
+
 
 @dataclass(frozen=True, slots=True)
 class Reproduction:
@@ -142,6 +170,10 @@ class Reproduction:
 
     script: str
     sha256: str
+
+    def __post_init__(self) -> None:
+        strict.string(self.script, "reproduce.script", empty=False)
+        strict.string(self.sha256, "reproduce.sha256", pattern=strict.DIGEST)
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +189,8 @@ class DifferentiatingInput:
     submission_output: str
 
     def __post_init__(self) -> None:
+        for name in ("input", "reference_output", "submission_output"):
+            strict.string(getattr(self, name), f"differentiating_input.{name}")
         if self.reference_output == self.submission_output:
             raise ValueError("a differentiating input must produce different outputs")
 
@@ -184,8 +218,12 @@ class DifferentiatingObservation:
     MIN_PRESUMED_CORRECT: ClassVar[int] = 3
 
     def __post_init__(self) -> None:
-        if not self.requirement.strip() or not self.observation.strip():
-            raise ValueError("an observation must quote its requirement and name its check")
+        _meaningful(strict.string(self.requirement, "requirement"), "differentiating_observation.requirement")
+        _meaningful(strict.string(self.observation, "observation"), "differentiating_observation.observation")
+        strict.boolean(self.reference_passed, "reference_passed")
+        strict.boolean(self.submission_passed, "submission_passed")
+        for passed in self.presumed_correct_passed:
+            strict.boolean(passed, "presumed_correct_passed")
 
     @property
     def proves(self) -> bool:
@@ -211,6 +249,16 @@ class Run:
     provenance: str | None = None
 
     def __post_init__(self) -> None:
+        strict.string(self.tool, "run.tool", empty=False)
+        strict.string(self.tool_version, "run.tool_version", empty=False)
+        for name in ("environment_digest", "provenance"):
+            if getattr(self, name) is not None:
+                strict.string(getattr(self, name), f"run.{name}")
+        for key, value in self.conditions.items():
+            where = f"run.conditions[{key!r}]"
+            if isinstance(value, bool | str):
+                continue
+            strict.number(value, where)
         object.__setattr__(self, "conditions", MappingProxyType(dict(self.conditions)))
 
 
@@ -248,12 +296,19 @@ class Finding:
             raise ValueError(f"malformed probe ID {self.probe!r}")
         if self.level not in LEVELS:
             raise ValueError(f"level must be one of {sorted(LEVELS)}")
-        if self.battery < 1:
-            raise ValueError("battery must be a positive integer")
+        strict.string(self.task_id, "task.id", empty=False)
+        Shape(self.shape)
+        strict.integer(self.battery, "battery", minimum=1)
+        if self.ground is not None:
+            Ground(self.ground)
+        if self.baseline_passed is not None:
+            strict.boolean(self.baseline_passed, "baseline.passed")
+        strict.string(self.fix, "fix")
+        strict.string(self.reason, "reason")
         if self.level in PROVEN:
             self._check_proven()
-        if self.level in ("lead", "excluded") and not self.reason.strip():
-            raise ValueError(f"a {self.level} finding states why it is not proven")
+        if self.level in ("lead", "excluded"):
+            _meaningful(self.reason, f"a {self.level} finding states why it is not proven: reason")
 
     def _check_proven(self) -> None:
         missing = [
@@ -342,71 +397,49 @@ class Finding:
         return out
 
     @classmethod
-    def from_json(cls, data: Mapping[str, Any]) -> Finding:
-        """Read a record back. The same rules apply: a record claiming too much raises.
+    def from_json(cls, data: Any) -> Finding:
+        """Read a record back, refusing anything the published schema refuses.
 
-        Unknown fields are refused at every level, as the published schema refuses them: a field
-        this version does not define is a claim this version cannot check.
+        Every field must be exactly the type the schema gives it: ``"false"`` is not false, ``null``
+        is not an absent field, and a field this version does not define is a claim this version
+        cannot check. Then the rules of evidence apply as for a record made in Python.
         """
-        if data.get("$schema") != SCHEMA:
+        record = strict.obj(
+            data, "finding", _FIELDS, frozenset({"$schema", "id", "weakness", "probe", "level", "task", "battery"})
+        )
+        if record["$schema"] != SCHEMA:
             raise ValueError(f"not a {SCHEMA} record")
-        _only(data, _FIELDS, "finding")
-        for key, allowed in _NESTED.items():
-            if isinstance(data.get(key), Mapping):
-                _only(data[key], allowed, key)
-        sub = data.get("submission")
-        submission = None
-        if sub is not None:
-            submission = Submission(
-                kind=sub["kind"],
-                sha256=sub.get("sha256"),
-                files=sub.get("files", {}),
-                commands=tuple(sub.get("commands", ())),
-                parameters=tuple(sub.get("parameters", ())),
-            )
-        verdict = data.get("verdict")
-        reproduce = data.get("reproduce")
-        dinput = data.get("differentiating_input")
-        dobs = data.get("differentiating_observation")
-        run = data.get("run")
+        task = strict.obj(record["task"], "task", frozenset({"id", "shape"}), frozenset({"id", "shape"}))
         return cls(
-            id=data["id"],
-            weakness=data["weakness"],
-            probe=data["probe"],
-            level=data["level"],
-            task_id=data["task"]["id"],
-            shape=Shape(data["task"]["shape"]),
-            battery=data["battery"],
-            submission=submission,
-            ground=Ground(data["ground"]) if "ground" in data else None,
-            verdict=Scored(reward=verdict["reward"], passed=verdict["passed"]) if verdict else None,
-            baseline_passed=data["baseline"]["passed"] if "baseline" in data else None,
-            reproduce=Reproduction(script=reproduce["script"], sha256=reproduce["sha256"]) if reproduce else None,
-            differentiating_input=DifferentiatingInput(**dinput) if dinput else None,
+            id=strict.string(record["id"], "id", pattern=FINDING_ID),
+            weakness=strict.string(record["weakness"], "weakness", pattern=WEAKNESS_ID),
+            probe=strict.string(record["probe"], "probe", pattern=PROBE_ID),
+            level=strict.string(record["level"], "level"),
+            task_id=strict.string(task["id"], "task.id", empty=False),
+            shape=Shape(strict.string(task["shape"], "task.shape")),
+            battery=strict.integer(record["battery"], "battery", minimum=1),
+            submission=_read_submission(record["submission"]) if "submission" in record else None,
+            ground=Ground(strict.string(record["ground"], "ground")) if "ground" in record else None,
+            verdict=_read_scored(record["verdict"], "verdict") if "verdict" in record else None,
+            baseline_passed=(
+                strict.boolean(
+                    strict.obj(record["baseline"], "baseline", _ONLY_PASSED, _ONLY_PASSED)["passed"], "baseline.passed"
+                )
+                if "baseline" in record
+                else None
+            ),
+            reproduce=_read_reproduction(record["reproduce"]) if "reproduce" in record else None,
+            differentiating_input=_read_input(record["differentiating_input"])
+            if "differentiating_input" in record
+            else None,
             differentiating_observation=(
-                DifferentiatingObservation(
-                    requirement=dobs["requirement"],
-                    observation=dobs["observation"],
-                    reference_passed=dobs["reference_passed"],
-                    presumed_correct_passed=tuple(dobs["presumed_correct_passed"]),
-                    submission_passed=dobs["submission_passed"],
-                )
-                if dobs
+                _read_observation(record["differentiating_observation"])
+                if "differentiating_observation" in record
                 else None
             ),
-            run=(
-                Run(
-                    tool=run["tool"],
-                    tool_version=run["tool_version"],
-                    environment_digest=run.get("environment_digest"),
-                    conditions=run.get("conditions", {}),
-                    provenance=run.get("provenance"),
-                )
-                if run
-                else None
-            ),
-            fix=data.get("fix", ""),
-            reason=data.get("reason", ""),
+            run=_read_run(record["run"]) if "run" in record else None,
+            fix=strict.string(record.get("fix", ""), "fix"),
+            reason=strict.string(record.get("reason", ""), "reason"),
         )
 
 
@@ -416,26 +449,95 @@ _FIELDS = frozenset(
         "baseline", "reproduce", "differentiating_input", "differentiating_observation", "run", "fix", "reason",
     }
 )  # fmt: skip
-_NESTED: Mapping[str, frozenset[str]] = MappingProxyType(
-    {
-        "task": frozenset({"id", "shape"}),
-        "submission": frozenset({"kind", "sha256", "files", "commands", "parameters"}),
-        "verdict": frozenset({"reward", "passed"}),
-        "baseline": frozenset({"passed"}),
-        "reproduce": frozenset({"script", "sha256"}),
-        "differentiating_input": frozenset({"input", "reference_output", "submission_output"}),
-        "differentiating_observation": frozenset(
-            {"requirement", "observation", "reference_passed", "presumed_correct_passed", "submission_passed"}
+_ONLY_PASSED = frozenset({"passed"})
+_SCORED = frozenset({"reward", "passed"})
+
+
+def _read_submission(value: Any) -> Submission:
+    either = frozenset({"kind", "sha256", "files", "commands", "parameters"})
+    kind = strict.string(strict.obj(value, "submission", either, frozenset({"kind"}))["kind"], "submission.kind")
+    if kind == "source":
+        sub = strict.obj(value, "submission", frozenset({"kind", "sha256"}), frozenset({"kind", "sha256"}))
+        return Submission(
+            kind="source", sha256=strict.string(sub["sha256"], "submission.sha256", pattern=strict.DIGEST)
+        )
+    if kind != "workspace":
+        raise ValueError(f"unknown submission kind {kind!r}")
+    fields = frozenset({"kind", "files", "commands", "parameters"})
+    sub = strict.obj(value, "submission", fields, fields)
+    files = strict.obj(
+        sub["files"], "submission.files", frozenset(sub["files"]) if isinstance(sub["files"], dict) else frozenset()
+    )
+    return Submission(
+        kind="workspace",
+        files={
+            path: None
+            if digest is None
+            else strict.string(digest, f"submission.files[{path!r}]", pattern=strict.DIGEST)
+            for path, digest in files.items()
+        },
+        commands=strict.array(sub["commands"], "submission.commands", strict.string),
+        parameters=strict.array(
+            sub["parameters"], "submission.parameters", lambda v, w: strict.string(v, w, pattern=_PARAMETER)
         ),
-        "run": frozenset({"tool", "tool_version", "environment_digest", "conditions", "provenance"}),
-    }
-)
+    )
 
 
-def _only(data: Mapping[str, Any], allowed: frozenset[str], where: str) -> None:
-    unknown = sorted(set(data) - allowed)
-    if unknown:
-        raise ValueError(f"{where}: fields not defined by {SCHEMA}: {unknown}")
+def _read_scored(value: Any, where: str) -> Scored:
+    scored = strict.obj(value, where, _SCORED, _SCORED)
+    return Scored(
+        reward=strict.number(scored["reward"], f"{where}.reward"),
+        passed=strict.boolean(scored["passed"], f"{where}.passed"),
+    )
+
+
+def _read_reproduction(value: Any) -> Reproduction:
+    fields = frozenset({"script", "sha256"})
+    reproduce = strict.obj(value, "reproduce", fields, fields)
+    return Reproduction(
+        script=strict.string(reproduce["script"], "reproduce.script", empty=False),
+        sha256=strict.string(reproduce["sha256"], "reproduce.sha256", pattern=strict.DIGEST),
+    )
+
+
+def _read_input(value: Any) -> DifferentiatingInput:
+    fields = frozenset({"input", "reference_output", "submission_output"})
+    d = strict.obj(value, "differentiating_input", fields, fields)
+    return DifferentiatingInput(
+        **{name: strict.string(d[name], f"differentiating_input.{name}") for name in sorted(fields)}
+    )
+
+
+def _read_observation(value: Any) -> DifferentiatingObservation:
+    fields = frozenset(
+        {"requirement", "observation", "reference_passed", "presumed_correct_passed", "submission_passed"}
+    )
+    o = strict.obj(value, "differentiating_observation", fields, fields)
+    return DifferentiatingObservation(
+        requirement=strict.string(o["requirement"], "requirement", empty=False),
+        observation=strict.string(o["observation"], "observation", empty=False),
+        reference_passed=strict.boolean(o["reference_passed"], "reference_passed"),
+        presumed_correct_passed=strict.array(o["presumed_correct_passed"], "presumed_correct_passed", strict.boolean),
+        submission_passed=strict.boolean(o["submission_passed"], "submission_passed"),
+    )
+
+
+def _read_run(value: Any) -> Run:
+    fields = frozenset({"tool", "tool_version", "environment_digest", "conditions", "provenance"})
+    run = strict.obj(value, "run", fields, frozenset({"tool", "tool_version"}))
+    conditions = strict.obj(run.get("conditions", {}), "run.conditions", frozenset(run.get("conditions", {}) or {}))
+    for key, item in conditions.items():
+        if not isinstance(item, bool | str):
+            strict.number(item, f"run.conditions[{key!r}]")
+    return Run(
+        tool=strict.string(run["tool"], "run.tool", empty=False),
+        tool_version=strict.string(run["tool_version"], "run.tool_version", empty=False),
+        environment_digest=strict.string(run["environment_digest"], "run.environment_digest")
+        if "environment_digest" in run
+        else None,
+        conditions=dict(conditions),
+        provenance=strict.string(run["provenance"], "run.provenance") if "provenance" in run else None,
+    )
 
 
 __all__ = [
