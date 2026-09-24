@@ -1,5 +1,5 @@
 name: False positive
-description: A candidate is called wrong (it carries a ground) but it is actually a correct answer.
+description: A candidate is called wrong (it carries a ground) but it is actually a correct solution.
 title: "[false positive] "
 labels: ["false-positive", "calibration"]
 body:
@@ -9,12 +9,12 @@ body:
         **This is the most valuable report you can send us.**
 
         A candidate may be called wrong only when its wrongness is established independently
-        of the grader. If one of Bohrin's grounded candidates is really a correct answer for
+        of the grader. If one of Bohrin's grounded candidates is really a correct solution for
         your task, a correct grader would be accused of accepting wrong work. We cannot find
         those on synthetic data — we need yours.
 
-        You do **not** need to share your environment. The operator, the task's declared
-        answer, the candidate, and why it is correct are enough to act on.
+        You do **not** need to share your environment. The operator, the task's reference
+        solution, the candidate, and why it is correct are enough to act on.
 
   - type: input
     id: operator-id
@@ -28,8 +28,8 @@ body:
   - type: textarea
     id: the-candidate
     attributes:
-      label: The task's declared answer, and the candidate
-      description: The reference answer, the candidate's payload, and its ground.
+      label: The task's reference solution, and the candidate
+      description: The reference, the candidate's payload, and its ground.
       render: shell
     validations:
       required: true
@@ -40,8 +40,8 @@ body:
       label: Why is this candidate actually correct?
       description: What does Bohrin not know about your task? This is the part we cannot guess.
       placeholder: |
-        The candidate is the constant 0, but for this task 0 IS the correct answer written
-        another way, so a correct grader is right to accept it.
+        What your task allows that Bohrin assumed it does not: for example, which behaviour the
+        grader is entitled to ignore, and why this candidate still meets the task.
     validations:
       required: true
 

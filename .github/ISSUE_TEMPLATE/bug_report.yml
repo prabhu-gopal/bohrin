@@ -9,7 +9,7 @@ body:
         Thanks for reporting. The version fields below are required because without them
         almost every bug report is unactionable — we cannot tell a fixed bug from a live one.
 
-        **If a candidate is called wrong but is actually a correct answer**, that is a false
+        **If a candidate is called wrong but is actually a correct solution**, that is a false
         positive, not a bug — please use the *False positive* template instead.
 
   - type: textarea
@@ -18,7 +18,7 @@ body:
       label: What happened?
       description: What did you run, what did you expect, and what did you get instead?
       placeholder: |
-        battery(task) raised a RecursionError on a task whose reference is a long LaTeX expression.
+        battery(task) raised a RecursionError on a task whose reference is a deeply nested function.
     validations:
       required: true
 
