@@ -14,6 +14,9 @@ happened. That script is the evidence a stranger actually checks, so its shape i
   every time and the submission is paid full marks every time; mixed verdicts are ``flaky``.
 * **It runs the grader exactly as its owner's harness does**, not hardened: hardening would hide
   the very defects a tamper probe proves.
+* **It runs each grading in its own process, with a time limit.** A submission that exits,
+  crashes or hangs cannot stop the script from reporting, and nothing carries from one run to
+  the next. A run that reports no reward counts as not paid, so the script fails closed.
 * **It reports one line of JSON** (``https://bohrin.com/schema/reproduction-result/v1``) and a
   distinct exit code for each outcome.
 
@@ -126,6 +129,8 @@ def check_script(text: str, finding: Finding) -> list[str]:
         problems.append("imports bohrin: a reproduction must run without it")
     if imported & _NETWORK:
         problems.append(f"imports network modules {sorted(imported & _NETWORK)}: a reproduction must not need one")
+    if not imported & {"subprocess", "multiprocessing"}:
+        problems.append("never starts a process: each grading must run in its own, so a submission cannot stop it")
     if RESULT_SCHEMA not in text:
         problems.append(f"never reports a {RESULT_SCHEMA} result")
     return problems

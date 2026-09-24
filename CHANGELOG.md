@@ -23,7 +23,8 @@ All notable changes to this project are documented here. The format follows
   `https://bohrin.com/schema/reproduction-result/v1`, and "Reproduction scripts" in
   `docs/SPEC.md`). Every proven finding's script is a standalone PEP 723 script: it needs nothing
   from Bohrin and makes no network call. It checks its embedded submission against the declared
-  digest, and runs the reference and the submission at least three times each. It reports one of
+  digest, and runs the reference and the submission at least three times each, each run in its own
+  process with a time limit, so a submission that exits, crashes or hangs cannot stop it reporting. It reports one of
   `reproduced`, `not-reproduced`, `flaky`, `baseline-failed` or `error`, with a distinct exit
   code. `check_script()` checks a script without running it. `parse_result()` recomputes the
   outcome from the recorded runs rather than trusting the script. `apply()` downgrades a finding
