@@ -141,3 +141,7 @@ def test_an_operator_without_a_category_counts_as_other() -> None:
 
 def test_category_of_names_the_built_in_category() -> None:
     assert category_of("drop_side_effect") == "hollow_program"
+
+
+def test_an_unknown_operator_counts_as_other() -> None:
+    assert category_of("no_such_operator") == OTHER

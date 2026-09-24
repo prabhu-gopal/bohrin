@@ -146,6 +146,8 @@ def test_a_complete_proven_finding_is_accepted() -> None:
         ("malformed weakness", {"weakness": "CWE-79"}),
         ("malformed probe", {"probe": "empty-implementation"}),
         ("unknown level", {"level": "confirmed"}),
+        ("battery 0", {"battery": 0}),
+        ("battery given as true", {"battery": True}),
     ],
 )
 def test_a_finding_claiming_more_than_its_evidence_is_refused(rule: str, changes: dict[str, Any]) -> None:
@@ -404,3 +406,27 @@ def test_strings_are_escaped_as_rfc_8785_section_3_2_2_2_shows() -> None:
 def test_values_canonical_json_cannot_represent_exactly_are_refused(value: Any) -> None:
     with pytest.raises((TypeError, ValueError, UnicodeEncodeError)):
         canonical_json(value)
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"kind": "archive"},
+        {"kind": "source"},
+        {"kind": "workspace", "sha256": _DIGEST},
+        {"kind": "source", "sha256": "md5:abc"},
+        {"kind": "workspace", "files": {"a.py": "not a digest"}},
+        {"kind": "workspace", "parameters": ("not an identifier",)},
+    ],
+)
+def test_a_submission_built_in_python_is_held_to_the_schema(fields: dict[str, Any]) -> None:
+    with pytest.raises(ValueError):
+        Submission(**fields)
+
+
+def test_equal_submissions_hash_equally() -> None:
+    assert hash(Submission.of(Source("x = 1\n"))) == hash(Submission.of(Source("x = 1\n")))
+
+
+def test_canonical_json_takes_the_scalars_ids_are_made_of() -> None:
+    assert canonical_json(["a", 1, True, None, {"b": []}]) == b'["a",1,true,null,{"b":[]}]'
