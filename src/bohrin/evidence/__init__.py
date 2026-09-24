@@ -1,4 +1,4 @@
-"""Evidence formats: the finding record and its published schema."""
+"""Evidence formats: the finding record, reproduction scripts, and their published schemas."""
 
 from __future__ import annotations
 

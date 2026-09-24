@@ -49,7 +49,10 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
   - `ids.py`: the identifier formats (`BGW-`, `BVR-`, probe IDs, `BF-`, schemas, `BCL-`).
   - `python -m bohrin.spec` regenerates `docs/WEAKNESSES.md`.
 - **`evidence/`**: the finding record (`finding.py`) and its published JSON Schema
-  (`finding.v1.json`), with `finding_id()`.
+  (`finding.v1.json`), with `finding_id()`; and the reproduction-script contract
+  (`reproduction.py`, `reproduction-result.v1.json`): the static check of a script, the reading
+  of its result, and invariant I7, a finding whose script does not reproduce it loses its proof.
+  `docs/examples/` holds a complete script that the tests run.
 - **`_plugins.py`**: entry-point discovery, shared by operators and relations.
 
 `tests/` mirrors the package. `tests/_fixtures.py` holds graders with known behaviour, correct and

@@ -135,8 +135,11 @@ same defect gets the same ID on every run. Its **level** says how far the eviden
 `proven`, `proven-experimental`, `suspected`, `lead`, `observation` or `excluded`.
 
 **Reproduction script.** A plain Python script attached to a proven finding. It applies the exact
-submission to your environment, runs your grader and prints the reward. It needs nothing from
-Bohrin, so anyone can check a finding themselves.
+submission to your environment, runs your grader on the reference and on the submission three
+times each, and prints one line saying whether the finding was reproduced. It needs nothing from
+Bohrin, so anyone can check a finding themselves. A finding whose script does not reproduce it
+stops being proven. See [SPEC.md](SPEC.md#reproduction-scripts) and the
+[example](examples/reproduce_BF-QA8M7NM39K.py).
 
 **Differentiating input.** An input on which the reference and the submission give different
 outputs. It proves a program wrong without asking the grader.

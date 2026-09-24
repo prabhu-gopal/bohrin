@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bohrin.com/schema/reproduction-result/v1",
+  "title": "Bohrin reproduction result",
+  "description": "The last line a reproduction script prints. Readers recompute the outcome from the runs rather than trusting it.",
+  "type": "object",
+  "required": ["$schema", "finding", "submission", "runs", "baseline_runs", "outcome"],
+  "properties": {
+    "$schema": {"const": "https://bohrin.com/schema/reproduction-result/v1"},
+    "finding": {"type": "string", "pattern": "^BF-[0-9A-HJKMNP-TV-Z]{10}$"},
+    "submission": {
+      "description": "The submission the script actually ran, as digests, in the same form as a finding record's submission.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {"kind": {"enum": ["source", "workspace"]}}
+    },
+    "runs": {"type": "array", "items": {"$ref": "#/$defs/run"}},
+    "baseline_runs": {"type": "array", "items": {"$ref": "#/$defs/run"}},
+    "outcome": {"enum": ["reproduced", "not-reproduced", "flaky", "baseline-failed", "error"]},
+    "python": {"type": "string"},
+    "platform": {"type": "string"},
+    "error": {"type": "string"}
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"properties": {"outcome": {"enum": ["reproduced", "not-reproduced", "flaky", "baseline-failed"]}}},
+      "then": {"properties": {"runs": {"minItems": 3}, "baseline_runs": {"minItems": 3}}}
+    },
+    {
+      "if": {"properties": {"outcome": {"const": "error"}}},
+      "then": {"required": ["error"], "properties": {"error": {"minLength": 1}}}
+    }
+  ],
+  "$defs": {
+    "run": {
+      "type": "object",
+      "required": ["reward", "passed"],
+      "properties": {"reward": {"type": "number"}, "passed": {"type": "boolean"}},
+      "additionalProperties": false
+    }
+  }
+}

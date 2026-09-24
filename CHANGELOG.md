@@ -19,6 +19,16 @@ All notable changes to this project are documented here. The format follows
 - **Identifier formats** (`bohrin.spec.ids`, and "Identifiers" in `docs/SPEC.md`) for weakness
   classes (`BGW-`), registry records (`BVR-`), probes (`bohrin/<slug>@<major>`), findings
   (`BF-`), schemas and conformance levels.
+- **Reproduction scripts** (`bohrin.evidence.reproduction`, the result schema
+  `https://bohrin.com/schema/reproduction-result/v1`, and "Reproduction scripts" in
+  `docs/SPEC.md`). Every proven finding's script is a standalone PEP 723 script: it needs nothing
+  from Bohrin and makes no network call. It checks its embedded submission against the declared
+  digest, and runs the reference and the submission at least three times each. It reports one of
+  `reproduced`, `not-reproduced`, `flaky`, `baseline-failed` or `error`, with a distinct exit
+  code. `check_script()` checks a script without running it. `parse_result()` recomputes the
+  outcome from the recorded runs rather than trusting the script. `apply()` downgrades a finding
+  its script did not reproduce, and never upgrades one. A complete, runnable example is in
+  `docs/examples/`.
 - **Documentation for newcomers**, organised by what a reader needs:
   - a [tutorial](docs/tutorial.md) that checks a first grader step by step;
   - [concepts](docs/concepts.md), explaining the idea and every term in a glossary;
