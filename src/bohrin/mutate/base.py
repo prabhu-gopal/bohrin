@@ -13,7 +13,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 
-from bohrin.ir.task import Candidate, Task
+from bohrin.ir.task import Candidate, Shape, Task
 
 
 class MutationOperator(ABC):
@@ -31,6 +31,10 @@ class MutationOperator(ABC):
 
     #: True when the operator needs the reference to parse as Python.
     requires_code: bool = False
+
+    #: The task shapes this operator applies to. Empty means every shape, so an operator written
+    #: before shapes existed keeps running everywhere it ran before.
+    shapes: tuple[Shape, ...] = ()
 
     @abstractmethod
     def apply(self, task: Task) -> Iterator[Candidate]:

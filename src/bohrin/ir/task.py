@@ -6,10 +6,13 @@ environment format, which is what keeps the definitions portable across formats.
 
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from types import MappingProxyType
+from typing import Any, ClassVar
 
 
 class Ground(StrEnum):
@@ -71,10 +74,86 @@ class Provenance:
 
 
 @dataclass(frozen=True, slots=True)
+class Source:
+    """A submission that is program text: a solution, a module, a reply."""
+
+    kind: ClassVar[str] = "source"
+
+    text: str
+
+    @property
+    def key(self) -> str:
+        """What makes two submissions the same one: surrounding whitespace is not part of a program."""
+        return f"source:{self.text.strip()}"
+
+
+#: A parameter placeholder in a workspace path, such as ``{test_root}``.
+_PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
+_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+@dataclass(frozen=True, slots=True)
+class Workspace:
+    """A submission that is a set of file changes, and commands, applied to a repository or container.
+
+    ``files`` maps a path to its new content, or to ``None`` to delete it. Paths are relative
+    to the root of whatever the submission is applied to, and may never leave it.
+
+    **A workspace is a template, never an instantiation.** A path may name a parameter, such
+    as ``{test_root}/conftest.py``, and every parameter it names is declared in
+    ``parameters``. Filling a parameter in needs knowledge of one particular environment (its
+    test root, its reward path, its parser), so nothing in this library does it: the template
+    is the same for every environment, which is what lets anyone read it and check it.
+    """
+
+    kind: ClassVar[str] = "workspace"
+
+    files: Mapping[str, str | None] = field(default_factory=dict)
+    commands: tuple[str, ...] = ()
+    parameters: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for name in self.parameters:
+            if not _IDENTIFIER.fullmatch(name):
+                raise ValueError(f"parameter {name!r} is not an identifier")
+        if len(set(self.parameters)) != len(self.parameters):
+            raise ValueError(f"parameters repeat: {self.parameters}")
+        for path in self.files:
+            _check_path(path, self.parameters)
+        # Frozen means frozen: a caller's dict must not be able to change a candidate after the
+        # battery has checked it. Sorted, so equal workspaces render identically.
+        object.__setattr__(self, "files", MappingProxyType(dict(sorted(self.files.items()))))
+
+    def __hash__(self) -> int:
+        return hash(self.key)
+
+    @property
+    def key(self) -> str:
+        """A canonical rendering: two workspaces with the same key are the same submission."""
+        body = {"files": dict(self.files), "commands": list(self.commands), "parameters": list(self.parameters)}
+        return "workspace:" + json.dumps(body, sort_keys=True)
+
+
+def _check_path(path: str, parameters: tuple[str, ...]) -> None:
+    """Refuse a path that is empty, absolute, escapes the root, or names an undeclared parameter."""
+    if not path or path.startswith("/") or "\\" in path:
+        raise ValueError(f"workspace path {path!r} must be relative, with forward slashes")
+    if any(part in ("", ".", "..") for part in path.split("/")):
+        raise ValueError(f"workspace path {path!r} has an empty, '.' or '..' segment")
+    undeclared = sorted(set(_PLACEHOLDER.findall(path)) - set(parameters))
+    if undeclared:
+        raise ValueError(f"workspace path {path!r} names undeclared parameters {undeclared}")
+
+
+#: A submission: program text, or changes to a workspace.
+Payload = Source | Workspace
+
+
+@dataclass(frozen=True, slots=True)
 class Candidate:
     """A submission Bohrin constructed, carrying a claim about its own correctness."""
 
-    payload: str
+    payload: Payload
     provenance: Provenance
 
     #: How wrongness was established, or None when it was not. This field is load-bearing:
@@ -104,6 +183,9 @@ class Task:
 
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
+    #: How this task's grader is called, which decides which operators apply to it.
+    shape: Shape = Shape.PROGRAM
+
 
 @dataclass(frozen=True, slots=True)
 class Verdict:
@@ -121,4 +203,4 @@ class Verdict:
     scale_exceeded: bool = False
 
 
-__all__ = ["Candidate", "Ground", "Provenance", "Shape", "Task", "Verdict"]
+__all__ = ["Candidate", "Ground", "Payload", "Provenance", "Shape", "Source", "Task", "Verdict", "Workspace"]

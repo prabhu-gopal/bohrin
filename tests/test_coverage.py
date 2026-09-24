@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
 
-from _fixtures import REFERENCE, task
-from bohrin.ir.task import Candidate, Ground, Provenance, Task
+from _fixtures import REFERENCE, task, text
+from bohrin.ir.task import Candidate, Ground, Provenance, Source, Task
 from bohrin.mutate import discover
 from bohrin.mutate.base import MutationOperator
 from bohrin.mutate.battery import battery
@@ -28,7 +28,7 @@ from bohrin.spec.weaknesses import weakness_list
 def _attempts(
     tasks: Sequence[Task], accepts: Callable[[Task, str], bool], operators: Sequence[MutationOperator] | None = None
 ) -> list[Attempt]:
-    return [Attempt(t.id, c, accepts(t, c.payload)) for t in tasks for c in battery(t, operators).candidates]
+    return [Attempt(t.id, c, accepts(t, text(c))) for t in tasks for c in battery(t, operators).candidates]
 
 
 def _exact(t: Task, reply: str) -> bool:
@@ -49,7 +49,7 @@ class _Hollow(MutationOperator):
     def apply(self, task: Task) -> Iterator[Candidate]:
         for body in ("return None", "raise NotImplementedError"):
             payload = f"def solve(items):\n    {body}\n"
-            yield Candidate(payload, Provenance(self.id, "reference", body), Ground.STRUCTURAL)
+            yield Candidate(Source(payload), Provenance(self.id, "reference", body), Ground.STRUCTURAL)
 
 
 def test_every_category_is_a_weakness_family() -> None:
@@ -93,7 +93,7 @@ def test_one_accepted_candidate_is_enough_for_a_category_to_get_through() -> Non
 
 
 def test_leads_never_count_in_either_direction() -> None:
-    lead = Candidate("def solve(items):\n    return -1\n", Provenance("x", "reference", "unproven"), None)
+    lead = Candidate(Source("def solve(items):\n    return -1\n"), Provenance("x", "reference", "unproven"), None)
     assert coverage_score([Attempt("a", lead, accepted=True)]).score is None
 
 
@@ -125,7 +125,7 @@ class _Uncategorised(MutationOperator):
     rationale = "test double"
 
     def apply(self, task: Task) -> Iterator[Candidate]:
-        yield Candidate("banana", Provenance(self.id, "constant", "not 70"), Ground.DIFFERENTIAL)
+        yield Candidate(Source("banana"), Provenance(self.id, "constant", "not 70"), Ground.DIFFERENTIAL)
 
 
 def test_an_operator_without_a_category_counts_as_other() -> None:

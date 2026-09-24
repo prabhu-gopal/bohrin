@@ -53,7 +53,8 @@ def my_grader(task, submission):
 
 
 attempts = [
-    Attempt(task.id, candidate, accepted=my_grader(task, candidate.payload)) for candidate in battery(task).candidates
+    Attempt(task.id, candidate, accepted=my_grader(task, candidate.payload.text))
+    for candidate in battery(task).candidates
 ]
 print(coverage_score(attempts))
 ```

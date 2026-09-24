@@ -19,8 +19,8 @@ from typing import Any
 
 import pytest
 
-from _fixtures import LENIENT_CORRECT, REFERENCE, TRIVIAL_REFERENCE, behavioural_grader, task
-from bohrin.ir.task import Candidate, Ground, Provenance, Task
+from _fixtures import LENIENT_CORRECT, REFERENCE, TRIVIAL_REFERENCE, behavioural_grader, task, text
+from bohrin.ir.task import Candidate, Ground, Provenance, Source, Task
 from bohrin.mutate.base import MutationOperator
 from bohrin.mutate.battery import battery
 
@@ -36,7 +36,9 @@ class _Proposes(MutationOperator):
 
     def apply(self, task: Task) -> Iterator[Candidate]:
         for payload, ground in self.proposals:
-            yield Candidate(payload, Provenance(self.id, "constant", f"claims {payload[:20]!r} is wrong"), ground)
+            yield Candidate(
+                Source(payload), Provenance(self.id, "constant", f"claims {payload[:20]!r} is wrong"), ground
+            )
 
 
 #: What an unguarded third-party operator might claim about any task: an empty submission
@@ -49,9 +51,7 @@ _OVERCLAIMS = _Proposes(
 
 def _accused(t: Task, accepts: Callable[[str], bool], operators: Sequence[MutationOperator] | None = None) -> list[str]:
     """Grounded candidates a grader accepted, as ``operator: payload``. Empty for a correct grader."""
-    return [
-        f"{c.provenance.operator}: {c.payload[:60]!r}" for c in battery(t, operators).grounded if accepts(c.payload)
-    ]
+    return [f"{c.provenance.operator}: {text(c)[:60]!r}" for c in battery(t, operators).grounded if accepts(text(c))]
 
 
 # --------------------------------------------------------------------------- the guard
@@ -91,7 +91,7 @@ def test_a_third_party_candidate_that_is_the_answer_is_suppressed_and_counted() 
     op = _Proposes(("70.0", Ground.DIFFERENTIAL), ("71", Ground.DIFFERENTIAL))
     result = battery(task("70"), [op])
 
-    assert [c.payload for c in result.candidates] == ["71"], "only the colliding candidate is removed"
+    assert [text(c) for c in result.candidates] == ["71"], "only the colliding candidate is removed"
     assert result.suppressed == 1
 
 
@@ -108,7 +108,7 @@ def test_an_empty_submission_is_not_suppressed_against_a_bare_answer() -> None:
     """``compile("70")`` equals ``compile("")``; TCE once suppressed the empty reply everywhere."""
     result = battery(task("70"), [_OVERCLAIMS])
 
-    assert any(c.payload == "" and c.known_wrong for c in result.candidates)
+    assert any(text(c) == "" and c.known_wrong for c in result.candidates)
 
 
 # ---------------------------------------------------------------- withdrawn grounds
@@ -163,6 +163,6 @@ def test_a_grader_accepting_anything_is_caught_by_every_grounded_candidate() -> 
 
 def test_duplicate_payloads_are_tried_once() -> None:
     op = _Proposes(("0", Ground.DIFFERENTIAL), (" 0 ", Ground.DIFFERENTIAL), ("0\n", None))
-    kept = [c.payload.strip() for c in battery(task(REFERENCE), [op]).candidates]
+    kept = [text(c).strip() for c in battery(task(REFERENCE), [op]).candidates]
 
     assert kept == ["0"]

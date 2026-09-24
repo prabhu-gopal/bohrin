@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from _fixtures import REFERENCE, TRIVIAL_REFERENCE, task
+from _fixtures import REFERENCE, TRIVIAL_REFERENCE, task, text
 from bohrin.ir.task import Ground
 from bohrin.mutate import discover
 from bohrin.mutate.battery import battery
@@ -160,8 +160,8 @@ def test_emptying_every_body_is_structurally_wrong() -> None:
     (candidate,) = DropSideEffect().apply(task(REFERENCE))
 
     assert candidate.ground is Ground.STRUCTURAL
-    assert "def solve(items):" in candidate.payload, "the signature survives"
-    assert "total" not in candidate.payload, "the work does not"
+    assert "def solve(items):" in text(candidate), "the signature survives"
+    assert "total" not in text(candidate), "the work does not"
 
 
 @pytest.mark.parametrize("reference", [None, "", "70", "not python at all (", TRIVIAL_REFERENCE])
