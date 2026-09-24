@@ -19,6 +19,17 @@ All notable changes to this project are documented here. The format follows
 - **Identifier formats** (`bohrin.spec.ids`, and "Identifiers" in `docs/SPEC.md`) for weakness
   classes (`BGW-`), registry records (`BVR-`), probes (`bohrin/<slug>@<major>`), findings
   (`BF-`), schemas and conformance levels.
+- **Documentation for newcomers**, organised by what a reader needs:
+  - a [tutorial](docs/tutorial.md) that checks a first grader step by step;
+  - [concepts](docs/concepts.md), explaining the idea and every term in a glossary;
+  - [ARCHITECTURE.md](ARCHITECTURE.md), with the code map and the invariants the code keeps;
+  - how-to guides for [adding a probe](docs/how-to/add-a-probe.md) and
+    [adding a weakness class](docs/how-to/add-a-weakness.md);
+  - a [map of all the docs](docs/README.md).
+
+  Tests run every example in the tutorial and the README against the output they show, check
+  every relative link and anchor, require a docstring on every public class and function, and
+  check that the package never imports a network or process module or calls `exec`.
 - **The finding record** (`bohrin.evidence`, published as the JSON Schema
   `https://bohrin.com/schema/finding/v1`): six evidence levels, from `proven` to `excluded`; the
   submission recorded as digests; differentiating inputs and observations; run conditions. A

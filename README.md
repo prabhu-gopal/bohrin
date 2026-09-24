@@ -116,12 +116,22 @@ further: to benchmarks, to the tests coding agents change, and to any checker wh
 someone else relies on. They extend one kind of checker at a time, and only as far as proof
 can follow.
 
+## Documentation
+
+| Start with | If you want to |
+|---|---|
+| [Tutorial](docs/tutorial.md) | check your first grader, in about ten minutes |
+| [Concepts](docs/concepts.md) | understand the idea: grounds, leads, weaknesses, probes, findings |
+| [Weakness list](docs/WEAKNESSES.md) | look up every published way a coding grader is cheated |
+| [Specification](docs/SPEC.md) | know the exact rules behind every number |
+| [Architecture](ARCHITECTURE.md) | find your way around the code |
+| [All documentation](docs/README.md) | see everything, by what you want to do |
+
 ## Extending it
 
-Operators (new known-wrong submissions) and relations (new certified rewritings of a correct
-solution) register through the public `bohrin.mutators` and `bohrin.relations` entry points,
-from your own package, with no fork. Third-party code is held to exactly the same rules as
-built-in code. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Probes can be added from your own package, with no fork: an operator registered under the
+public `bohrin.mutators` entry point runs in the battery under exactly the same rules as a
+built-in one. See [How to add a probe](docs/how-to/add-a-probe.md).
 
 ## Contributing
 

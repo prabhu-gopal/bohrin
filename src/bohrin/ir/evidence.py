@@ -22,6 +22,7 @@ class Exploit:
 
     @property
     def summary(self) -> str:
+        """One line a person can read in a report."""
         return f"{self.task_id}: accepted {self.candidate.provenance.operator} (reward {self.verdict.reward:g})"
 
 
@@ -68,10 +69,12 @@ class Flake:
 
     @property
     def spread(self) -> float:
+        """How far apart the rewards for the identical submission were."""
         return max(self.rewards) - min(self.rewards)
 
     @property
     def summary(self) -> str:
+        """One line a person can read in a report."""
         seen = ", ".join(f"{r:g}" for r in self.rewards)
         return f"{self.task_id}: identical submission scored {seen}"
 
@@ -111,6 +114,7 @@ class GroundTruthRejected:
 
     @property
     def summary(self) -> str:
+        """One line a person can read in a report."""
         n = len(self.relations_tried)
         return f"{self.task_id}: no rendering of the declared answer was accepted ({n} tried)"
 
@@ -146,6 +150,7 @@ class HarnessDisruption:
 
     @property
     def summary(self) -> str:
+        """One line a person can read in a report."""
         return f"{self.task_id}: the verifier failed on a well-formed submission ({self.error[:80]})"
 
 
@@ -172,6 +177,7 @@ class AnswerInPrompt:
 
     @property
     def summary(self) -> str:
+        """One line a person can read in a report."""
         return f"{self.task_id}: the declared answer appears verbatim in the prompt"
 
 

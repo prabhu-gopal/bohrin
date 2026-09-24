@@ -79,6 +79,7 @@ class Submission:
 
     @classmethod
     def of(cls, payload: Payload) -> Submission:
+        """The digests of a submission: what a finding records instead of its content."""
         if isinstance(payload, Source):
             return cls(kind="source", sha256=_sha256(payload.text))
         return cls(
@@ -89,6 +90,7 @@ class Submission:
         )
 
     def to_json(self) -> dict[str, Any]:
+        """The submission as it appears in a finding record."""
         if self.kind == "source":
             return {"kind": "source", "sha256": self.sha256}
         return {
@@ -187,6 +189,7 @@ class DifferentiatingObservation:
 
     @property
     def proves(self) -> bool:
+        """Whether the observation can prove anything: never too narrow, and failed by the submission."""
         return (
             self.reference_passed
             and len(self.presumed_correct_passed) >= self.MIN_PRESUMED_CORRECT

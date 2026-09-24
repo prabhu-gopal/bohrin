@@ -74,6 +74,7 @@ class Weakness:
 
     @property
     def number(self) -> int:
+        """The ID's number, for ordering: ``BGW-108`` is ``108``. It carries no other meaning."""
         return weakness_number(self.id)
 
 
@@ -105,6 +106,7 @@ class WeaknessList:
         raise KeyError(weakness_id)
 
     def in_family(self, family: str) -> tuple[Weakness, ...]:
+        """The classes in one family, in ID order."""
         return tuple(w for w in self.weaknesses if w.family == family)
 
 
