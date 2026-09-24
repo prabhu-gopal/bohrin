@@ -94,4 +94,8 @@ jobs:
           result = battery(Task(id='0', prompt='What is 7 x 10?', reference='70', reward_fns=('r',)))
           assert result.grounded, 'the battery produced no grounded candidate'
           print(f'{len(operators)} operators, {len(result.candidates)} candidates for a numeric task')
+          from bohrin.spec import weakness_list
+          weaknesses = weakness_list()
+          assert len(weaknesses.weaknesses) >= 38, 'the weakness list did not ship in the wheel'
+          print(f'weakness list v{weaknesses.version}: {len(weaknesses.weaknesses)} classes')
           "

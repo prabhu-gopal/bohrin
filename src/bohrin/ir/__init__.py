@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from bohrin.ir.evidence import BaselineFailure, Exploit, Finding, Flake, Unverified
 from bohrin.ir.result import ProbeResult, ProbeStatus
-from bohrin.ir.task import Candidate, Ground, Provenance, Task, Verdict
+from bohrin.ir.task import Candidate, Ground, Provenance, Shape, Task, Verdict
 
 __all__ = [
     "BaselineFailure",
@@ -16,6 +16,7 @@ __all__ = [
     "ProbeResult",
     "ProbeStatus",
     "Provenance",
+    "Shape",
     "Task",
     "Unverified",
     "Verdict",

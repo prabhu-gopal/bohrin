@@ -8,6 +8,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **The weakness list** (`docs/WEAKNESSES.md`, `bohrin.spec`): 38 classes, `BGW-101` to
+  `BGW-138`, covering every published way a coding grader or its harness can be cheated or be
+  wrong — hollow programs, harness tampering, answer access, weak or wrong tests, grader logic,
+  isolation and measurement adequacy. Each class has a mechanism, the grader shapes it applies
+  to, the evidence a finding of it carries, fix guidance and public sources, and the list is
+  crosswalked to two published taxonomies (an 11-category exploit dataset and an 11-item task
+  rubric). It ships as data, `src/bohrin/spec/weaknesses.toml`, which any tool can read without
+  importing Bohrin.
+- **Identifier formats** (`bohrin.spec.ids`, and "Identifiers" in `docs/SPEC.md`) for weakness
+  classes (`BGW-`), registry records (`BVR-`), probes (`bohrin/<slug>@<major>`), findings
+  (`BF-`), schemas and conformance levels.
+- **`bohrin.ir.task.Shape`**: the ways a grader is called — `program`, `io`, `workspace`,
+  `container`, `history`, and `numeric`, `proof` and `query`.
 - **The specification defines every check behind the Verification Gap.** `docs/SPEC.md` now
   states what `weak_oracle`, `determinism`, `ground_truth_rejected` and `answer_leakage` ask,
   how each sub-score is computed, why two of them carry weight 0, and the three result states,
