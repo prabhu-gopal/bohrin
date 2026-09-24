@@ -109,3 +109,4 @@ jobs:
           "
           printf '%s\n' '{"task_id": "t0", "model": "a", "score": 1}' '{"task_id": "t1", "model": "a", "score": 0}' > /tmp/results.jsonl
           /tmp/fresh/bin/bohrin power /tmp/results.jsonl
+          /tmp/fresh/bin/bohrin verify --since HEAD "$GITHUB_WORKSPACE"

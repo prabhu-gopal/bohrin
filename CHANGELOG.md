@@ -19,6 +19,20 @@ All notable changes to this project are documented here. The format follows
 - **Identifier formats** (`bohrin.spec.ids`, and "Identifiers" in `docs/SPEC.md`) for weakness
   classes (`BGW-`), registry records (`BVR-`), probes (`bohrin/<slug>@<major>`), findings
   (`BF-`), schemas and conformance levels.
+- **`bohrin verify`**: facts about what a change did to the tests and the code, from the syntax
+  trees of each file at a commit and in the working tree, beside any commit message that claims
+  success. It reports:
+  - tests deleted or weakened (checks classified by the eight-category taxonomy of *All Smoke, No
+    Alarm*);
+  - assertions removed, skips added, tolerances loosened, timeouts raised, failures swallowed;
+  - expected values rewritten, the function under test mocked, test hooks planted, pytest
+    selection changed;
+  - functions replaced by stubs, `__eq__` always true, timers reassigned, exits added.
+
+  Moves and reformatting are not reported. Facts alone exit 0; facts beside a claim of success
+  exit 1; `--strict` exits 1 on any fact. It needs no account and no network, and reading history
+  is safe in a hostile repository: read-only git plumbing only, with repository-named programs
+  switched off, and the working tree read directly.
 - **`bohrin power`**, and the `bohrin` command itself (also `python -m bohrin`). It reads a
   JSON Lines results file (`task_id`, `model`, `score`; optionally `max_score`, `cluster`,
   `sample`) and, with no account and no network, reports:

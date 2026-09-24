@@ -47,7 +47,12 @@ than that, we will say so publicly and explain why.
 submissions from a task's reference solution by parsing it with LibCST. To decide whether a
 candidate is the reference written another way, it compiles both with `compile` and compares
 the bytecode, or parses a bare value as JSON or a Python literal. It never runs any of them,
-and it has no module that opens a network connection or starts a process (a test checks this).
+and it has no module that opens a network connection. The one process it starts is `git`, for
+`bohrin verify`, and only for read-only plumbing on committed history, with the programs a
+repository can name (fsmonitor, external diff, hooks) switched off. It never asks git to diff
+the working tree, because that runs a repository's filters; it reads working-tree files itself,
+without following symlinks. Tests check all of this, including in a deliberately booby-trapped
+repository.
 The data it reads is its own: the weakness list, the probe manifests and the finding schema that
 ship inside the package. Anything that makes Bohrin execute text taken from a task is a
 vulnerability.

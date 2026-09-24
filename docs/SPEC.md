@@ -326,6 +326,49 @@ line is refused with its line number, never skipped.
 when nothing was found, 1 when the audit found something, 2 when the file cannot be read, and 64
 on a usage error.
 
+## `bohrin verify`
+
+What did a change do to the tests and the code, beside what its commits claim? `bohrin verify
+--since REF` compares the files at `REF` (default: where the branch started) with the working
+tree, uncommitted work included. It needs no account and no network, and it reports **facts**
+read from syntax trees, never "cheated": reformatting never looks like a removed assertion, and
+a test moved to another file never looks like a deleted one.
+
+| Rule | Reports | Kind | Weakness |
+|---|---|---|---|
+| `tests-removed` | a test file deleted or emptied, or tests gone, and not moved elsewhere | fact | BGW-109 |
+| `check-weakened` | a test's checks dropped from strong (value, error, containment or type) to weak (none, non-None only, truth only, mock calls only, snapshot only) | fact | BGW-109 |
+| `checks-removed` | fewer assertions in a test than before | fact | BGW-109 |
+| `skips-added` | an unconditional skip or xfail | fact | BGW-109 |
+| `conditional-skips-added` | a `skipif`, or a `pytest.skip()` under an `if` | observation | BGW-109 |
+| `tolerance-loosened` | a larger `pytest.approx` / `isclose` / `assert_allclose` tolerance, fewer `assertAlmostEqual` places | fact | BGW-134 |
+| `timeout-raised` | a larger test timeout | fact | BGW-109 |
+| `failure-swallowed` | a check moved inside a `try` whose `except` catches its failure | fact | BGW-109 |
+| `expected-value-changed` | the literal a checked expression is compared with changed | observation | BGW-109 |
+| `subject-mocked` | a test newly patching the function it is named after | observation | BGW-109 |
+| `trivial-checks-added` | a check that cannot fail (`assert True`, `assert x == x` with no call) | observation | BGW-109 |
+| `tests-without-checks` | a new test with no assertion | observation | BGW-109 |
+| `report-hook-added` | a `conftest.py` hook that can change test outcomes | fact | BGW-108 |
+| `selection-changed` | pytest's `addopts`, `testpaths` or other selection settings changed | fact | BGW-109 |
+| `replaced-by-stub` | a function that did work replaced by a stub | fact | BGW-101 |
+| `always-equal-added` | an `__eq__` that always returns `True` | fact | BGW-103 |
+| `timer-reassigned` | `time.perf_counter` or another timer reassigned | fact | BGW-113 |
+| `exit-added` | a call that exits the process added in source | observation | BGW-102 |
+
+Test strength follows the eight-category taxonomy of
+[All Smoke, No Alarm](https://arxiv.org/abs/2606.18168) (strong: S1 value, S2 error, containment
+or type, S3 both; weak: W1 none, W2 existence, W3 truth, W4 mock calls, W5 snapshot).
+
+A refactor can delete tests honestly, so facts alone exit 0. A fact beside a commit message that
+**claims success** exits 1: a subject line starting "Fix", "Resolves", "Implemented" and the like,
+or a message saying the tests pass. `--strict` exits 1 on any fact, for CI; observations never
+change the exit code. Not checked yet: a test's expected value copied into the source, and files
+other than Python and pytest configuration; a report always says so.
+
+Reading history is safe in a hostile repository: only read-only git plumbing runs, with the
+programs a repository can name switched off, and the working tree is read directly, never
+diffed by git.
+
 ## Identifiers
 
 Every artefact has a permanent identifier, following conventions the security field already

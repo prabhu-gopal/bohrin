@@ -23,6 +23,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import NoReturn
 
+from bohrin.history import verify as history
+from bohrin.history.git import GitError
 from bohrin.stats.power import analyse, render
 from bohrin.stats.results import read_results
 from bohrin.version import __version__
@@ -71,6 +73,24 @@ def _parser() -> _Parser:
         help="the smallest difference you need to detect, such as 0.02; without it, size is reported but not judged",
     )
     power.add_argument("--json", action="store_true", help="print only the JSON report")
+    check = verbs.add_parser(
+        "verify",
+        help="report what a change did to the tests and the code, beside what its commits claim",
+        description=(
+            "Compare the files at a commit with the working tree, uncommitted work included, and report facts read "
+            "from syntax trees: tests deleted or weakened, checks removed, skips added, tolerances loosened, test "
+            "hooks planted, functions replaced by stubs. Facts alone exit 0; facts beside a commit message that "
+            "claims success exit 1. Needs no account and makes no network call."
+        ),
+    )
+    check.add_argument(
+        "--since",
+        metavar="REF",
+        help="the commit to compare from, such as HEAD~1 or main (default: where this branch started)",
+    )
+    check.add_argument("--strict", action="store_true", help="exit 1 on any fact, for CI")
+    check.add_argument("--json", action="store_true", help="print only the JSON report")
+    check.add_argument("path", nargs="?", type=Path, default=Path("."), help="a path inside the repository")
     return parser
 
 
@@ -100,12 +120,34 @@ def _power(args: argparse.Namespace) -> int:
     return FINDINGS if report.findings else CLEAN
 
 
+def _verify(args: argparse.Namespace) -> int:
+    try:
+        report = history.verify(args.path, args.since)
+    except GitError as exc:
+        print(
+            f"bohrin: cannot read the history: {exc}. Run bohrin verify inside a git repository, "
+            "with --since naming a commit that exists.",
+            file=sys.stderr,
+        )
+        return CANNOT_RUN
+    if args.json:
+        print(json.dumps(report.to_json(), indent=2))
+    else:
+        print(history.render(report))
+    hard = any(fact.kind == "fact" for fact in report.facts)
+    if hard and (args.strict or report.claims):
+        return FINDINGS
+    return CLEAN
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run ``bohrin`` with ``argv`` (default: the process's arguments) and return its exit code."""
     parser = _parser()
     args = parser.parse_args(argv)
     if args.verb == "power":
         return _power(args)
+    if args.verb == "verify":
+        return _verify(args)
     parser.print_help()
     return USAGE if argv else CLEAN
 
