@@ -100,4 +100,7 @@ jobs:
           from bohrin.spec import probes
           assert {p.operator for p in probes()} == {o.id for o in operators}, 'the probe manifests did not ship'
           print(f'{len(probes())} probe manifests')
+          from bohrin.evidence import SCHEMA, finding_schema
+          assert finding_schema()['\$id'] == SCHEMA, 'the finding schema did not ship'
+          print('finding schema', SCHEMA)
           "
