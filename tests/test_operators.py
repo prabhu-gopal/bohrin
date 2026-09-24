@@ -172,3 +172,33 @@ def test_it_stays_silent_where_emptying_proves_nothing(reference: str | None) ->
 
 def test_the_battery_grounds_it_on_a_real_program() -> None:
     assert [c.provenance.operator for c in battery(task(REFERENCE)).grounded] == ["drop_side_effect"]
+
+
+#: References whose functions do no work of their own: an interface, an abstract base, a protocol.
+#: Emptying them removes nothing, so "the emptied program does no work" proves nothing about it.
+_INERT_REFERENCES = {
+    "docstring only": 'class Store:\n    def get(self, key):\n        """Return the value for key."""\n',
+    "raises NotImplementedError": "class Store:\n    def get(self, key):\n        raise NotImplementedError\n",
+    "raises NotImplementedError with a message": (
+        'class Store:\n    def get(self, key):\n        """Return it."""\n'
+        '        raise NotImplementedError("subclass")\n'
+    ),
+    "ellipsis": "class Store:\n    def get(self, key): ...\n",
+}
+
+
+@pytest.mark.parametrize("reference", _INERT_REFERENCES.values(), ids=_INERT_REFERENCES.keys())
+def test_emptying_a_reference_that_does_no_work_is_never_grounded(reference: str) -> None:
+    """A correct grader of an interface accepts the emptied interface, and is right to."""
+    assert [c for c in battery(task(reference)).grounded if c.provenance.operator == "drop_side_effect"] == []
+
+
+def test_one_function_that_does_work_is_enough_for_the_ground() -> None:
+    """The counterweight: an abstract method beside a real one still proves the emptied version wrong."""
+    mixed = (
+        "class Store:\n"
+        "    def get(self, key):\n        raise NotImplementedError\n"
+        "    def size(self):\n        return len(self.items)\n"
+    )
+    (candidate,) = DropSideEffect().apply(task(mixed))
+    assert candidate.ground is Ground.STRUCTURAL

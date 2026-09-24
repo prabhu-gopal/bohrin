@@ -40,6 +40,35 @@ class _BodyStripper(cst.CSTTransformer):
         return updated_node.with_changes(body=cst.IndentedBlock(body=[cst.SimpleStatementLine(body=[cst.Pass()])]))
 
 
+def _inert(statement: cst.BaseSmallStatement) -> bool:
+    """A statement that does nothing: ``pass``, ``...``, a bare string, or ``raise NotImplementedError``."""
+    if isinstance(statement, cst.Pass):
+        return True
+    if isinstance(statement, cst.Expr):
+        return isinstance(statement.value, cst.Ellipsis | cst.SimpleString | cst.ConcatenatedString)
+    if isinstance(statement, cst.Raise) and statement.exc is not None:
+        raised = statement.exc.func if isinstance(statement.exc, cst.Call) else statement.exc
+        return isinstance(raised, cst.Name) and raised.value == "NotImplementedError"
+    return False
+
+
+class _WorkFinder(cst.CSTVisitor):
+    """Records whether any function in a module has a body that does work."""
+
+    def __init__(self) -> None:
+        self.does_work = False
+
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
+        """Mark the module as doing work if this function's body holds anything but no-ops."""
+        body = node.body
+        lines = body.body if isinstance(body, cst.IndentedBlock) else [body]
+        for line in lines:
+            if not (
+                isinstance(line, cst.SimpleStatementLine | cst.SimpleStatementSuite) and all(map(_inert, line.body))
+            ):
+                self.does_work = True
+
+
 def _parse(source: str) -> cst.Module | None:
     try:
         return cst.parse_module(source)
@@ -52,6 +81,13 @@ class DropSideEffect(MutationOperator):
 
     A grader that checks only that the code imports and runs, or that checks a return value
     but never the filesystem or database, accepts a solution that does no work.
+
+    **The ground needs a reference that does work.** "The emptied program does no work" proves
+    it wrong only if the reference does some. An interface, an abstract base class or a protocol
+    has functions whose bodies are only docstrings, ``pass``, ``...`` or ``raise
+    NotImplementedError``; emptying them removes nothing, and a correct grader of that interface
+    is right to accept the result. So the operator stays silent unless at least one function in
+    the reference does something else.
     """
 
     id = "drop_side_effect"
@@ -65,6 +101,10 @@ class DropSideEffect(MutationOperator):
         source = task.reference or ""
         module = _parse(source)
         if module is None:
+            return
+        finder = _WorkFinder()
+        module.visit(finder)
+        if not finder.does_work:
             return
         tf = _BodyStripper()
         mutated = module.visit(tf)

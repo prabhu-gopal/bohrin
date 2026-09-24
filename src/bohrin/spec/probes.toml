@@ -26,6 +26,7 @@ maturity = "experimental"
 battery = 2
 guards = [
     "The reference does not parse, or defines no function: nothing is submitted.",
+    "No function in the reference does work of its own (every body is a docstring, pass, ... or raise NotImplementedError, as in an interface): nothing is submitted.",
     "The emptied program compiles to the same bytecode as the reference, because its bodies were already empty: nothing is submitted.",
 ]
 sources = ["https://arxiv.org/abs/2604.17596", "https://link.springer.com/article/10.1007/s10664-018-9653-2"]
