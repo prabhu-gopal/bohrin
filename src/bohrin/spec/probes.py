@@ -35,6 +35,7 @@ SOLUTIONS: Mapping[str, str] = MappingProxyType(
         "no-op": "the task is not attempted",
         "reference": "the declared solution, unchanged",
         "reference-emptied": "the declared solution with every function body replaced by pass",
+        "reference-rewritten": "the declared solution rewritten in a way certified not to change what it does",
     }
 )
 

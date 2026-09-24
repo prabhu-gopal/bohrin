@@ -70,8 +70,12 @@ Changelog = "https://github.com/prabhu-gopal/bohrin/blob/main/CHANGELOG.md"
 [project.entry-points."bohrin.mutators"]
 drop_side_effect = "bohrin.mutate.operators:DropSideEffect"
 
-# `bohrin.relations` is the seam for certified meaning-preserving rewritings of a correct
-# solution. Nothing is built in; the group name is public API all the same.
+# Certified meaning-preserving rewritings of a correct solution: positive controls. Their order is
+# fixed in `bohrin.relations._BUILTIN_ORDER`, not by this table.
+[project.entry-points."bohrin.relations"]
+comment_free   = "bohrin.relations.builtin:CommentFree"
+reformatted    = "bohrin.relations.builtin:Reformatted"
+renamed_locals = "bohrin.relations.builtin:RenamedLocals"
 
 [tool.hatch.version]
 path = "src/bohrin/version.py"

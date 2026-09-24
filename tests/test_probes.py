@@ -12,6 +12,8 @@ import pytest
 
 from _fixtures import REFERENCE, task
 from bohrin.mutate import discover
+from bohrin.relations import BASELINE
+from bohrin.relations import discover as discover_relations
 from bohrin.scoring.coverage import BATTERY_VERSION
 from bohrin.spec.probes import parse, probe_for, probes
 from bohrin.spec.weaknesses import weakness_list
@@ -19,8 +21,16 @@ from bohrin.spec.weaknesses import weakness_list
 # --------------------------------------------------------------------------- code and data agree
 
 
-def test_every_built_in_operator_has_exactly_one_manifest_and_back() -> None:
-    assert {op.id for op in discover()} == {p.operator for p in probes()}
+def test_every_built_in_generator_has_exactly_one_manifest_and_back() -> None:
+    """Operators (negative controls) and relations plus the baseline (positive controls)."""
+    generators = {op.id for op in discover()} | {r.id for r in discover_relations()} | {BASELINE}
+    assert generators == {p.operator for p in probes()}
+
+
+def test_negative_controls_reject_and_positive_controls_accept() -> None:
+    for probe in probes():
+        operator = probe.operator in {op.id for op in discover()}
+        assert probe.expect == ("reject" if operator else "accept"), probe.id
 
 
 def test_built_in_probes_are_in_the_bohrin_namespace_and_the_current_battery() -> None:
@@ -41,7 +51,7 @@ def test_an_operator_emits_what_its_manifest_promises(operator: str) -> None:
     assert {c.ground for c in candidates} == {probe.ground}, "every submission carries the manifest's ground"
 
 
-@pytest.mark.parametrize("probe_id", [p.id for p in probes()])
+@pytest.mark.parametrize("probe_id", [p.id for p in probes() if p.expect == "reject"])
 def test_an_operator_counts_towards_the_family_of_its_weakness(probe_id: str) -> None:
     probe = next(p for p in probes() if p.id == probe_id)
     op = next(o for o in discover() if o.id == probe.operator)

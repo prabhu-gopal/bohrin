@@ -19,6 +19,17 @@ All notable changes to this project are documented here. The format follows
 - **Identifier formats** (`bohrin.spec.ids`, and "Identifiers" in `docs/SPEC.md`) for weakness
   classes (`BGW-`), registry records (`BVR-`), probes (`bohrin/<slug>@<major>`), findings
   (`BF-`), schemas and conformance levels.
+- **Positive controls: correct work a grader must accept** (`bohrin.relations.positive_controls`).
+  The reference itself (the baseline; if a grader rejects it, the task is excluded), and three
+  rewritings of it, each emitted only with a mechanical proof that it does the same thing:
+  - comments removed (the same syntax tree);
+  - re-laid out by Python's unparser (the same syntax tree);
+  - local variables renamed (the same bytecode up to local names; never parameters or function
+    names, and never in code that reads its own local names at run time).
+
+  Each has a manifest (`bohrin/oracle@1`, `…/comment-free-oracle@1`, `…/reformatted-oracle@1`,
+  `…/renamed-oracle@1`). A differential test runs every emitted control beside its original on a
+  corpus built to break naive renaming, and demands identical results.
 - **SARIF output and a GitHub Action for `bohrin verify`.** `--sarif FILE` writes the facts as
   SARIF 2.1.0 (validated against the OASIS schema), with a line for each fact, facts as warnings
   and observations as notes, and fingerprints that keep a fact's annotation when its counts

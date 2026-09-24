@@ -1,4 +1,4 @@
-"""The metamorphic relation catalogue: a seam, with nothing built in.
+"""The metamorphic relation catalogue: the seam positive controls come through.
 
 A relation claims that its rewriting preserves meaning. The consequence of a wrong claim is
 specific and severe: Bohrin would report a verifier for rejecting a solution that was never
@@ -47,9 +47,9 @@ def registered(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     yield
 
 
-def test_nothing_is_built_in() -> None:
-    assert discover() == []
-    assert renderings("def f():\n    return 1\n") == []
+def test_the_built_ins_are_the_certified_positive_controls() -> None:
+    assert [r.id for r in discover()] == ["comment_free", "reformatted", "renamed_locals"]
+    assert renderings("def f():\n    return 1\n") == [], "nothing to rewrite here"
 
 
 @pytest.mark.usefixtures("registered")
