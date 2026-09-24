@@ -68,16 +68,8 @@ def number(value: Any, where: str) -> float:
     return float(value)
 
 
-def array(value: Any, where: str, item: Callable[[Any, str], T], *, min_items: int = 0) -> tuple[T, ...]:
-    """A list whose every item passes ``item``, with at least ``min_items`` of them."""
+def array(value: Any, where: str, item: Callable[[Any, str], T]) -> tuple[T, ...]:
+    """A list whose every item passes ``item``."""
     if not isinstance(value, list):
         raise ValueError(f"{where}: expected a list")
-    if len(value) < min_items:
-        raise ValueError(f"{where}: needs at least {min_items} items")
     return tuple(item(entry, f"{where}[{index}]") for index, entry in enumerate(value))
-
-
-def finite(value: float, where: str) -> None:
-    """Refuse NaN and infinity in a value built in Python, which ``json`` would write as invalid JSON."""
-    if not math.isfinite(value):
-        raise ValueError(f"{where}: must be finite")

@@ -115,3 +115,26 @@ def test_a_repeated_probe_id_is_refused() -> None:
     second = _GOOD.replace('operator = "reward_write"', 'operator = "other"')
     with pytest.raises(ValueError, match="duplicate"):
         parse(_GOOD + second)
+
+
+def test_a_positive_control_manifest_carries_no_ground() -> None:
+    """The accepting side of the loader: a correct submission is not accused of anything."""
+    accept = _GOOD.replace('ground = "structural"\n', "").replace('expect = "reject"', 'expect = "accept"')
+    (probe,) = parse(accept.replace('solution = "no-op"', 'solution = "reference"'))
+    assert (probe.expect, probe.ground) == ("accept", None)
+
+
+@pytest.mark.parametrize(
+    ("breakage", "old", "new"),
+    [
+        ("no template table", "[probe.template]\n", "[probe.not_a_template]\n"),
+        ("no shape", 'shapes = ["container"]', "shapes = []"),
+        ("weakness not a list", 'weakness = ["BGW-111"]', 'weakness = "BGW-111"'),
+        ("empty title", 'title = "Write the maximum reward"', 'title = ""'),
+        ("template file is not a name", '"{reward_path}" = "reward_max.txt"', '"{reward_path}" = 1'),
+    ],
+)
+def test_more_malformed_manifests_are_refused(breakage: str, old: str, new: str) -> None:
+    assert old in _GOOD, breakage
+    with pytest.raises(ValueError):
+        parse(_GOOD.replace(old, new, 1))

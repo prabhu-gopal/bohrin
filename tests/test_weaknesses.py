@@ -193,3 +193,26 @@ def test_the_vocabularies_are_described() -> None:
     page = render_markdown()
     for key in [*EVIDENCE, *PROVIDES]:
         assert f"**{key}**" in page, key
+
+
+def test_an_unknown_id_is_a_key_error_not_a_guess() -> None:
+    with pytest.raises(KeyError):
+        weakness_list().get("BGW-999")
+
+
+@pytest.mark.parametrize(
+    ("breakage", "old", "new"),
+    [
+        ("no families table", '[families]\nf = "A family"\n', ""),
+        ("shapes not a list", 'shapes = ["program"]', 'shapes = "program"'),
+    ],
+)
+def test_more_malformed_lists_are_refused(breakage: str, old: str, new: str) -> None:
+    assert old in _GOOD, breakage
+    with pytest.raises(ValueError):
+        parse(_GOOD.replace(old, new, 1))
+
+
+def test_a_crosswalk_that_maps_nothing_is_refused() -> None:
+    with pytest.raises(ValueError, match="maps no categories"):
+        parse(_GOOD + '\n[crosswalk.x]\ntitle = "X"\nsource = "https://example.org"\n')

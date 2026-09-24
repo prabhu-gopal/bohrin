@@ -376,3 +376,8 @@ def test_a_submission_that_exits_or_crashes_cannot_stop_the_script_reporting(tmp
     assert result.outcome == "not-reproduced", "no reward reported is not paid: the script fails closed"
     assert done.returncode == OUTCOMES["not-reproduced"][0]
     assert all(run.passed for run in result.baseline_runs), "the reference still ran normally"
+
+
+def test_a_script_that_is_not_python_is_reported() -> None:
+    text = SCRIPT.read_text(encoding="utf-8") + "\ndef broken(:\n"
+    assert any("not valid Python" in problem for problem in check_script(text, _FINDING))
