@@ -34,6 +34,31 @@ class Ground(StrEnum):
     INVARIANT = "invariant"
 
 
+class Shape(StrEnum):
+    """How a grader is called, which decides what a probe against it means.
+
+    ``numeric``, ``proof`` and ``query`` are defined so the weakness list is complete; no
+    probe targets them yet.
+    """
+
+    #: (task, source) -> reward, with tests run in-process or in a subprocess.
+    PROGRAM = "program"
+    #: A program run on inputs, with a checker comparing its output.
+    IO = "io"
+    #: A repository plus a patch, judged by a test command.
+    WORKSPACE = "workspace"
+    #: The agent acts in a container, and a script there writes the reward.
+    CONTAINER = "container"
+    #: A change in a repository with a claim of success, read from version history.
+    HISTORY = "history"
+    #: A program whose output is compared within a numeric tolerance.
+    NUMERIC = "numeric"
+    #: A proof checked by a proof assistant.
+    PROOF = "proof"
+    #: A database query checked by executing it.
+    QUERY = "query"
+
+
 @dataclass(frozen=True, slots=True)
 class Provenance:
     """Where a candidate came from, so a finding can be reproduced and argued with."""
@@ -96,4 +121,4 @@ class Verdict:
     scale_exceeded: bool = False
 
 
-__all__ = ["Candidate", "Ground", "Provenance", "Task", "Verdict"]
+__all__ = ["Candidate", "Ground", "Provenance", "Shape", "Task", "Verdict"]

@@ -117,6 +117,35 @@ Every check ends in one of three states, and they are never collapsed:
 
 A clean result bounds what was tried. It is not a proof that a grader is sound.
 
+## Identifiers
+
+Every artefact has a permanent identifier, following conventions the security field already
+uses (CWE, CVE and OSV, CodeQL query IDs, SARIF fingerprints). The formats are checked by
+`bohrin.spec.ids`.
+
+| Object | Format | Example | Rules |
+|---|---|---|---|
+| Weakness class | `BGW-<number>` | `BGW-108` | The number carries no meaning and is never reused. A retired class keeps its number, marked deprecated |
+| Registry record | `BVR-<year>-<five or more digits>` | `BVR-2026-00042` | The year is when the ID was assigned; the sequence grows without limit |
+| Probe | `<namespace>/<slug>@<major>` | `bohrin/pytest-report-patch@1` | The major version changes when what the probe tries changes. Third parties use their own namespace |
+| Finding | `BF-<10 Crockford base32>` | `BF-7K3Q9D2M1X` | Derived from what was tried and where, so the same defect gets the same ID on every run. No `I`, `L`, `O` or `U` |
+| Schema | `https://bohrin.com/schema/<name>/v<major>` | `https://bohrin.com/schema/finding/v1` | Additive changes keep the major version |
+| Battery | integer | `1` | Changes whenever a category is added, removed or redefined |
+| Conformance level | `BCL-1` to `BCL-4` | `BCL-2` | |
+
+## Weakness list
+
+[WEAKNESSES.md](WEAKNESSES.md) lists every published way a coding grader or its harness can be
+cheated or be wrong, as `BGW-` classes grouped into families: hollow programs, harness
+tampering, answer access, weak or wrong tests, grader logic, isolation, and measurement
+adequacy. Each class states its mechanism, the grader shapes it applies to, the evidence a
+finding of it carries, static fix guidance and its public sources, and it is crosswalked to
+other published taxonomies. The list is data (`src/bohrin/spec/weaknesses.toml`), readable
+without importing Bohrin.
+
+A technique enters the list only once it is public. Mechanisms describe how a grader fails,
+never whose.
+
 ## How it is tested
 
 Every guard is tested from both directions: no correct grader may accept a grounded submission,

@@ -1,0 +1,535 @@
+# The Bohrin weakness list: every published way a coding grader or its harness can be cheated
+# or be wrong. Probes, findings, registry records and fix guidance all refer to these IDs.
+#
+# The rules for this file are in docs/SPEC.md ("Identifiers") and are enforced by
+# tests/test_weaknesses.py:
+#
+# * An ID is `BGW-<number>`. The number carries no meaning and is never reused. A retired
+#   class keeps its number with `status = "deprecated"`.
+# * `family` is a view for reading the list, not part of the ID: moving a class to another
+#   family never renumbers it.
+# * Every class names at least one public source. A technique enters this list only once it
+#   is already public.
+# * Mechanisms and fixes describe how a grader fails, never whose grader failed.
+#
+# docs/WEAKNESSES.md is generated from this file: `python -m bohrin.spec > docs/WEAKNESSES.md`.
+
+version = 1
+
+[families]
+hollow_program = "Hollow programs: the grader pays for code that does no work"
+harness_tampering = "Harness tampering: the submission changes what judges it"
+answer_access = "Answer access: the submission obtains the solution instead of producing it"
+weak_tests = "Weak or wrong tests: the tests cannot tell right from wrong"
+grader_logic = "Grader logic and reliability"
+isolation = "Isolation and permissions: the structure that enables tampering and answer access"
+measurement = "Measurement adequacy"
+
+# --------------------------------------------------------------------------- hollow programs
+
+[[weakness]]
+id = "BGW-101"
+name = "Trivial implementation"
+family = "hollow_program"
+mechanism = "A body that is empty, returns None or a type-correct constant, or raises NotImplementedError passes a grader that checks only that the code imports, runs or returns the right type, so the policy is paid for skipping the work."
+shapes = ["program", "io", "workspace", "container", "history"]
+grounds = ["structural"]
+evidence = ["reproduction", "fact"]
+provides = ["template", "fact"]
+fix = "Check return values against known outputs on inputs the submission cannot see, and include at least one case a constant or empty body cannot pass."
+sources = ["https://arxiv.org/abs/2604.17596"]
+
+[[weakness]]
+id = "BGW-102"
+name = "Exit before the checks"
+family = "hollow_program"
+mechanism = "Calling sys.exit(0), os._exit(0) or raising SystemExit(0) ends the process with a success code before any assertion runs, and a grader that reads the exit code as the verdict pays full marks."
+shapes = ["program", "workspace", "container", "history"]
+grounds = ["structural"]
+evidence = ["reproduction", "fact"]
+provides = ["template", "fact"]
+fix = "Never infer a pass from the exit code alone: require a positive record that every expected test ran and passed, written outside the submission's reach."
+sources = ["https://arxiv.org/abs/2511.18397"]
+
+[[weakness]]
+id = "BGW-103"
+name = "Equality spoofing"
+family = "hollow_program"
+mechanism = "An object whose __eq__ always returns True, with __ne__ and methods such as strip() overridden to match, satisfies every equality assertion without computing anything."
+shapes = ["program", "workspace", "container", "history"]
+grounds = ["structural"]
+evidence = ["reproduction", "fact"]
+provides = ["template", "fact"]
+fix = "Check the exact type of a returned value before comparing it, compare serialised values rather than calling the submission's own __eq__, and reject monkey-patched operators on built-in types."
+sources = ["https://arxiv.org/abs/2511.18397", "https://metr.org/blog/2025-06-05-recent-reward-hacking/"]
+
+[[weakness]]
+id = "BGW-104"
+name = "Hard-coded expected outputs"
+family = "hollow_program"
+mechanism = "Special-casing the inputs the visible tests use returns the expected outputs without implementing the behaviour, so a grader that tests only those inputs is passed by a lookup table."
+shapes = ["program", "io", "workspace", "container", "history"]
+grounds = ["differential"]
+evidence = ["differentiating-input", "fact"]
+provides = ["fact"]
+fix = "Grade on held-out inputs the submission never sees, generated or drawn fresh per run, in addition to the visible examples."
+sources = ["https://arxiv.org/abs/2604.17596", "https://arxiv.org/abs/2510.20270", "https://arxiv.org/abs/2605.21384"]
+
+[[weakness]]
+id = "BGW-105"
+name = "State recorded across calls"
+family = "hollow_program"
+mechanism = "A submission that remembers what it saw on earlier calls, such as the first expected value, can replay it to game checks that repeat or compare calls."
+shapes = ["program", "workspace", "container"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = ["template"]
+fix = "Run each check in a fresh process, and never pass expected values into the code under test."
+sources = ["https://arxiv.org/abs/2510.20270"]
+
+[[weakness]]
+id = "BGW-106"
+name = "Dead code for a static check"
+family = "hollow_program"
+mechanism = "Code that is never executed but contains what a static check looks for (a keyword, an import, a call) satisfies the check without the behaviour."
+shapes = ["program", "workspace", "container"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = []
+fix = "Verify behaviour by executing the code, not by searching its source for keywords or imports."
+sources = ["https://arxiv.org/abs/2604.17596"]
+
+[[weakness]]
+id = "BGW-107"
+name = "Letter of the specification, not its intent"
+family = "hollow_program"
+mechanism = "A brute force where efficiency was required, or a trivial method that happens to satisfy the tests, meets what the grader checks while missing what the task asked for."
+shapes = ["program", "io", "workspace", "container"]
+grounds = ["differential"]
+evidence = ["differentiating-input"]
+provides = []
+fix = "Test the stated constraints directly: inputs large enough that a brute force times out, and cases that separate the required method from a shortcut."
+sources = ["https://arxiv.org/abs/2604.17596"]
+
+# --------------------------------------------------------------------------- harness tampering
+
+[[weakness]]
+id = "BGW-108"
+name = "Test-framework hook"
+family = "harness_tampering"
+mechanism = "A conftest.py that patches pytest's report creation, or a monkey-patched unittest.TestCase.run, rewrites every test outcome to passed, so the test run reports success whatever the code does."
+shapes = ["workspace", "container", "history"]
+grounds = ["structural"]
+evidence = ["reproduction", "fact"]
+provides = ["template", "fact"]
+fix = "Run the tests in a separate verifier environment, copy in only the submission's source files, and disable plugin and conftest discovery from the submission's paths."
+sources = ["https://arxiv.org/abs/2511.18397", "https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/"]
+
+[[weakness]]
+id = "BGW-109"
+name = "Tests edited, deleted or skipped"
+family = "harness_tampering"
+mechanism = "A submission that can write to the tests or their configuration can delete them, empty them, mark them skipped or deselect them, and a grader that runs whatever tests remain reports success."
+shapes = ["workspace", "container", "history"]
+grounds = ["structural"]
+evidence = ["reproduction", "fact"]
+provides = ["template", "fact"]
+fix = "Make the tests and test configuration read-only to the agent, or restore them from a trusted copy before grading, and check the number of tests collected."
+sources = ["https://arxiv.org/abs/2510.20270", "https://arxiv.org/abs/2511.21654"]
+
+[[weakness]]
+id = "BGW-110"
+name = "Hijacked tool"
+family = "harness_tampering"
+mechanism = "Any tool the verifier runs to read state (the test runner, a service manager, a settings reader, a patched standard library) can be replaced by one that prints the state the verifier wants."
+shapes = ["container"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = ["template"]
+fix = "Run the verifier with its own trusted binaries and interpreter, from paths the agent cannot write, with a fixed PATH."
+sources = ["https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/", "https://arxiv.org/abs/2604.17596"]
+
+[[weakness]]
+id = "BGW-111"
+name = "Direct write to the reward file"
+family = "harness_tampering"
+mechanism = "When the verifier's result is a file in a path the agent can write, the agent can write the maximum reward there itself."
+shapes = ["container"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = ["template"]
+fix = "Write the reward from a process the agent does not control, to a location the agent cannot write, after the agent has finished."
+sources = ["https://docs.harborframework.com/core-concepts/tasks/overview.md"]
+
+[[weakness]]
+id = "BGW-112"
+name = "Result parser replaced"
+family = "harness_tampering"
+mechanism = "When the script that turns test output into a verdict lives where the agent can write, replacing it with one that reports success passes every task."
+shapes = ["workspace", "container"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = ["template"]
+fix = "Keep the result parser outside the agent's environment and parse output copied out of it."
+sources = ["https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/"]
+
+[[weakness]]
+id = "BGW-113"
+name = "Measurement tampering"
+family = "harness_tampering"
+mechanism = "A submission that reassigns timers, synchronisation calls or counters changes what a performance grader measures, so a slow or wrong program reports a speed-up."
+shapes = ["container", "history"]
+grounds = ["structural"]
+evidence = ["reproduction", "fact"]
+provides = ["template", "fact"]
+fix = "Measure from outside the submission's process, and check the output's correctness in the same run as its timing."
+sources = ["https://metr.org/blog/2025-06-05-recent-reward-hacking/", "https://arxiv.org/abs/2604.17596"]
+
+[[weakness]]
+id = "BGW-114"
+name = "Shared state tampered through a side channel"
+family = "harness_tampering"
+mechanism = "Inputs, fixtures or shared files the grader reads after the agent has run can be changed by the agent so that its output matches them."
+shapes = ["container"]
+grounds = ["differential"]
+evidence = ["differentiating-observation"]
+provides = []
+fix = "Give the grader its own copy of every input, taken before the agent runs, and compare against that copy."
+sources = ["https://arxiv.org/abs/2604.17596"]
+
+# --------------------------------------------------------------------------- answer access
+
+[[weakness]]
+id = "BGW-115"
+name = "Solution in the task text"
+family = "answer_access"
+mechanism = "When the task statement or its attached discussion contains the solution, a submission can copy it, and the task measures copying rather than solving."
+shapes = ["workspace", "container"]
+grounds = []
+evidence = ["statistic"]
+provides = ["statistic"]
+fix = "Remove solutions and solution hints from task text before release, and exclude tasks whose statement cannot be separated from the answer."
+sources = ["https://arxiv.org/abs/2410.06992"]
+
+[[weakness]]
+id = "BGW-116"
+name = "Reference or verifier readable at run time"
+family = "answer_access"
+mechanism = "When the reference solution, the tests or the verifier can be read from the agent's environment (files, configuration, stack frames), the agent can return the expected answer instead of computing it."
+shapes = ["container"]
+grounds = ["structural"]
+evidence = ["reproduction", "structural-risk"]
+provides = ["template"]
+fix = "Keep references, tests and verifier code out of the agent's image; copy them in only for grading, in a separate environment."
+sources = ["https://arxiv.org/abs/2604.17596", "https://metr.org/blog/2025-06-05-recent-reward-hacking/", "https://arxiv.org/abs/2605.20744"]
+
+[[weakness]]
+id = "BGW-117"
+name = "Future repository state"
+family = "answer_access"
+mechanism = "When the repository keeps history past the task's starting commit (other branches, the reflog, remote refs, unsquashed commits), the agent can find the real fix and apply it."
+shapes = ["workspace", "container"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = ["template"]
+fix = "Ship the repository as a single squashed commit at the starting state, with no other refs, remotes or reflog."
+sources = ["https://github.com/SWE-bench/SWE-bench/issues/465", "https://arxiv.org/abs/2604.11072", "https://poolside.ai/blog/through-the-looking-glass"]
+
+[[weakness]]
+id = "BGW-118"
+name = "Solution fetched from the network"
+family = "answer_access"
+mechanism = "With network access, an agent can fetch the published fix from a public repository, a package registry or a web archive."
+shapes = ["container"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = []
+fix = "Block egress during the agent's run, or allow only the package mirrors the task needs, pinned to versions that predate the fix."
+sources = ["https://poolside.ai/blog/through-the-looking-glass", "https://arxiv.org/abs/2507.02825"]
+
+# --------------------------------------------------------------------------- weak or wrong tests
+
+[[weakness]]
+id = "BGW-119"
+name = "Tests too weak"
+family = "weak_tests"
+mechanism = "When a wrong program passes every test, the grader pays for wrong behaviour, and the policy learns whichever wrong behaviour is easiest."
+shapes = ["program", "io", "workspace", "container"]
+grounds = ["differential"]
+evidence = ["differentiating-input"]
+provides = []
+fix = "Add the inputs that separate the reference from the surviving wrong programs, and measure test strength by mutation analysis."
+sources = ["https://arxiv.org/abs/2506.09289", "https://arxiv.org/abs/2503.15223", "https://arxiv.org/abs/2305.01210", "https://arxiv.org/abs/2505.24098"]
+
+[[weakness]]
+id = "BGW-120"
+name = "Tests too narrow"
+family = "weak_tests"
+mechanism = "Tests that depend on one implementation's incidental choices (formatting, names, order, an internal API) reject correct programs, so the policy is penalised for correct work."
+shapes = ["program", "io", "workspace", "container"]
+grounds = []
+evidence = ["positive-control"]
+provides = ["template"]
+fix = "Test behaviour through the interface the task specifies, and confirm that equivalent rewritings of the reference still pass."
+sources = ["https://openai.com/index/introducing-swe-bench-verified/", "https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/"]
+
+[[weakness]]
+id = "BGW-121"
+name = "Specification contradicts the tests"
+family = "weak_tests"
+mechanism = "When the task text and the hidden tests disagree, a program that follows the text fails, and an agent is pushed toward whatever the tests reward, including cheating."
+shapes = ["program", "io", "workspace", "container"]
+grounds = []
+evidence = ["positive-control"]
+provides = []
+fix = "Check each test against the sentence of the task it verifies, and remove or reword tests that require behaviour the task does not state."
+sources = ["https://openai.com/index/separating-signal-from-noise-coding-evaluations/", "https://arxiv.org/abs/2510.20270"]
+
+[[weakness]]
+id = "BGW-122"
+name = "Partial credit rewards the wrong approach"
+family = "weak_tests"
+mechanism = "A reward proportional to the share of tests passed can pay most for an approach that is fundamentally wrong but passes the easy cases."
+shapes = ["program", "io", "workspace", "container"]
+grounds = []
+evidence = ["statistic"]
+provides = ["statistic"]
+fix = "Use all-or-nothing rewards for correctness, or weight tests so that no wrong approach can outscore a correct partial one."
+sources = ["https://arxiv.org/abs/2605.02944", "https://www.together.ai/blog/deepcoder"]
+
+[[weakness]]
+id = "BGW-123"
+name = "Output checker too lenient"
+family = "weak_tests"
+mechanism = "An input/output checker that normalises too aggressively (ignoring extra tokens, order or content) accepts outputs that differ from the only correct one."
+shapes = ["program", "io", "workspace", "container"]
+grounds = ["differential"]
+evidence = ["reproduction"]
+provides = ["template"]
+fix = "Compare exactly what the task specifies, and use a special checker only where the task genuinely accepts several answers."
+sources = ["https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/", "https://github.com/MikeMirzayanov/testlib"]
+
+[[weakness]]
+id = "BGW-124"
+name = "Reference solution wrong"
+family = "weak_tests"
+mechanism = "When the reference is wrong, tests derived from it reward the same mistake and penalise correct programs."
+shapes = ["program", "io", "workspace", "container"]
+grounds = []
+evidence = ["differentiating-input"]
+provides = []
+fix = "Check the reference against the specification on independent inputs, and exclude tasks whose reference fails its own grader."
+sources = ["https://arxiv.org/abs/2305.01210"]
+
+[[weakness]]
+id = "BGW-134"
+name = "Numeric tolerance too loose for the output"
+family = "weak_tests"
+mechanism = "A tolerance-based comparison whose acceptance band grows with the size of the output eventually admits clearly wrong results, such as a constant of the right shape."
+shapes = ["numeric"]
+grounds = ["differential"]
+evidence = ["differentiating-input"]
+provides = ["template"]
+fix = "Set the tolerance from the variance correct implementations actually produce, and include cases where a constant or zero output falls outside it."
+sources = ["https://arxiv.org/abs/2609.22220"]
+
+[[weakness]]
+id = "BGW-135"
+name = "Proof checker accepts incomplete proofs"
+family = "weak_tests"
+mechanism = "A proof checker that allows placeholder proofs, non-standard axioms or a changed statement accepts proofs that prove nothing about the task."
+shapes = ["proof"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = ["template"]
+fix = "Check proofs with an independent checker, an axiom allow-list and a comparison of the proved statement with the original."
+sources = ["https://arxiv.org/abs/2606.29493", "https://lean-lang.org/doc/reference/latest/ValidatingProofs/"]
+
+[[weakness]]
+id = "BGW-136"
+name = "Execution equivalence on one database"
+family = "weak_tests"
+mechanism = "Two queries can return the same rows on one database instance while meaning different things, so comparing results on one instance accepts a semantically wrong query."
+shapes = ["query"]
+grounds = ["differential"]
+evidence = ["differentiating-input"]
+provides = []
+fix = "Compare results on several database instances built to separate queries that agree by accident."
+sources = ["https://aclanthology.org/2025.naacl-long.228.pdf", "https://www.vldb.org/cidrdb/papers/2026/p5-jin.pdf"]
+
+[[weakness]]
+id = "BGW-137"
+name = "Pseudo-tested code"
+family = "weak_tests"
+mechanism = "A function the tests execute but never check can have its body replaced by a default value with every test still passing, so its behaviour is unverified."
+shapes = ["program", "workspace"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = ["template"]
+fix = "Add an assertion on each function's observable effect, and run extreme mutation (empty each body in turn) to find the ones no test checks."
+sources = ["https://link.springer.com/article/10.1007/s10664-018-9653-2", "https://arxiv.org/abs/2103.08480"]
+
+[[weakness]]
+id = "BGW-138"
+name = "Proxy-state check"
+family = "weak_tests"
+mechanism = "A verifier that checks a stand-in for the required state (keywords in a file, a file's existence or apparent size, a status line a tool prints) is passed by producing the stand-in without the behaviour the task asks for."
+shapes = ["workspace", "container"]
+grounds = ["structural", "differential"]
+evidence = ["reproduction", "differentiating-observation"]
+provides = ["template"]
+fix = "Verify the behaviour itself by exercising it (start the service, read the configuration the way the system does, use the file), not by inspecting its traces."
+sources = ["https://arxiv.org/abs/2604.17596", "https://github.com/harbor-framework/terminal-bench-science/blob/main/rubrics/task-implementation.toml"]
+
+# --------------------------------------------------------------------------- grader logic
+
+[[weakness]]
+id = "BGW-125"
+name = "Evaluation that does not evaluate"
+family = "grader_logic"
+mechanism = "A grader whose logic never inspects the work (it checks who spoke last, or that a file exists) passes anything that reaches it."
+shapes = ["program", "io", "workspace", "container"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = []
+fix = "Confirm that the grader rejects a submission that does nothing before relying on it."
+sources = ["https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/"]
+
+[[weakness]]
+id = "BGW-126"
+name = "Failure scored as success"
+family = "grader_logic"
+mechanism = "A grader that reads an exception, a timeout or an exit code as a pass pays for failures, and one that charges infrastructure failures to the model penalises it for the harness."
+shapes = ["program", "io", "workspace", "container"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = ["template"]
+fix = "Fail closed: anything other than a positive, complete record of passing is a fail, and harness errors are recorded as errors, never as scores."
+sources = ["https://github.com/UKGovernmentBEIS/inspect_evals/pull/2298"]
+
+[[weakness]]
+id = "BGW-127"
+name = "Nondeterministic grader"
+family = "grader_logic"
+mechanism = "A grader that gives different rewards for the same submission, through async waits, concurrency or test order, turns the reward into noise the policy cannot learn from."
+shapes = ["program", "io", "workspace", "container"]
+grounds = []
+evidence = ["statistic"]
+provides = ["statistic"]
+fix = "Score each submission several times, in varied test order, and remove the sources of variation found."
+sources = ["https://dl.acm.org/doi/10.1145/2635868.2635920"]
+
+[[weakness]]
+id = "BGW-128"
+name = "Aggregation defect"
+family = "grader_logic"
+mechanism = "Dropping errored samples from the denominator, or allowing rewards past the declared maximum, makes the aggregate score overstate performance."
+shapes = ["program", "io", "workspace", "container"]
+grounds = []
+evidence = ["statistic"]
+provides = ["statistic"]
+fix = "Count every sample in the denominator, record errors as failures or report them separately, and clip or reject rewards outside the declared range."
+sources = ["https://github.com/UKGovernmentBEIS/inspect_ai/issues/4286"]
+
+[[weakness]]
+id = "BGW-129"
+name = "Grader executes agent-controlled data"
+family = "grader_logic"
+mechanism = "A grader that calls eval or exec on, or unsafely deserialises, data the agent produced lets the agent run code inside the grader and set its own verdict."
+shapes = ["workspace", "container"]
+grounds = ["structural"]
+evidence = ["reproduction"]
+provides = []
+fix = "Parse agent output with a safe parser, and never execute it in the grader's process."
+sources = ["https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/", "https://arxiv.org/abs/2605.12673"]
+
+# --------------------------------------------------------------------------- isolation
+
+[[weakness]]
+id = "BGW-130"
+name = "Agent and grader share an environment"
+family = "isolation"
+mechanism = "When the grader runs in the environment the agent controlled, everything it relies on (files, binaries, interpreter, processes) may have been changed by the agent."
+shapes = ["container"]
+grounds = []
+evidence = ["structural-risk"]
+provides = []
+fix = "Run the verifier in a separate sandbox, and copy across only the artefacts the task produces."
+sources = ["https://arxiv.org/abs/2605.12673", "https://docs.harborframework.com/news/separate-verifier-sandboxes.md", "https://arxiv.org/abs/2605.02964"]
+
+[[weakness]]
+id = "BGW-131"
+name = "Evaluator paths writable by the agent"
+family = "isolation"
+mechanism = "When the tests, the verifier or the reward location are writable by the agent, tampering with them is one write away."
+shapes = ["container"]
+grounds = []
+evidence = ["structural-risk"]
+provides = []
+fix = "Mount evaluator paths read-only for the agent, or keep them out of its environment entirely."
+sources = ["https://arxiv.org/abs/2510.20270"]
+
+[[weakness]]
+id = "BGW-132"
+name = "Excessive permissions or network egress"
+family = "isolation"
+mechanism = "Root access, broad capabilities or open egress give the agent the means to tamper with the harness or fetch the answer."
+shapes = ["container"]
+grounds = []
+evidence = ["structural-risk"]
+provides = []
+fix = "Run the agent as an unprivileged user with no network, or only the egress the task needs."
+sources = ["https://arxiv.org/abs/2605.12673", "https://poolside.ai/blog/through-the-looking-glass"]
+
+# --------------------------------------------------------------------------- measurement
+
+[[weakness]]
+id = "BGW-133"
+name = "Evaluation too small or noisy"
+family = "measurement"
+mechanism = "An evaluation with too few tasks, or with tasks that cluster, cannot distinguish the differences it is used to claim, so its conclusions are noise."
+shapes = ["program", "io", "workspace", "container"]
+grounds = []
+evidence = ["statistic"]
+provides = ["statistic"]
+fix = "Report every score with an interval suited to its sample, cluster by shared source, and size the evaluation for the smallest difference it must detect."
+sources = ["https://arxiv.org/abs/2411.00640", "https://arxiv.org/abs/2503.01747"]
+
+# --------------------------------------------------------------------------- crosswalks
+
+# Every category of another published taxonomy, mapped to the classes above. An empty list
+# means the category describes something that is not a grader weakness.
+
+[crosswalk.terminal-wrench]
+title = "Terminal Wrench exploit categories"
+source = "https://arxiv.org/abs/2604.17596"
+
+[crosswalk.terminal-wrench.map]
+hollow-implementation = ["BGW-101", "BGW-138"]
+output-spoofing = ["BGW-104"]
+constraint-loophole = ["BGW-107"]
+structural-extraction = ["BGW-116"]
+binary-hijacking = ["BGW-110"]
+algorithmic-simplification = ["BGW-107"]
+mutable-input-tampering = ["BGW-114"]
+keyword-gaming = ["BGW-106", "BGW-138"]
+metric-spoofing = ["BGW-113"]
+security-downgrading = ["BGW-138", "BGW-110"]
+deceptive-rationalization = []
+
+[crosswalk.harbor-rubric]
+title = "Harbor task implementation rubric"
+source = "https://github.com/harbor-framework/terminal-bench-science/blob/main/rubrics/task-implementation.toml"
+
+[crosswalk.harbor-rubric.map]
+"Anti-Cheat Robustness" = ["BGW-108", "BGW-109", "BGW-110", "BGW-111", "BGW-112", "BGW-113", "BGW-114"]
+"Functional Verification" = ["BGW-106", "BGW-138"]
+"Graded Instances Discriminate" = ["BGW-101", "BGW-119"]
+"Do Not Modify Enforced" = ["BGW-109"]
+"Separate Verifier Configured" = ["BGW-130"]
+"Verifier Execution Isolation" = ["BGW-111", "BGW-129", "BGW-131"]
+"Environment Hygiene" = ["BGW-116"]
+"Test-Instruction Alignment" = ["BGW-121"]
+"Deterministic & Reproducible" = ["BGW-127"]
+"Ground Truth Provenance" = ["BGW-124"]
+"Solution Quality" = ["BGW-124"]
