@@ -19,6 +19,14 @@ All notable changes to this project are documented here. The format follows
 - **Identifier formats** (`bohrin.spec.ids`, and "Identifiers" in `docs/SPEC.md`) for weakness
   classes (`BGW-`), registry records (`BVR-`), probes (`bohrin/<slug>@<major>`), findings
   (`BF-`), schemas and conformance levels.
+- **The finding record** (`bohrin.evidence`, published as the JSON Schema
+  `https://bohrin.com/schema/finding/v1`): six evidence levels, from `proven` to `excluded`; the
+  submission recorded as digests; differentiating inputs and observations; run conditions. A
+  record that claims more than its evidence supports cannot be made or read. A proven finding
+  needs a ground, a paying verdict, a passing baseline and a reproduction script, and a
+  differentiating observation proves nothing without the reference and at least three
+  presumed-correct solutions passing it. `finding_id()` derives the same `BF-` ID for the same
+  defect on every run, and `normalise_finding_id()` reads one as people type it.
 - **Probe manifests** (`src/bohrin/spec/probes.toml`, `bohrin.spec.probes`): every built-in
   probe described as data a third-party tool can read without importing Bohrin: ID
   (`bohrin/empty-implementation@1`), weaknesses, shapes, template and its parameters, ground,

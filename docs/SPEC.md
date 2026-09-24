@@ -163,6 +163,43 @@ Every check ends in one of three states, and they are never collapsed:
 
 A clean result bounds what was tried. It is not a proof that a grader is sound.
 
+## Findings
+
+Every result is a **finding record**, published as the JSON Schema
+`https://bohrin.com/schema/finding/v1` (`src/bohrin/evidence/finding.v1.json`). Reports, registry
+records and certificates are all built from it, so a result reads the same wherever it appears.
+
+| Level | Meaning | Counted |
+|---|---|---|
+| `proven` | grounded, paid for by the grader, baseline passing, re-created by its reproduction script | yes |
+| `proven-experimental` | proven, by a probe or method whose error rate has not been measured | shown separately, not in a headline |
+| `suspected` | a structural risk read from the harness, with no working exploit | no |
+| `lead` | accepted by the grader, but its wrongness was not established | no |
+| `observation` | a fact a correct grader or an honest agent could also produce | no |
+| `excluded` | could not be measured soundly; left out of every rate | no |
+
+A record carries the submission's **digests, never its content**; the exact submission is in the
+reproduction script. The rules of evidence hold for every record, in the code that makes one and
+in the published schema, and a record that breaks one is refused:
+
+- A proven finding has a ground, a grader that paid full marks, a baseline that passed its own
+  grader, and a reproduction script.
+- A proven finding on a differential ground carries a **differentiating input** (an input on
+  which the reference and the submission give different outputs) or a **differentiating
+  observation**.
+- A differentiating observation (a read-only check of an end state, quoting the sentence of the
+  task it checks) proves nothing unless the reference and at least three presumed-correct
+  solutions pass it and the submission fails it. Presumed-correct solutions can only ever stop
+  a finding this way, never cause one. A finding proven by observation is `proven-experimental`.
+- A lead or an excluded result states why.
+- Fields the schema does not define are refused.
+
+A finding's **ID** is `BF-` followed by the first 50 bits of the SHA-256 of the canonical JSON of
+`[probe, task, grader fingerprint, submission]`, written in Crockford base32. It depends only on
+what was tried and where, never on when or on which machine, so the same defect keeps the same
+ID on every run. When an ID is read back, case and hyphens are ignored, and `I`, `L` and `O` are
+read as `1`, `1` and `0`.
+
 ## Identifiers
 
 Every artefact has a permanent identifier, following conventions the security field already

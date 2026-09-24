@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bohrin.com/schema/finding/v1",
+  "title": "Bohrin finding",
+  "description": "One result about a grader, with exactly the evidence it has. Additive changes keep this major version.",
+  "type": "object",
+  "required": ["$schema", "id", "weakness", "probe", "level", "task", "battery"],
+  "properties": {
+    "$schema": {"const": "https://bohrin.com/schema/finding/v1"},
+    "id": {
+      "description": "BF- and ten Crockford base32 characters, derived from the probe, task, grader fingerprint and submission.",
+      "type": "string",
+      "pattern": "^BF-[0-9A-HJKMNP-TV-Z]{10}$"
+    },
+    "weakness": {"type": "string", "pattern": "^BGW-[1-9][0-9]*$"},
+    "probe": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*@[1-9][0-9]*$"
+    },
+    "level": {
+      "enum": ["proven", "proven-experimental", "suspected", "lead", "observation", "excluded"]
+    },
+    "task": {
+      "type": "object",
+      "required": ["id", "shape"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "shape": {"enum": ["program", "io", "workspace", "container", "history", "numeric", "proof", "query"]}
+      },
+      "additionalProperties": false
+    },
+    "battery": {"type": "integer", "minimum": 1},
+    "submission": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "sha256"],
+          "properties": {
+            "kind": {"const": "source"},
+            "sha256": {"$ref": "#/$defs/digest"}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "files", "commands", "parameters"],
+          "properties": {
+            "kind": {"const": "workspace"},
+            "files": {
+              "type": "object",
+              "additionalProperties": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}
+            },
+            "commands": {"type": "array", "items": {"type": "string"}},
+            "parameters": {"type": "array", "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"}}
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ground": {"enum": ["structural", "differential", "invariant"]},
+    "verdict": {
+      "type": "object",
+      "required": ["reward", "passed"],
+      "properties": {"reward": {"type": "number"}, "passed": {"type": "boolean"}},
+      "additionalProperties": false
+    },
+    "baseline": {
+      "type": "object",
+      "required": ["passed"],
+      "properties": {"passed": {"type": "boolean"}},
+      "additionalProperties": false
+    },
+    "reproduce": {
+      "type": "object",
+      "required": ["script", "sha256"],
+      "properties": {"script": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}},
+      "additionalProperties": false
+    },
+    "differentiating_input": {
+      "type": "object",
+      "required": ["input", "reference_output", "submission_output"],
+      "properties": {
+        "input": {"type": "string"},
+        "reference_output": {"type": "string"},
+        "submission_output": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "differentiating_observation": {
+      "type": "object",
+      "required": ["requirement", "observation", "reference_passed", "presumed_correct_passed", "submission_passed"],
+      "properties": {
+        "requirement": {"type": "string", "minLength": 1},
+        "observation": {"type": "string", "minLength": 1},
+        "reference_passed": {"type": "boolean"},
+        "presumed_correct_passed": {"type": "array", "items": {"type": "boolean"}},
+        "submission_passed": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "run": {
+      "type": "object",
+      "required": ["tool", "tool_version"],
+      "properties": {
+        "tool": {"type": "string", "minLength": 1},
+        "tool_version": {"type": "string", "minLength": 1},
+        "environment_digest": {"type": "string"},
+        "conditions": {
+          "type": "object",
+          "additionalProperties": {"type": ["string", "number", "boolean"]}
+        },
+        "provenance": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "fix": {"type": "string"},
+    "reason": {"type": "string"}
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"properties": {"level": {"enum": ["proven", "proven-experimental"]}}},
+      "then": {
+        "required": ["submission", "ground", "verdict", "baseline", "reproduce"],
+        "properties": {
+          "verdict": {"properties": {"passed": {"const": true}}},
+          "baseline": {"properties": {"passed": {"const": true}}}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"level": {"enum": ["proven", "proven-experimental"]}, "ground": {"const": "differential"}},
+        "required": ["ground"]
+      },
+      "then": {
+        "anyOf": [{"required": ["differentiating_input"]}, {"required": ["differentiating_observation"]}]
+      }
+    },
+    {
+      "if": {
+        "properties": {"level": {"enum": ["proven", "proven-experimental"]}},
+        "required": ["differentiating_observation"]
+      },
+      "then": {
+        "properties": {
+          "level": {"const": "proven-experimental"},
+          "differentiating_observation": {
+            "properties": {
+              "reference_passed": {"const": true},
+              "presumed_correct_passed": {"minItems": 3, "items": {"const": true}},
+              "submission_passed": {"const": false}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"level": {"enum": ["lead", "excluded"]}}},
+      "then": {"required": ["reason"], "properties": {"reason": {"minLength": 1}}}
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
