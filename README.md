@@ -140,6 +140,24 @@ not reported, and it never says "cheated". No account, no network.
 $ bohrin verify --since main
 ```
 
+On GitHub, the Action runs it on every pull request and shows the facts on the lines they are
+about:
+
+```yaml
+on: pull_request
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: prabhu-gopal/bohrin@main  # pin to a release tag or commit once you adopt it
+```
+
 ## Documentation
 
 | Start with | If you want to |

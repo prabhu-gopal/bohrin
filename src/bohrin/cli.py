@@ -25,6 +25,7 @@ from typing import NoReturn
 
 from bohrin.history import verify as history
 from bohrin.history.git import GitError
+from bohrin.report.sarif import to_sarif
 from bohrin.stats.power import analyse, render
 from bohrin.stats.results import read_results
 from bohrin.version import __version__
@@ -90,6 +91,12 @@ def _parser() -> _Parser:
     )
     check.add_argument("--strict", action="store_true", help="exit 1 on any fact, for CI")
     check.add_argument("--json", action="store_true", help="print only the JSON report")
+    check.add_argument(
+        "--sarif",
+        type=Path,
+        metavar="FILE",
+        help="also write the facts as SARIF 2.1.0 to FILE, for code-scanning annotations on a pull request",
+    )
     check.add_argument("path", nargs="?", type=Path, default=Path("."), help="a path inside the repository")
     return parser
 
@@ -130,6 +137,12 @@ def _verify(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return CANNOT_RUN
+    if args.sarif is not None:
+        try:
+            args.sarif.write_text(json.dumps(to_sarif(report), indent=2) + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"bohrin: cannot write {args.sarif}: {exc.strerror}. Check the directory exists.", file=sys.stderr)
+            return CANNOT_RUN
     if args.json:
         print(json.dumps(report.to_json(), indent=2))
     else:

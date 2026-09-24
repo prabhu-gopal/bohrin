@@ -43,6 +43,8 @@ dev = [
   "pytest-cov>=5.0",
   "jsonschema>=4.23",         # tests validate every emitted record against the published schemas
   "types-jsonschema>=4.23",
+  "pyyaml>=6.0",              # tests read the GitHub Action and workflows as YAML
+  "types-PyYAML>=6.0",
 ]
 
 [project.scripts]

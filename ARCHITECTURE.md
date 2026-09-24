@@ -61,6 +61,11 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
   git, safe in a hostile repository), `facts.py` (the rules, on syntax trees), `oracle.py` (how
   strongly a test checks, and how a change can weaken it), and `verify.py` (the report and
   `verify-report.v1.json`).
+- **`report/`**: renderers. `sarif.py` writes `verify`'s facts as SARIF 2.1.0 for code-scanning
+  annotations; rule descriptions come from `history/rules.py`, the one table of what each rule
+  means, which a test holds to the rules the code emits and to docs/SPEC.md.
+- **`action.yml`** (repository root): the GitHub Action that runs `bohrin verify` on a pull request
+  and uploads the SARIF. Inputs reach its shell only through environment variables.
 - **`cli.py`**: the `bohrin` command (also `python -m bohrin`), with the exit codes every verb
   shares.
 - **`_plugins.py`**: entry-point discovery, shared by operators and relations.

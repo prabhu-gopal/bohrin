@@ -25,7 +25,9 @@ _PINNED = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
 
 
 def _workflows() -> list[Path]:
-    return sorted(WORKFLOWS.glob("*.yml")) + sorted(WORKFLOWS.glob("*.yaml"))
+    """The workflows, and the Action this repository publishes, which runs in other people's CI."""
+    action = WORKFLOWS.parents[1] / "action.yml"
+    return sorted(WORKFLOWS.glob("*.yml")) + sorted(WORKFLOWS.glob("*.yaml")) + ([action] if action.is_file() else [])
 
 
 def test_every_third_party_action_is_pinned_to_a_full_commit() -> None:
