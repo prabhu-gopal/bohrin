@@ -141,7 +141,7 @@ Evidence kinds:
 - **Evidence:** reproduction
 - **Grounds:** structural
 - **Fix:** Write the reward from a process the agent does not control, to a location the agent cannot write, after the agent has finished.
-- **Sources:** <https://docs.harborframework.com/core-concepts/tasks/overview.md>
+- **Sources:** <https://docs.harborframework.com/core-concepts/tasks/overview.md> · <https://arxiv.org/abs/2605.12673>
 
 ### BGW-112
 
@@ -195,7 +195,7 @@ Evidence kinds:
 - **Evidence:** reproduction, structural-risk
 - **Grounds:** structural
 - **Fix:** Keep references, tests and verifier code out of the agent's image; copy them in only for grading, in a separate environment.
-- **Sources:** <https://arxiv.org/abs/2604.17596> · <https://metr.org/blog/2025-06-05-recent-reward-hacking/> · <https://arxiv.org/abs/2605.20744>
+- **Sources:** <https://arxiv.org/abs/2604.17596> · <https://metr.org/blog/2025-06-05-recent-reward-hacking/> · <https://arxiv.org/abs/2605.12673> · <https://arxiv.org/abs/2605.20744>
 
 ### BGW-117
 
@@ -213,7 +213,7 @@ Evidence kinds:
 - **Evidence:** reproduction
 - **Grounds:** structural
 - **Fix:** Block egress during the agent's run, or allow only the package mirrors the task needs, pinned to versions that predate the fix.
-- **Sources:** <https://poolside.ai/blog/through-the-looking-glass> · <https://arxiv.org/abs/2507.02825>
+- **Sources:** <https://poolside.ai/blog/through-the-looking-glass> · <https://arxiv.org/abs/2605.12673>
 
 ## Weak or wrong tests: the tests cannot tell right from wrong
 

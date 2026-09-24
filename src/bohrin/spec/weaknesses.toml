@@ -159,7 +159,7 @@ grounds = ["structural"]
 evidence = ["reproduction"]
 provides = ["template"]
 fix = "Write the reward from a process the agent does not control, to a location the agent cannot write, after the agent has finished."
-sources = ["https://docs.harborframework.com/core-concepts/tasks/overview.md"]
+sources = ["https://docs.harborframework.com/core-concepts/tasks/overview.md", "https://arxiv.org/abs/2605.12673"]
 
 [[weakness]]
 id = "BGW-112"
@@ -221,7 +221,7 @@ grounds = ["structural"]
 evidence = ["reproduction", "structural-risk"]
 provides = ["template"]
 fix = "Keep references, tests and verifier code out of the agent's image; copy them in only for grading, in a separate environment."
-sources = ["https://arxiv.org/abs/2604.17596", "https://metr.org/blog/2025-06-05-recent-reward-hacking/", "https://arxiv.org/abs/2605.20744"]
+sources = ["https://arxiv.org/abs/2604.17596", "https://metr.org/blog/2025-06-05-recent-reward-hacking/", "https://arxiv.org/abs/2605.12673", "https://arxiv.org/abs/2605.20744"]
 
 [[weakness]]
 id = "BGW-117"
@@ -245,7 +245,7 @@ grounds = ["structural"]
 evidence = ["reproduction"]
 provides = []
 fix = "Block egress during the agent's run, or allow only the package mirrors the task needs, pinned to versions that predate the fix."
-sources = ["https://poolside.ai/blog/through-the-looking-glass", "https://arxiv.org/abs/2507.02825"]
+sources = ["https://poolside.ai/blog/through-the-looking-glass", "https://arxiv.org/abs/2605.12673"]
 
 # --------------------------------------------------------------------------- weak or wrong tests
 
