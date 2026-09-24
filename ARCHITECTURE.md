@@ -57,6 +57,10 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
   minimum detectable difference, each tied to its published equation), `results.py` (the results
   file format and its strict reader, with `results-row.v1.json`), and `power.py` (the analysis,
   the aggregation audit, the report and `power-report.v1.json`).
+- **`history/`**: `bohrin verify`. `git.py` (the one module that starts a process: read-only
+  git, safe in a hostile repository), `facts.py` (the rules, on syntax trees), `oracle.py` (how
+  strongly a test checks, and how a change can weaken it), and `verify.py` (the report and
+  `verify-report.v1.json`).
 - **`cli.py`**: the `bohrin` command (also `python -m bohrin`), with the exit codes every verb
   shares.
 - **`_plugins.py`**: entry-point discovery, shared by operators and relations.
@@ -71,8 +75,11 @@ weak; most tests are "no correct grader is accused, and a weak one is still caug
 These hold everywhere. Several are rules about what the code must *not* do, which is why they
 are written down here.
 
-1. **The library never calls a grader.** No module imports a runner, opens a network connection
-   or starts a process. It generates, checks, scores and reads data it is given.
+1. **The library never calls a grader.** No module imports a runner or opens a network
+   connection, and only one starts a process: `history/git.py`, which runs read-only git
+   plumbing (`rev-parse`, `merge-base`, `ls-tree`, `cat-file`, `ls-files`, `log`) with every
+   repository-named program switched off. It never diffs the working tree, because that runs a
+   repository's filters whatever is switched off. `tests/test_boundaries.py` pins all of this.
 2. **A submission is called wrong only on a ground established without the grader.** A candidate
    with `ground=None` is a lead and is never counted in a score.
 3. **Every rule after generation can only remove a ground.** `battery()` and `equivalence.py` may

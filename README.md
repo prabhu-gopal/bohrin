@@ -128,6 +128,18 @@ dropped from the denominator.
 $ bohrin power results.jsonl --min-difference 0.02
 ```
 
+## What did a coding agent change in the tests?
+
+`bohrin verify` compares your working tree with where your branch started and states facts about
+what changed in the tests and the code: tests deleted, assertions removed or weakened (an
+equality check turned into a non-None check), skips added, tolerances loosened, failures
+swallowed, functions replaced by stubs. It reads syntax trees, so reformatting and moved tests are
+not reported, and it never says "cheated". No account, no network.
+
+```console
+$ bohrin verify --since main
+```
+
 ## Documentation
 
 | Start with | If you want to |

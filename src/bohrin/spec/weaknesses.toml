@@ -83,7 +83,7 @@ mechanism = "A submission that remembers what it saw on earlier calls, such as t
 shapes = ["program", "workspace", "container"]
 grounds = ["structural"]
 evidence = ["reproduction"]
-provides = ["template"]
+provides = []
 fix = "Run each check in a fresh process, and never pass expected values into the code under test."
 sources = ["https://arxiv.org/abs/2510.20270"]
 

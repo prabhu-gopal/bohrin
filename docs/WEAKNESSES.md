@@ -28,7 +28,7 @@ Evidence kinds:
 | [BGW-102](#bgw-102) | Exit before the checks | program, workspace, container, history | template, fact |
 | [BGW-103](#bgw-103) | Equality spoofing | program, workspace, container, history | template, fact |
 | [BGW-104](#bgw-104) | Hard-coded expected outputs | program, io, workspace, container, history | fact |
-| [BGW-105](#bgw-105) | State recorded across calls | program, workspace, container | template |
+| [BGW-105](#bgw-105) | State recorded across calls | program, workspace, container | definition |
 | [BGW-106](#bgw-106) | Dead code for a static check | program, workspace, container | definition |
 | [BGW-107](#bgw-107) | Letter of the specification, not its intent | program, io, workspace, container | definition |
 

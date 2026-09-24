@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bohrin.com/schema/verify-report/v1",
+  "title": "Bohrin verify report",
+  "description": "What `bohrin verify --json` prints: facts about a change to tests and code, read from syntax trees, beside any commit message that claims success.",
+  "type": "object",
+  "required": ["$schema", "since", "base", "files_changed", "commits", "facts", "success_claims", "not_checked"],
+  "properties": {
+    "$schema": {"const": "https://bohrin.com/schema/verify-report/v1"},
+    "since": {"type": "string", "minLength": 1},
+    "base": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"},
+    "files_changed": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "commits": {"type": "integer", "minimum": 0},
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule", "weakness", "kind", "path", "message"],
+        "properties": {
+          "rule": {"type": "string", "pattern": "^[a-z]+(-[a-z]+)*$"},
+          "weakness": {"type": "string", "pattern": "^BGW-[1-9][0-9]*$"},
+          "kind": {"enum": ["fact", "observation"]},
+          "path": {"type": "string", "minLength": 1},
+          "message": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "success_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["commit", "message"],
+        "properties": {"commit": {"type": "string", "minLength": 1}, "message": {"type": "string"}},
+        "additionalProperties": false
+      }
+    },
+    "not_checked": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "additionalProperties": false
+}
