@@ -184,6 +184,8 @@ _INERT_REFERENCES = {
         '        raise NotImplementedError("subclass")\n'
     ),
     "ellipsis": "class Store:\n    def get(self, key): ...\n",
+    "only an empty nested function": "def outer():\n    def inner():\n        pass\n",
+    "only an empty nested class": "def outer():\n    class Inner:\n        pass\n",
 }
 
 
@@ -201,4 +203,11 @@ def test_one_function_that_does_work_is_enough_for_the_ground() -> None:
         "    def size(self):\n        return len(self.items)\n"
     )
     (candidate,) = DropSideEffect().apply(task(mixed))
+    assert candidate.ground is Ground.STRUCTURAL
+
+
+def test_a_nested_function_that_does_work_still_grounds_the_candidate() -> None:
+    """The counterweight to skipping nested definitions: their bodies are still checked."""
+    reference = "def outer(items):\n    def total():\n        return sum(items)\n    return total()\n"
+    (candidate,) = DropSideEffect().apply(task(reference))
     assert candidate.ground is Ground.STRUCTURAL
