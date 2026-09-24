@@ -41,8 +41,9 @@ def task(reference: str | None = "70", prompt: str = "What is the value?", task_
 #: mistakes a *rendering* difference for a *behaviour* difference. Every grader here is right
 #: to accept what it accepts, so a grounded candidate it accepts is a false accusation.
 #:
-#: The references are chosen to collide with ``constant_return``'s literals under exactly one
-#: normalisation each, which is how the defect was originally reproduced.
+#: The references are chosen to collide with a constant candidate (``0``, ``1``, ``True``,
+#: ``None``, ``[]``) under exactly one normalisation each, which is how the defect was
+#: originally reproduced.
 LENIENT_CORRECT: tuple[tuple[str, str, Callable[[str, str], bool]], ...] = (
     ("numeric", "1.0", lambda reply, ref: _as_float(reply) is not None and _as_float(reply) == _as_float(ref)),
     ("numeric-zero", "0.0", lambda reply, ref: _as_float(reply) is not None and _as_float(reply) == _as_float(ref)),
@@ -73,17 +74,13 @@ def _as_json(text: str) -> str | None:
 #: own known-good answer.
 TRIVIAL_REFERENCE = "def solve(items):\n    pass\n"
 
-#: A reference where negating the branch predicate cannot change behaviour, because both
-#: arms do the same thing. The textbook equivalent mutant.
-EQUIVALENT_BRANCH_REFERENCE = "def solve(x):\n    if x > 0:\n        return abs(x)\n    return abs(x)\n"
 
-
-def behavioural_grader(reference: str, inputs: tuple[int, ...]) -> Callable[[str], bool]:
+def behavioural_grader(reference: str, inputs: tuple[object, ...]) -> Callable[[str], bool]:
     """A correct grader that **executes** the submission and compares its outputs.
 
-    The only shape of grader that can catch an equivalent mutant being called wrong: a
-    textual grader rejects a mutated source outright, while a behavioural one accepts any
-    program that behaves like the reference — which is precisely correct.
+    The shape of grader that exposes a candidate wrongly called wrong: a textual grader
+    rejects any changed source outright, while a behavioural one accepts every program that
+    behaves like the reference — which is precisely correct.
 
     Executes fixture-local code only, on inputs this module supplies.
     """
@@ -102,7 +99,6 @@ def behavioural_grader(reference: str, inputs: tuple[int, ...]) -> Callable[[str
 
 
 __all__ = [
-    "EQUIVALENT_BRANCH_REFERENCE",
     "LENIENT_CORRECT",
     "REFERENCE",
     "TRIVIAL_REFERENCE",

@@ -1,9 +1,8 @@
-"""Certified meaning-preserving rewritings of an answer.
+"""Certified meaning-preserving rewritings of a correct solution.
 
 The catalogue is discovered exactly like mutation operators: through an entry-point group,
-with no privileged path for the built-ins. A third party adds a
-relation — a domain's own notation, a unit convention, a house answer format — by
-publishing a package, not by patching Bohrin.
+with no privileged path for built-ins. A third party adds a relation — a formatting
+convention, a certified refactoring — by publishing a package, not by patching Bohrin.
 """
 
 from __future__ import annotations
@@ -11,32 +10,9 @@ from __future__ import annotations
 from bohrin._plugins import RELATIONS, load_plugin_classes
 from bohrin.relations.base import Relation
 
-#: Built-ins in the order they are tried. Presentational rewritings first, because the
-#: published category-level evidence says those are what verifiers actually reject.
-_BUILTIN_ORDER = (
-    "verbatim",
-    "stripped",
-    # Punctuation and layout lead the presentational group: a category-level audit of four
-    # verifiers attributes 93.0% of in-contract failures on one configuration to whitespace
-    # and punctuation, with a trailing period or newline the dominant individual cause.
-    "trailing_period",
-    "trailing_newline",
-    "boxed",
-    "boxed_math",
-    "prose",
-    "prose_boxed",
-    "emphasis",
-    "boxed_text",
-    "inline_math",
-    "decimal_point",
-    "trailing_zeros_dropped",
-    "latex_fraction",
-    "display_fraction",
-    "braced_sqrt_argument",
-    # Appended, not inserted: the order is the baseline's search order, and moving an existing
-    # relation would change which rendering an already-published audit accepted first.
-    "final_answer_label",
-)
+#: Built-ins in the order they are tried. There are none: the catalogue is whatever is
+#: registered under the entry-point group, in id order.
+_BUILTIN_ORDER: tuple[str, ...] = ()
 
 
 def discover() -> list[Relation]:
@@ -58,7 +34,7 @@ def discover() -> list[Relation]:
 
 
 def renderings(answer: str) -> list[tuple[str, str]]:
-    """``(relation_id, rendering)`` pairs for ``answer``, duplicates removed.
+    """``(relation_id, rendering)`` pairs for ``answer`` (a solution), duplicates removed.
 
     Deduplication is by the rendered string: two relations that agree on a given answer
     produce one submission, because sending the same bytes twice spends a scoring call

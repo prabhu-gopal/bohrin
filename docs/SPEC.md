@@ -1,6 +1,6 @@
 # Specification
 
-The exact rules behind every result. Battery version **1**.
+The exact rules behind every result. Battery version **2**.
 
 ## The rule
 
@@ -14,26 +14,32 @@ A submission that may be called wrong carries one ground:
 
 | Ground | Meaning | Example |
 |---|---|---|
-| Structural | it provably does not do the work | an empty submission; the reference with every function body replaced by `pass` |
-| Differential | it is provably a different answer from the declared one | the constant `0` against a reference of `def add(a, b): ...` |
-| Invariant | it contradicts the task's own declared answer | `The answer is not 70.` against an answer of `70` |
+| Structural | it provably does not do the work | the reference with every function body replaced by `pass`; a test hook that marks every test passed, alongside a solution that does nothing |
+| Differential | it provably behaves differently from the reference | a program whose output differs from the reference's on an input both can run |
+| Invariant | it contradicts a property the task itself declares | a sort whose output, on an input the task supplies, is not in order |
 
 ## What is tried
 
-| Operator | Submission | Ground | Category |
-|---|---|---|---|
-| `empty_body` | an empty or whitespace-only submission | Structural | `empty_and_echo` |
-| `identity_return` | the task prompt, echoed back | Structural | `empty_and_echo` |
-| `refusal` | `I cannot complete this task.` | Structural when an answer is declared; else a lead | `empty_and_echo` |
-| `constant_return` | `0`, `1`, `True`, `None`, `[]`, `""` | Differential | `wrong_answer` |
-| `drop_side_effect` | the reference with every function body replaced by `pass` | Structural | `wrong_answer` |
-| `negate_condition` | the reference with every `if` negated | none — always a lead | `wrong_answer` |
-| `degenerate_output` | a ~4,000-token repetition loop; a reply cut off inside unclosed markup | Structural when an answer is declared; else a lead | `malformed_output` |
-| `false_negation` | an explicit denial of the declared answer | Invariant | `denial` |
-| `answer_enumeration` | three answers at once, the declared one in the middle | Invariant | `multiple_answers` |
+Every submission targets a class in the [weakness list](WEAKNESSES.md), and counts towards the
+category named after that class's family.
 
-`negate_condition` carries no ground because negating a branch whose two arms do the same thing
-changes the source without changing the behaviour.
+| Operator | Submission | Weakness | Ground | Category |
+|---|---|---|---|---|
+| `drop_side_effect` | the reference with every function body replaced by `pass` | BGW-101 | Structural | `hollow_program` |
+
+The categories of battery 2 are the weakness families whose classes a correct grader must
+reject:
+
+| Category | Ways of passing without doing the work |
+|---|---|
+| `hollow_program` | code that does no work: empty or constant bodies, an early exit, spoofed equality |
+| `harness_tampering` | a submission that changes what judges it: test hooks, edited tests, a written reward |
+| `answer_access` | a solution obtained instead of produced: read from the environment or from history |
+| `weak_tests` | a wrong program or output that the tests or the checker cannot tell from a right one |
+| `grader_logic` | a failure the grader scores as success |
+
+A Coverage Score names how many of these categories it measured. A category with no
+submission in the battery is not measured, and is never counted as caught.
 
 ## Rules applied to every submission
 
@@ -91,8 +97,8 @@ A check with weight 0 is reported beside the headline and never moves it.
   10⁻⁹ is a finding. It is reported with its detection power: at *N* repeats, a grader that
   flips with probability *r* is observed disagreeing with probability 1 − *r*ᴺ − (1 − *r*)ᴺ.
   No disagreement seen is never reported as "deterministic".
-- **`ground_truth_rejected`.** The declared answer is submitted under every certified rewriting
-  in `bohrin.relations`. The record states how many were tried, never that the grader rejects
+- **`ground_truth_rejected`.** The declared solution is submitted under every certified
+  rewriting registered under the `bohrin.relations` entry point. The record states how many were tried, never that the grader rejects
   correct answers. Weight 0, because two correct graders produce the same result: one that
   enforces an output format the prompt documents, and one whose reward never reads the reply.
 - **`answer_leakage`.** Executes nothing. The match is whole-token, after Unicode (NFKC), case
@@ -130,7 +136,7 @@ uses (CWE, CVE and OSV, CodeQL query IDs, SARIF fingerprints). The formats are c
 | Probe | `<namespace>/<slug>@<major>` | `bohrin/pytest-report-patch@1` | The major version changes when what the probe tries changes. Third parties use their own namespace |
 | Finding | `BF-<10 Crockford base32>` | `BF-7K3Q9D2M1X` | Derived from what was tried and where, so the same defect gets the same ID on every run. No `I`, `L`, `O` or `U` |
 | Schema | `https://bohrin.com/schema/<name>/v<major>` | `https://bohrin.com/schema/finding/v1` | Additive changes keep the major version |
-| Battery | integer | `1` | Changes whenever a category is added, removed or redefined |
+| Battery | integer | `2` | Changes whenever a category is added, removed or redefined |
 | Conformance level | `BCL-1` to `BCL-4` | `BCL-2` | |
 
 ## Weakness list

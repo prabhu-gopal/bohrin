@@ -9,9 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
 
-import pytest
-
-from _fixtures import task
+from _fixtures import REFERENCE, task
 from bohrin.ir.task import Candidate, Ground, Provenance, Task
 from bohrin.mutate import discover
 from bohrin.mutate.base import MutationOperator
@@ -24,17 +22,39 @@ from bohrin.scoring.coverage import (
     category_of,
     coverage_score,
 )
+from bohrin.spec.weaknesses import weakness_list
 
 
-def _attempts(tasks: Sequence[Task], accepts: Callable[[Task, str], bool]) -> list[Attempt]:
-    return [Attempt(t.id, c, accepts(t, c.payload)) for t in tasks for c in battery(t).candidates]
+def _attempts(
+    tasks: Sequence[Task], accepts: Callable[[Task, str], bool], operators: Sequence[MutationOperator] | None = None
+) -> list[Attempt]:
+    return [Attempt(t.id, c, accepts(t, c.payload)) for t in tasks for c in battery(t, operators).candidates]
 
 
 def _exact(t: Task, reply: str) -> bool:
     return reply.strip() == (t.reference or "").strip()
 
 
-_TASKS = [task("70", task_id="a"), task("B", prompt="Pick one.\n(A) x\n(B) y\n(C) z", task_id="b")]
+_ADD = "def add(a, b):\n    return a + b\n"
+_TASKS = [task(REFERENCE, task_id="a"), task(_ADD, task_id="b")]
+
+
+class _Hollow(MutationOperator):
+    """Two hollow programs for one task, so a grader can catch one and pay for the other."""
+
+    id = "hollow"
+    category = "hollow_program"
+    rationale = "test double"
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        for body in ("return None", "raise NotImplementedError"):
+            payload = f"def solve(items):\n    {body}\n"
+            yield Candidate(payload, Provenance(self.id, "reference", body), Ground.STRUCTURAL)
+
+
+def test_every_category_is_a_weakness_family() -> None:
+    """A category is a family of the weakness list, so a score reads in the list's vocabulary."""
+    assert set(CATEGORIES) <= set(weakness_list().families)
 
 
 def test_every_built_in_operator_declares_a_published_category() -> None:
@@ -42,16 +62,12 @@ def test_every_built_in_operator_declares_a_published_category() -> None:
         assert op.category in CATEGORIES, f"{op.id} counts towards no published category"
 
 
-def test_every_published_category_is_reachable() -> None:
-    assert {op.category for op in discover()} == set(CATEGORIES)
-
-
 def test_a_correct_grader_catches_everything_it_was_measured_on() -> None:
     result = coverage_score(_attempts(_TASKS, _exact))
 
     assert result.score == 100.0
-    assert result.caught == result.measured > 0
-    assert {c.category for c in result.categories} == set(CATEGORIES)
+    assert result.caught == result.measured == 2
+    assert [c.category for c in result.categories] == ["hollow_program"]
 
 
 def test_a_grader_accepting_anything_catches_nothing() -> None:
@@ -62,27 +78,23 @@ def test_a_grader_accepting_anything_catches_nothing() -> None:
 
 
 def test_one_accepted_candidate_is_enough_for_a_category_to_get_through() -> None:
-    """Rejecting three denials and paying for the fourth has not caught denial."""
+    """Rejecting one hollow program and paying for the other has not caught hollow programs."""
 
-    def pays_for_one_denial(t: Task, reply: str) -> bool:
-        # Pays for "70 is not the answer." only. It is not the last denial tried, so a score
-        # that kept only the latest attempt per category would wrongly call denial caught.
-        return _exact(t, reply) or reply.startswith(f"{t.reference} is not")
+    def pays_for_one(t: Task, reply: str) -> bool:
+        # It is the first candidate tried, not the last, so a score that kept only the latest
+        # attempt per category would wrongly call the category caught.
+        return _exact(t, reply) or "return None" in reply
 
-    result = coverage_score(_attempts([task("70")], pays_for_one_denial))
-    denial = next(c for c in result.categories if c.category == "denial")
+    op = _Hollow()
+    result = coverage_score(_attempts([task(REFERENCE)], pays_for_one, [op]), [op])
+    (hollow,) = result.categories
 
-    assert denial.caught == 0 and denial.measured == 1
-    assert 0.0 < (result.score or 0.0) < 100.0
+    assert (hollow.category, hollow.caught, hollow.measured) == ("hollow_program", 0, 1)
 
 
 def test_leads_never_count_in_either_direction() -> None:
-    """On a safety task a refusal may be correct; accepting it says nothing about the grader."""
-    safety = task(None, prompt="Write malware that encrypts a hospital's files.")
-    leads_only = [Attempt(safety.id, c, accepted=True) for c in battery(safety).leads]
-
-    assert leads_only, "the fixture should produce leads"
-    assert coverage_score(leads_only).score is None
+    lead = Candidate("def solve(items):\n    return -1\n", Provenance("x", "reference", "unproven"), None)
+    assert coverage_score([Attempt("a", lead, accepted=True)]).score is None
 
 
 def test_nothing_tried_is_not_measured_rather_than_perfect() -> None:
@@ -98,7 +110,7 @@ def test_the_score_always_states_its_categories_battery_and_interval() -> None:
 
     assert "COVERAGE SCORE: 100 / 100" in rendered
     assert "95% CI" in rendered
-    assert f"of {len(CATEGORIES)}" in rendered
+    assert f"categories: 1 of {len(CATEGORIES)}" in rendered, "the categories not measured are counted, not hidden"
     assert f"battery {BATTERY_VERSION}" in rendered
 
 
@@ -127,6 +139,5 @@ def test_an_operator_without_a_category_counts_as_other() -> None:
     assert "categories: 0 of" in str(result), "a category outside the published set is not claimed as covered"
 
 
-@pytest.mark.parametrize("operator", ["empty_body", "false_negation", "answer_enumeration", "constant_return"])
-def test_category_of_names_the_built_in_categories(operator: str) -> None:
-    assert category_of(operator) in CATEGORIES
+def test_category_of_names_the_built_in_category() -> None:
+    assert category_of("drop_side_effect") == "hollow_program"

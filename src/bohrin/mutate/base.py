@@ -4,10 +4,8 @@ An operator turns a task into candidate submissions. Every candidate it emits mu
 the :class:`~bohrin.ir.task.Ground` on which its incorrectness rests, or no ground at all
 — in which case the candidate is a lead, never an exploit.
 
-The distinction between text-level and code-level operators is not cosmetic. Inspecting
-real tasksets shows most verifiers score a *reply*, not a source file: the reward function
-receives a trace and reads its last message. Text-level operators therefore apply to every
-task, while code-level operators apply only where the reply is Python that parses.
+An operator that needs the reference to be a program says so with :attr:`requires_code`, and
+yields nothing for a task whose reference does not parse: silence, not a guess.
 """
 
 from __future__ import annotations

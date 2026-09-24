@@ -59,20 +59,25 @@ print(coverage_score(attempts))
 ```
 
 ```console
-COVERAGE SCORE: 75 / 100   95% CI 30–95   3 of 4 caught   categories: 4 of 5 (battery 1)
+COVERAGE SCORE: 0 / 100   95% CI 0–79   0 of 1 caught   categories: 1 of 5 (battery 2)
 ```
 
-That grader rejects an empty submission, a truncated reply and a constant, and pays for the
-reference with every function body replaced by `pass`. The replaced code runs, so the grader
-never notices that it returns nothing.
+That grader pays for the reference with every function body replaced by `pass`: the emptied
+code still runs, so the grader never notices that it returns nothing. The score says exactly
+how much was tried, one submission in one of five categories, and its interval is wide
+because one submission is a small sample.
 
-| Category | Submissions |
+Every submission targets a class in the [weakness list](docs/WEAKNESSES.md), which names every
+published way a coding grader or its harness can be cheated, and counts towards the category
+named after that class's family:
+
+| Category | Ways of passing without doing the work |
 |---|---|
-| `empty_and_echo` | an empty submission, the task prompt echoed back, a refusal |
-| `wrong_answer` | a constant (`0`, `None`, `[]` …), the reference with every function body emptied |
-| `malformed_output` | a repetition loop, and a reply cut off inside unclosed markup |
-| `denial` | an explicit denial of the declared answer |
-| `multiple_answers` | several answers at once, the declared one among them |
+| `hollow_program` | code that does no work: empty or constant bodies, an early exit, spoofed equality |
+| `harness_tampering` | a submission that changes what judges it: test hooks, edited tests, a written reward |
+| `answer_access` | a solution obtained instead of produced: read from the environment or from history |
+| `weak_tests` | a wrong program or output that the tests or the checker cannot tell from a right one |
+| `grader_logic` | a failure the grader scores as success |
 
 Two numbers come out of it:
 
@@ -113,7 +118,7 @@ can follow.
 ## Extending it
 
 Operators (new known-wrong submissions) and relations (new certified rewritings of a correct
-answer) register through the public `bohrin.mutators` and `bohrin.relations` entry points,
+solution) register through the public `bohrin.mutators` and `bohrin.relations` entry points,
 from your own package, with no fork. Third-party code is held to exactly the same rules as
 built-in code. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
