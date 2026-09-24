@@ -109,7 +109,7 @@ def check_script(text: str, finding: Finding) -> list[str]:
         problems.append(f"[tool.bohrin] declares finding {declared.get('finding')!r}, not {finding.id!r}")
     if declared.get("probe") != finding.probe:
         problems.append(f"[tool.bohrin] declares probe {declared.get('probe')!r}, not {finding.probe!r}")
-    if finding.submission is None or declared.get("submission") != finding.submission.to_json():
+    if finding.submission is None or _declared_submission(declared.get("submission")) != finding.submission.to_json():
         problems.append("[tool.bohrin] submission digests do not match the finding")
     runs = declared.get("runs")
     if not isinstance(runs, int) or runs < MIN_RUNS:
@@ -126,6 +126,22 @@ def check_script(text: str, finding: Finding) -> list[str]:
     if RESULT_SCHEMA not in text:
         problems.append(f"never reports a {RESULT_SCHEMA} result")
     return problems
+
+
+def _declared_submission(table: Any) -> Any:
+    """A ``[tool.bohrin.submission]`` table in the finding record's form.
+
+    TOML has no null, so a script lists the files a workspace deletes under ``deleted`` rather than
+    as null digests. They are folded back into ``files`` here, as the record writes them.
+    """
+    if not isinstance(table, dict) or table.get("kind") != "workspace":
+        return table
+    record = {key: value for key, value in table.items() if key != "deleted"}
+    files: dict[str, Any] = dict(table.get("files", {}))
+    for path in table.get("deleted", []):
+        files[path] = None
+    record["files"] = dict(sorted(files.items()))
+    return record
 
 
 def _imports(tree: ast.AST) -> set[str]:
