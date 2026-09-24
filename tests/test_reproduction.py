@@ -18,6 +18,7 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
+from _parity import disagreements
 from bohrin.evidence import Finding, Reproduction, Scored, Submission, finding_id
 from bohrin.evidence.reproduction import (
     OUTCOMES,
@@ -33,7 +34,7 @@ from bohrin.evidence.reproduction import (
 from bohrin.ir.task import Ground, Shape, Source, Workspace
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "docs" / "examples"
-SCRIPT = EXAMPLES / "reproduce_BF-QA8M7NM39K.py"
+SCRIPT = EXAMPLES / "reproduce_BF-GZW6R2M9CJ.py"
 _VALIDATOR = Draft202012Validator(reproduction_result_schema())
 
 pytestmark = pytest.mark.skipif(not SCRIPT.is_file(), reason="no docs/examples in this checkout")
@@ -79,7 +80,7 @@ def _report(runs: list[Scored], baseline: list[Scored], outcome: str, **extra: A
 
 
 def test_the_example_script_meets_the_contract() -> None:
-    assert _FINDING.id == "BF-QA8M7NM39K", "the example's file name and header must name its real ID"
+    assert _FINDING.id == "BF-GZW6R2M9CJ", "the example's file name and header must name its real ID"
     assert check_script(SCRIPT.read_text(encoding="utf-8"), _FINDING) == []
 
 
@@ -123,7 +124,7 @@ def test_the_inline_metadata_is_read_the_way_pep_723_specifies() -> None:
 @pytest.mark.parametrize(
     ("problem", "old", "new"),
     [
-        ("another finding", 'finding = "BF-QA8M7NM39K"', 'finding = "BF-0000000000"'),
+        ("another finding", 'finding = "BF-GZW6R2M9CJ"', 'finding = "BF-0000000000"'),
         ("another probe", 'probe = "bohrin/empty-implementation@1"', 'probe = "bohrin/other@1"'),
         ("another submission", "sha256:60a654ef", "sha256:70a654ef"),
         ("too few runs", "# runs = 3", "# runs = 1"),
@@ -299,3 +300,37 @@ def test_a_script_can_declare_a_workspace_that_deletes_files() -> None:
     )
     assert check_script(header, finding) == []
     assert check_script(header.replace('# deleted = ["tests/test_a.py"]\n', "# deleted = []\n"), finding) != []
+
+
+# --------------------------------------------------------------------------- schema parity, exhaustively
+
+
+@pytest.mark.parametrize(
+    ("outcome", "runs", "baseline"),
+    [("reproduced", [PASS] * 3, [PASS] * 3), ("not-reproduced", [FAIL] * 3, [PASS] * 3)],
+)
+def test_the_reader_and_the_result_schema_agree_on_every_single_point_breakage(
+    outcome: str, runs: list[Scored], baseline: list[Scored]
+) -> None:
+    valid = json.loads(_report(runs, baseline, outcome, python="3.13.5", platform="Linux"))
+
+    def accepts(record: dict[str, Any]) -> bool:
+        try:
+            parse_result(json.dumps(record), OUTCOMES[outcome][0])
+        except ValueError as exc:
+            # Comparing the claimed outcome with the runs is a cross-field rule JSON Schema cannot
+            # express. It has its own tests above; parity is about each field on its own.
+            return "but its runs show" in str(exc)
+        except TypeError:
+            return False
+        return True
+
+    assert disagreements(valid, reproduction_result_schema(), accepts) == []
+
+
+def test_a_passed_written_as_a_string_is_not_read_as_true() -> None:
+    """The dangerous coercion: ``"false"`` read as passed would turn a failure into a reproduction."""
+    line = json.loads(_report([PASS] * 3, [PASS] * 3, "reproduced"))
+    line["runs"] = [{"reward": 0.0, "passed": "false"}] * 3
+    with pytest.raises(ValueError, match="true or false"):
+        parse_result(json.dumps(line), 0)

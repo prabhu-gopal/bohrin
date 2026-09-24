@@ -47,7 +47,10 @@ All notable changes to this project are documented here. The format follows
   needs a ground, a paying verdict, a passing baseline and a reproduction script, and a
   differentiating observation proves nothing without the reference and at least three
   presumed-correct solutions passing it. `finding_id()` derives the same `BF-` ID for the same
-  defect on every run, and `normalise_finding_id()` reads one as people type it.
+  defect on every run from RFC 8785 canonical JSON, so it can be recomputed in any language, and
+  `normalise_finding_id()` reads one as people type it. Reading a record is strict: every field
+  must be exactly the type the schema gives it (`"false"` is not `false`; `NaN` is refused), and a
+  test holds the reader and the schema to the same verdict on every single-field breakage.
 - **Probe manifests** (`src/bohrin/spec/probes.toml`, `bohrin.spec.probes`): every built-in
   probe described as data a third-party tool can read without importing Bohrin: ID
   (`bohrin/empty-implementation@1`), weaknesses, shapes, template and its parameters, ground,
