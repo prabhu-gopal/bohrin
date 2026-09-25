@@ -37,7 +37,9 @@ lost rather than ignored.
 
 ## Disclosure
 
-We will credit you in the release notes and the advisory unless you prefer otherwise. We
+A fixed vulnerability is published as a GitHub security advisory, with a CVE when one is
+assigned, and the release that fixes it lists it under **Security** in `CHANGELOG.md` with that
+identifier. We will credit you in the release notes and the advisory unless you prefer otherwise. We
 ask that you give us the 90-day window before public disclosure; if a fix is taking longer
 than that, we will say so publicly and explain why.
 

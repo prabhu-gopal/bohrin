@@ -44,6 +44,11 @@ features, run the suite on the oldest supported Python too:
 
 ## What a change needs
 
+**Every change that adds or changes behaviour comes with tests, in the same pull request.** A new
+feature, command, probe, rule or format gets tests that exercise it; a bug fix gets a test that
+fails before the fix and passes after. A pull request that changes behaviour without a test is not
+merged. The table below says what that means for the most common kinds of change.
+
 | If you change… | Also do |
 |---|---|
 | anything a user can see | an entry in `CHANGELOG.md` under `## [Unreleased]` |
