@@ -82,6 +82,9 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
   `bohrin.commands` entry-point group, where `power`, `verify` and `conformance` register exactly
   as a plugin's command would; `command.py` is the `Command` base and the exit codes every command
   shares.
+- **`decisions.py`**: the `.bohrin/decisions.toml` format (ignore or dispute a finding, with a
+  reason and an optional expiry), its strict reader, a writer whose output reads back exactly, and
+  the mapping onto SARIF suppressions.
 - **`api.py`**: the seam. The one module a plugin or an extension imports; it re-exports the stable
   types and functions and declares `PLUGIN_API = 1`, which changes only when the seam breaks. A
   test freezes the names of version 1.

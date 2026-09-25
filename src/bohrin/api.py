@@ -30,6 +30,8 @@ from bohrin._plugins import ADAPTERS, COMMANDS, GROUPS, MUTATORS, PLUGIN_API, PR
 from bohrin.command import CANNOT_RUN, CLEAN, FINDINGS, NEEDS_SIGN_IN, OUT_OF_CREDITS, USAGE, Command
 from bohrin.conformance import check as check_conformance
 from bohrin.conformance import read_results as read_conformance_results
+from bohrin.decisions import Decision, format_decisions, read_decisions
+from bohrin.decisions import active as active_decisions
 from bohrin.evidence.finding import (
     DifferentiatingInput,
     DifferentiatingObservation,
@@ -95,6 +97,7 @@ __all__ = [
     "Control",
     "ControlAttempt",
     "CoverageScore",
+    "Decision",
     "DifferentiatingInput",
     "DifferentiatingObservation",
     "Exploit",
@@ -122,6 +125,7 @@ __all__ = [
     "Unverified",
     "Verdict",
     "Workspace",
+    "active_decisions",
     "battery",
     "check_conformance",
     "check_script",
@@ -129,12 +133,14 @@ __all__ = [
     "discover_operators",
     "discover_relations",
     "finding_id",
+    "format_decisions",
     "judge",
     "parse_result",
     "positive_controls",
     "probe_for",
     "probes",
     "read_conformance_results",
+    "read_decisions",
     "read_record",
     "scorecard",
     "to_sarif",

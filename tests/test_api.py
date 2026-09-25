@@ -35,7 +35,8 @@ V1 = frozenset(
         "Reproduction", "ReproductionResult", "Run", "Scorecard", "Scored", "Shape", "Source", "Submission", "Task",
         "Unverified", "Verdict", "Workspace", "battery", "check_conformance", "check_script", "coverage_score",
         "discover_operators", "discover_relations", "finding_id", "judge", "parse_result", "positive_controls",
-        "probe_for", "probes", "read_conformance_results", "read_record", "scorecard", "to_sarif",
+        "probe_for", "probes", "read_conformance_results", "read_record", "Decision", "active_decisions",
+        "format_decisions", "read_decisions", "scorecard", "to_sarif",
         "verification_gap", "weakness_list", "wilson_interval",
     }
 )  # fmt: skip
