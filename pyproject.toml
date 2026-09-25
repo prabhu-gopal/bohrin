@@ -68,7 +68,9 @@ Changelog = "https://github.com/prabhu-gopal/bohrin/blob/main/CHANGELOG.md"
 # Every registered operator either establishes a wrongness ground or emits leads only; see
 # src/bohrin/mutate/operators.py.
 [project.entry-points."bohrin.mutators"]
+constant_implementation = "bohrin.mutate.operators:ConstantImplementation"
 drop_side_effect = "bohrin.mutate.operators:DropSideEffect"
+raise_not_implemented = "bohrin.mutate.operators:RaiseNotImplemented"
 
 # Certified meaning-preserving rewritings of a correct solution: positive controls. Their order is
 # fixed in `bohrin.relations._BUILTIN_ORDER`, not by this table.

@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from _fixtures import REFERENCE, TRIVIAL_REFERENCE, task, text
+from _fixtures import REFERENCE, TRIVIAL_REFERENCE, behavioural_grader, task, text
 from bohrin.ir.task import Ground
 from bohrin.mutate import discover
 from bohrin.mutate.battery import battery
@@ -22,7 +22,7 @@ from bohrin.mutate.equivalence import (
     reads_as_refusal,
     reads_as_structured_state,
 )
-from bohrin.mutate.operators import DropSideEffect
+from bohrin.mutate.operators import ConstantImplementation, DropSideEffect, RaiseNotImplemented
 
 # ------------------------------------------------------------------------- the registry
 
@@ -30,7 +30,7 @@ from bohrin.mutate.operators import DropSideEffect
 def test_operators_are_discoverable_and_explain_themselves() -> None:
     ops = discover()
 
-    assert [op.id for op in ops] == ["drop_side_effect"]
+    assert [op.id for op in ops] == ["constant_implementation", "drop_side_effect", "raise_not_implemented"]
     assert all(op.rationale for op in ops), "an operator must explain why its output is wrong"
 
 
@@ -171,7 +171,8 @@ def test_it_stays_silent_where_emptying_proves_nothing(reference: str | None) ->
 
 
 def test_the_battery_grounds_it_on_a_real_program() -> None:
-    assert [c.provenance.operator for c in battery(task(REFERENCE)).grounded] == ["drop_side_effect"]
+    grounded = [c.provenance.operator for c in battery(task(REFERENCE)).grounded]
+    assert grounded == ["constant_implementation", "drop_side_effect", "raise_not_implemented"]
 
 
 #: References whose functions do no work of their own: an interface, an abstract base, a protocol.
@@ -225,3 +226,144 @@ def test_the_operator_itself_never_emits_an_emptying_that_changes_nothing(refere
     separately: each layer must stand without the other.
     """
     assert list(DropSideEffect().apply(task(reference))) == []
+
+
+# --------------------------------------------------------------------------- constant implementation
+
+
+def _constant(reference: str) -> list[tuple[Ground | None, str]]:
+    return [(c.ground, text(c)) for c in ConstantImplementation().apply(task(reference))]
+
+
+@pytest.mark.parametrize(
+    ("reference", "returns"),
+    [
+        ("def f(xs: list[int]) -> int:\n    return sum(xs)\n", "return 0"),
+        ("def f(xs) -> list[str]:\n    return [str(x) for x in xs]\n", "return []"),
+        ("def f(xs) -> typing.Dict[str, int]:\n    return dict(xs)\n", "return {}"),
+        ("def f(x) -> str:\n    return x.upper()\n", 'return ""'),
+        ("def f(x) -> bool:\n    return x > 1\n", "return False"),
+        ("def f(x) -> float:\n    return x / 2\n", "return 0.0"),
+        ("def f(x) -> set[int]:\n    return {x}\n", "return set()"),
+        ("def f(x) -> tuple[int, int]:\n    return x, x\n", "return ()"),
+    ],
+)
+def test_the_constant_has_the_declared_return_type(reference: str, returns: str) -> None:
+    ((ground, body),) = _constant(reference)
+    assert ground is Ground.STRUCTURAL and returns in body
+
+
+@pytest.mark.parametrize(
+    ("reference", "returns"),
+    [
+        (REFERENCE, "return 0"),
+        ("def f(words):\n    out = {}\n    for w in words:\n        out[w] = 1\n    return out\n", "return {}"),
+        ("def f(xs):\n    return len(xs)\n", "return 0"),
+        ("def f(x):\n    return x == 1\n", "return False"),
+        ("def f(x):\n    return f'{x}!'\n", 'return ""'),
+        ("def f(xs):\n    return sorted(xs)\n", "return []"),
+    ],
+)
+def test_without_an_annotation_the_type_is_read_from_what_the_reference_returns(reference: str, returns: str) -> None:
+    ((ground, body),) = _constant(reference)
+    assert ground is Ground.STRUCTURAL and returns in body
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "def f(xs, x):\n    xs.append(x)\n",
+        "def f(a, b):\n    return a + b\n",
+        "def f(x):\n    if x:\n        return 1\n    return 'no'\n",
+    ],
+    ids=["side effect only", "type not in the syntax", "two types returned"],
+)
+def test_where_every_constant_would_be_none_nothing_is_submitted(reference: str) -> None:
+    """That would be the empty implementation again, which its own probe already submits."""
+    assert _constant(reference) == []
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "def f() -> int:\n    x = compute()\n    return 42\n",
+        "def f(x) -> int:\n    y = clock()\n    return y + 1\n",
+    ],
+    ids=["returns a literal", "ignores its inputs"],
+)
+def test_a_reference_that_may_itself_be_constant_gives_only_a_lead(reference: str) -> None:
+    ((ground, _),) = _constant(reference)
+    assert ground is None
+
+
+def test_a_method_that_reads_self_depends_on_its_inputs() -> None:
+    reference = (
+        "class A:\n    def __init__(self, n):\n        self.n = n\n\n"
+        "    def double(self) -> int:\n        return self.n * 2\n"
+    )
+    ((ground, body),) = _constant(reference)
+    assert ground is Ground.STRUCTURAL
+    assert "self.n = n" in body, "special methods keep their bodies"
+    assert "return 0" in body
+
+
+def test_a_constant_that_is_the_reference_is_not_submitted() -> None:
+    assert _constant("def f(x) -> int:\n    return 0\n") == []
+
+
+def test_a_nested_functions_returns_are_not_the_outer_functions() -> None:
+    reference = "def f(xs):\n    def key(x):\n        return str(x)\n    return sorted(xs, key=key)\n"
+    ((ground, body),) = _constant(reference)
+    assert ground is Ground.STRUCTURAL and "return []" in body
+
+
+# --------------------------------------------------------------------------- raise NotImplementedError
+
+
+def test_every_body_raising_is_structurally_wrong() -> None:
+    (candidate,) = RaiseNotImplemented().apply(task(REFERENCE))
+    assert candidate.ground is Ground.STRUCTURAL
+    assert "raise NotImplementedError" in text(candidate) and "total" not in text(candidate)
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "def check(x):\n    raise ValueError(x)\n",
+        "class Store:\n    def get(self, key):\n        raise NotImplementedError\n",
+        "def f(x):\n    '''Always refuse.'''\n    raise PermissionError('no')\n",
+    ],
+    ids=["only raises another error", "an interface", "a docstring and a raise"],
+)
+def test_raising_is_silent_where_the_reference_only_raises(reference: str) -> None:
+    """One error raised for another is not provably wrong; an interface already raises."""
+    assert list(RaiseNotImplemented().apply(task(reference))) == []
+
+
+# --------------------------------------------------------------------------- never accuse a correct grader
+
+#: Correct programs of varied shapes, each with inputs that exercise it.
+_PROGRAMS = {
+    "sum of positives": (REFERENCE, ((), (1, -2, 3), (0,))),
+    "word counts": (
+        "def solve(words):\n    out = {}\n    for w in words:\n        out[w] = out.get(w, 0) + 1\n    return out\n",
+        (["a", "b", "a"], []),
+    ),
+    "typed upper": ("def solve(x: str) -> str:\n    return x.upper()\n", ("ab", "")),
+    "predicate": ("def solve(x):\n    return x > 1\n", (0, 2)),
+    "method": (
+        "class A:\n    def __init__(self, n):\n        self.n = n\n\n"
+        "    def get(self) -> int:\n        return self.n\n\n"
+        "def solve(n):\n    return A(n).get() * 2\n",
+        (1, 0, 3),
+    ),
+}
+
+
+@pytest.mark.parametrize("name", _PROGRAMS)
+def test_no_hollow_program_is_accepted_by_a_correct_grader(name: str) -> None:
+    reference, inputs = _PROGRAMS[name]
+    accepts = behavioural_grader(reference, inputs=inputs)
+    grounded = battery(task(reference)).grounded
+    assert grounded, "each program gives the battery something to try"
+    assert [c.provenance.operator for c in grounded if accepts(text(c))] == []

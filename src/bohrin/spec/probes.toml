@@ -35,6 +35,50 @@ sources = ["https://arxiv.org/abs/2604.17596", "https://link.springer.com/articl
 solution = "reference-emptied"
 parameters = []
 
+[[probe]]
+id = "bohrin/constant-implementation@1"
+operator = "constant_implementation"
+weakness = ["BGW-101"]
+title = "The reference with every function returning a constant of its own return type"
+shapes = ["program"]
+ground = "structural"
+expect = "reject"
+maturity = "experimental"
+battery = 2
+guards = [
+    "The reference does not parse, or no function in it does work of its own: nothing is submitted.",
+    "Every constant would be None (no return type is annotated or can be read from the reference): nothing is submitted, because that is the empty implementation again.",
+    "Special methods (__init__, __eq__ and the like) are kept: Python fixes their return types, not the task.",
+    "No function of the reference both reads its inputs (parameters, self or cls) and returns a value the syntax does not fix: the submission is a lead, never counted, because the reference may itself return this constant.",
+    "The result compiles to the same bytecode as the reference: nothing is submitted.",
+]
+sources = ["https://arxiv.org/abs/2604.17596"]
+
+[probe.template]
+solution = "reference-constant"
+parameters = []
+
+[[probe]]
+id = "bohrin/raise-not-implemented@1"
+operator = "raise_not_implemented"
+weakness = ["BGW-101"]
+title = "The reference with every function body replaced by raise NotImplementedError"
+shapes = ["program"]
+ground = "structural"
+expect = "reject"
+maturity = "experimental"
+battery = 2
+guards = [
+    "The reference does not parse, or no function in it does work of its own: nothing is submitted.",
+    "The reference's only work is raising an error: nothing is submitted, because one error raised for another is not provably wrong.",
+    "The result compiles to the same bytecode as the reference: nothing is submitted.",
+]
+sources = ["https://arxiv.org/abs/2604.17596"]
+
+[probe.template]
+solution = "reference-raising"
+parameters = []
+
 # --------------------------------------------------------------------------- positive controls
 # A correct grader must accept these. They are never merged with the Coverage Score: they measure
 # correct-work acceptance beside it, so a grader that rejects everything is exposed.

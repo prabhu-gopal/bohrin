@@ -135,9 +135,321 @@ class DropSideEffect(MutationOperator):
         )
 
 
+class _RaisingBodies(cst.CSTTransformer):
+    """Replace every function body with ``raise NotImplementedError``."""
+
+    def __init__(self) -> None:
+        self.changed = False
+
+    def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
+        """Replace this function's body; its signature, decorators and name are kept."""
+        self.changed = True
+        raising = cst.Raise(exc=cst.Name("NotImplementedError"))
+        return updated_node.with_changes(body=cst.IndentedBlock(body=[cst.SimpleStatementLine(body=[raising])]))
+
+
+def _statements(function: cst.FunctionDef) -> list[cst.CSTNode]:
+    """The function's own statements, small statements unpacked, nested definitions left out."""
+    body = function.body
+    lines = body.body if isinstance(body, cst.IndentedBlock) else [body]
+    out: list[cst.CSTNode] = []
+    for line in lines:
+        if isinstance(line, cst.SimpleStatementLine | cst.SimpleStatementSuite):
+            out.extend(line.body)
+        elif not isinstance(line, cst.FunctionDef | cst.ClassDef):
+            out.append(line)
+    return out
+
+
+class _BeyondRaising(cst.CSTVisitor):
+    """Records whether any function does work other than raising an error."""
+
+    def __init__(self) -> None:
+        self.found = False
+
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
+        """A statement that is neither inert nor a ``raise`` is work beyond raising."""
+        for statement in _statements(node):
+            if isinstance(statement, cst.Raise):
+                continue
+            if isinstance(statement, cst.BaseSmallStatement) and _inert(statement):
+                continue
+            self.found = True
+
+
+class RaiseNotImplemented(MutationOperator):
+    """Replace every function body with ``raise NotImplementedError`` (BGW-101, trivial implementation).
+
+    A grader that treats an exception as a pass, or checks only that the code imports, pays for a
+    solution that refuses to do anything.
+
+    **The ground needs a reference that does work, and work other than raising.** An interface's
+    functions already raise ``NotImplementedError``; a reference whose only work is raising some
+    other error (a validator that always refuses, say) differs from this one only in which error
+    it raises, which a correct grader may not distinguish. In both cases nothing is submitted.
+    """
+
+    id = "raise_not_implemented"
+    category = "hollow_program"
+    rationale = "Every function refuses to run, so only a grader that checks results can catch it."
+    requires_code = True
+    shapes = (Shape.PROGRAM,)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """The reference with every function body raising, or nothing if that proves nothing."""
+        source = task.reference or ""
+        module = _parse(source)
+        if module is None:
+            return
+        finder = _WorkFinder()
+        module.visit(finder)
+        beyond = _BeyondRaising()
+        module.visit(beyond)
+        if not (finder.does_work and beyond.found):
+            return
+        tf = _RaisingBodies()
+        mutated = module.visit(tf)
+        if not tf.changed or code_equivalent(mutated.code, source):
+            return
+        yield _cand(
+            self.id,
+            "reference",
+            "every function body replaced with `raise NotImplementedError`; no work is performed",
+            mutated.code,
+            Ground.STRUCTURAL,
+        )
+
+
+#: The constant each return type gets: the value a check of the type alone accepts.
+_CONSTANT_OF_TYPE = {
+    "int": "0",
+    "float": "0.0",
+    "complex": "0j",
+    "str": '""',
+    "bytes": 'b""',
+    "bool": "False",
+    "list": "[]",
+    "sequence": "[]",
+    "dict": "{}",
+    "mapping": "{}",
+    "set": "set()",
+    "frozenset": "frozenset()",
+    "tuple": "()",
+    "none": "None",
+}
+
+#: Built-in calls whose result type is fixed, by the name of the type.
+_CALL_TYPES = {
+    "len": "int",
+    "int": "int",
+    "round": "int",
+    "float": "float",
+    "str": "str",
+    "repr": "str",
+    "bool": "bool",
+    "isinstance": "bool",
+    "all": "bool",
+    "any": "bool",
+    "list": "list",
+    "sorted": "list",
+    "dict": "dict",
+    "set": "set",
+    "frozenset": "frozenset",
+    "tuple": "tuple",
+    "bytes": "bytes",
+}
+
+
+def _type_of_annotation(node: cst.BaseExpression) -> str | None:
+    if isinstance(node, cst.Subscript):
+        node = node.value
+    if isinstance(node, cst.Attribute):
+        node = node.attr
+    if isinstance(node, cst.Name) and node.value.lower() in _CONSTANT_OF_TYPE:
+        return node.value.lower()
+    return None
+
+
+def _type_of_value(node: cst.BaseExpression, assigned: dict[str, cst.BaseExpression], depth: int = 0) -> str | None:
+    """The type a returned expression certainly has, or None when the syntax does not say."""
+    if isinstance(node, cst.Integer):
+        return "int"
+    if isinstance(node, cst.Float):
+        return "float"
+    if isinstance(node, cst.Imaginary):
+        return "complex"
+    if isinstance(node, cst.SimpleString | cst.ConcatenatedString | cst.FormattedString):
+        prefix = node.prefix.lower() if isinstance(node, cst.SimpleString | cst.FormattedString) else ""
+        return "bytes" if "b" in prefix else "str"
+    if isinstance(node, cst.List | cst.ListComp):
+        return "list"
+    if isinstance(node, cst.Dict | cst.DictComp):
+        return "dict"
+    if isinstance(node, cst.Set | cst.SetComp):
+        return "set"
+    if isinstance(node, cst.Tuple):
+        return "tuple"
+    if isinstance(node, cst.Comparison) or (
+        isinstance(node, cst.UnaryOperation) and isinstance(node.operator, cst.Not)
+    ):
+        return "bool"
+    if isinstance(node, cst.Call) and isinstance(node.func, cst.Name):
+        return _CALL_TYPES.get(node.func.value)
+    if isinstance(node, cst.Name):
+        if node.value in ("True", "False"):
+            return "bool"
+        if node.value == "None":
+            return "none"
+        if node.value in assigned and depth < 5:
+            return _type_of_value(assigned[node.value], assigned, depth + 1)
+    return None
+
+
+class _Returns(cst.CSTVisitor):
+    """A function's own return values, and the first value assigned to each local name."""
+
+    def __init__(self) -> None:
+        self.values: list[cst.BaseExpression | None] = []
+        self.assigned: dict[str, cst.BaseExpression] = {}
+        self.names: set[str] = set()
+
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+        """Nested functions have returns of their own: they are not this function's."""
+        return False
+
+    def visit_Lambda(self, node: cst.Lambda) -> bool:
+        """A lambda's value is not this function's return value."""
+        return False
+
+    def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+        """Methods of a nested class are not this function's."""
+        return False
+
+    def visit_Return(self, node: cst.Return) -> None:
+        """Record what is returned (None for a bare return)."""
+        self.values.append(node.value)
+
+    def visit_Assign(self, node: cst.Assign) -> None:
+        """Remember the first value each simple name is given."""
+        for target in node.targets:
+            if isinstance(target.target, cst.Name):
+                self.assigned.setdefault(target.target.value, node.value)
+
+    def visit_Name(self, node: cst.Name) -> None:
+        """Every name the body mentions, to tell whether it reads its parameters."""
+        self.names.add(node.value)
+
+
+_LITERALS = (
+    cst.Integer,
+    cst.Float,
+    cst.Imaginary,
+    cst.SimpleString,
+    cst.ConcatenatedString,
+)
+
+
+def _is_literal(node: cst.BaseExpression | None) -> bool:
+    """A value the syntax fixes: a number, a plain string, True, False, None, or an empty collection."""
+    if node is None or isinstance(node, _LITERALS):
+        return True
+    if isinstance(node, cst.Name):
+        return node.value in ("True", "False", "None")
+    if isinstance(node, cst.List | cst.Tuple | cst.Set):
+        return not node.elements
+    if isinstance(node, cst.Dict):
+        return not node.elements
+    return False
+
+
+class _ConstantBodies(cst.CSTTransformer):
+    """Replace every function body with ``return <constant>`` of the type it returns.
+
+    Special methods are left as they are: their return types are fixed by Python, not the task.
+    """
+
+    def __init__(self) -> None:
+        self.constants: list[str] = []
+        #: Some replaced function read its parameters and returned something the syntax does not fix.
+        self.grounded = False
+
+    def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
+        """Replace this function's body with a constant of its return type."""
+        name = original_node.name.value
+        if name.startswith("__") and name.endswith("__"):
+            return updated_node
+        returns = _Returns()
+        for line in original_node.body.body if isinstance(original_node.body, cst.IndentedBlock) else []:
+            line.visit(returns)
+        kind = _type_of_annotation(original_node.returns.annotation) if original_node.returns else None
+        if kind is None:
+            kinds = {_type_of_value(v, returns.assigned) if v is not None else "none" for v in returns.values}
+            kind = kinds.pop() if len(kinds) == 1 else None
+        constant = _CONSTANT_OF_TYPE.get(kind or "none", "None")
+        self.constants.append(constant)
+        # ``self`` and ``cls`` are inputs too: a method reading ``self.n`` depends on the object.
+        parameters = {
+            p.name.value
+            for p in (
+                *original_node.params.params,
+                *original_node.params.posonly_params,
+                *original_node.params.kwonly_params,
+            )
+        }
+        reads_inputs = bool(parameters & returns.names)
+        computes = any(not _is_literal(v) for v in returns.values)
+        self.grounded = self.grounded or (reads_inputs and computes)
+        statement = cst.Return(value=cst.parse_expression(constant))
+        return updated_node.with_changes(body=cst.IndentedBlock(body=[cst.SimpleStatementLine(body=[statement])]))
+
+
+class ConstantImplementation(MutationOperator):
+    """Make every function return a constant of its own return type (BGW-101, trivial implementation).
+
+    ``0`` for a function returning a count, ``""`` for text, ``[]`` for a list: a grader that checks
+    only the type, or only that the call succeeds, pays for it. The type comes from the return
+    annotation, or else from what the reference itself returns (``total = 0 … return total`` is
+    an ``int``); where neither says, the constant is ``None``.
+
+    **The ground needs a reference whose result depends on its inputs.** If no function reads its
+    parameters and returns a computed value, the reference may itself return this constant, so
+    the submission is a lead, never counted. If every constant would be ``None``, the submission is
+    the empty implementation again and nothing is submitted.
+    """
+
+    id = "constant_implementation"
+    category = "hollow_program"
+    rationale = "The result has the right type and never the right value, so only a check of values catches it."
+    requires_code = True
+    shapes = (Shape.PROGRAM,)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """The reference with every function returning a type-correct constant."""
+        source = task.reference or ""
+        module = _parse(source)
+        if module is None:
+            return
+        finder = _WorkFinder()
+        module.visit(finder)
+        if not finder.does_work:
+            return
+        tf = _ConstantBodies()
+        mutated = module.visit(tf)
+        if all(c == "None" for c in tf.constants) or code_equivalent(mutated.code, source):
+            return
+        ground = Ground.STRUCTURAL if tf.grounded else None
+        detail = (
+            f"every function returns a constant of its type ({', '.join(sorted(set(tf.constants)))}), "
+            "whatever its inputs"
+        )
+        if ground is None:
+            detail += "; a lead: no function of the reference reads its inputs and computes its result"
+        yield _cand(self.id, "reference", detail, mutated.code, ground)
+
+
 # Negating a condition, perturbing a boundary by one, or swapping an operator (`<` for `<=`,
 # `+` for `-`) is deliberately absent: a changed source is not evidence of changed behaviour,
 # so none of them could establish wrongness without executing both programs on a
 # differentiating input.
 
-__all__ = ["DropSideEffect"]
+__all__ = ["ConstantImplementation", "DropSideEffect", "RaiseNotImplemented"]

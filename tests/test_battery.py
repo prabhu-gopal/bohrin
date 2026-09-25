@@ -153,7 +153,8 @@ def test_a_grader_that_only_checks_the_code_runs_is_still_caught() -> None:
         return True
 
     hits = _accused(task(REFERENCE), runs)
-    assert hits and all(hit.startswith("drop_side_effect:") for hit in hits)
+    # It pays for the empty and the constant body, which both run; the raising one does not run.
+    assert {hit.split(":", 1)[0] for hit in hits} == {"drop_side_effect", "constant_implementation"}
 
 
 def test_a_grader_accepting_anything_is_caught_by_every_grounded_candidate() -> None:
