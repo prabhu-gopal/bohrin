@@ -129,6 +129,34 @@ the grader catch? 0–100, higher is better.
 - Always printed with its sample, a 95% Wilson interval, the categories covered and the battery
   version.
 
+**Correct-work acceptance** — of the correct rewritings of a task's reference (the positive
+controls above), what share did the grader accept? 0–100, higher is better.
+
+- Counted per task and relation. A rewriting tried more than once counts as accepted only if it
+  was accepted **every** time.
+- The baseline (the reference unchanged) is a gate, not a point: it is never counted, and
+  acceptance on a task is measured only when its baseline was run and accepted.
+- Printed with its sample, a 95% Wilson interval and the number of relations measured. Nothing
+  measured is `not measured`, never 100.
+
+**The two are printed side by side and never merged.** A grader that rejects everything scores
+100 on the Coverage Score; correct-work acceptance exposes it. Any single number made from the two
+could be raised by trading one for the other.
+
+**Which tasks are scored.** Each exclusion is listed with its task and reason, never dropped
+silently:
+
+| Rule | Left out | Why |
+|---|---|---|
+| The grader rejected the task's reference, on any run | the task, from both numbers | a grader that fails the reference is not measuring the task, and rejecting a cheat there is not catching it |
+| The grader paid past full marks on any submission to the task | the task, from both numbers | full marks are then not known, so neither accepted nor rejected can be read |
+| An attempt could not run | that attempt, from both sides of every rate | a crash counted as rejected would score as a catch |
+
+**Per shape, then overall.** Tasks are scored per grader shape, then all together. Each shape
+names the weakness classes that apply to it (active classes of a scoring category that list the
+shape) and that nothing in the run measured. A class is measured when a probe whose manifest names
+it produced a counted result.
+
 **Verification Gap** — how often a grader paid for work that was wrong or disagreed with itself.
 0–100, lower is better, printed with the checks it covered. Checks that could not run are left
 out, never scored as clean.

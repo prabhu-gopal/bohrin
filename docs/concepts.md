@@ -127,7 +127,12 @@ is counted per task and category.
 a 95% Wilson interval and the categories measured. A score over nothing is "not measured", never
 100.
 
-**Verification Gap.** A second number: how often a grader paid for wrong work or disagreed with
+**Correct-work acceptance.** Always printed beside the Coverage Score and never merged with it:
+of the correct rewritings of each reference (the **positive controls**), the share the grader
+accepted. A grader that rejects everything scores 100 on coverage and 0 here. A task whose
+reference the grader rejects is left out of both numbers.
+
+**Verification Gap.** Another number: how often a grader paid for wrong work or disagreed with
 itself, over the checks that ran.
 
 **Finding.** One result, in a fixed record format with a stable ID such as `BF-W6YDC0TBE4`. The

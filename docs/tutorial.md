@@ -119,7 +119,82 @@ Read the whole line, not just the number:
   four were not tried, and a category that was not tried is never counted as caught.
 - **`battery 2`**: scores are comparable only within the same battery version.
 
-## 6. Look up what went wrong
+## 6. Check that it still accepts correct work
+
+A grader that rejects everything catches every cheat. So the Coverage Score has a second number
+beside it: **correct-work acceptance**, the share of *correct* submissions the grader accepted.
+Bohrin makes them from your reference: the reference itself, then rewritings of it that are
+proved, by machine, to do exactly the same thing. This task's reference has a comment and a local
+variable, so there is something to rewrite:
+
+```python
+from bohrin.relations import positive_controls
+
+reference = "def add(a, b):\n    total = a + b  # the sum\n    return total\n"
+task = Task(id="add", prompt="Write add(a, b) that returns the sum.", reference=reference)
+
+for control in positive_controls(task):
+    print(control.relation)
+    print(control.payload.text)
+```
+
+```text
+oracle
+def add(a, b):
+    total = a + b  # the sum
+    return total
+
+comment_free
+def add(a, b):
+    total = a + b
+    return total
+
+renamed_locals
+def add(a, b):
+    local_0 = a + b
+    return local_0
+
+```
+
+`oracle` is the reference unchanged. It is the baseline: if a grader rejects it, the task is left
+out of both numbers, because a grader that fails the reference is not measuring the task.
+
+Now score `checks_it` beside a grader that accepts only the reference's exact text:
+
+```python
+from bohrin.scoring.scorecard import ControlAttempt, scorecard
+
+
+def matches_reference(submission):
+    return submission == reference
+
+
+for grader in (checks_it, matches_reference):
+    attempts = [Attempt(task.id, c, accepted=grader(c.payload.text)) for c in battery(task).candidates]
+    controls = [ControlAttempt(task.id, c, accepted=grader(c.payload.text)) for c in positive_controls(task)]
+    print(grader.__name__)
+    print(scorecard([task], attempts, controls))
+```
+
+```text
+checks_it
+program: 1 task scored
+  COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
+  CORRECT-WORK ACCEPTANCE: 100 / 100   95% CI 34–100   2 of 2 accepted   relations: 2
+  not run: 15 applicable weakness classes: BGW-102, BGW-103, BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
+matches_reference
+program: 1 task scored
+  COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
+  CORRECT-WORK ACCEPTANCE: 0 / 100   95% CI 0–66   0 of 2 accepted   relations: 2
+  not run: 15 applicable weakness classes: BGW-102, BGW-103, BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
+```
+
+Both catch the empty body, but `matches_reference` rejects every correct rewriting: it checks the
+text, not what the code does. The two numbers are never merged, because any single number made
+from them could be raised by trading one for the other. The `not run` line names every weakness
+class that applies to this kind of grader and that nothing here tried.
+
+## 7. Look up what went wrong
 
 Every probe points at a weakness class, and every class has a permanent ID and fix guidance.
 

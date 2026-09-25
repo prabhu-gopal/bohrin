@@ -16,6 +16,11 @@ category is *measured* when at least one grounded candidate of that category was
 category to get through on that task: a grader that rejects three hollow programs and pays
 for the fourth has not caught hollow programs.
 
+**Only what was measured counts.** An attempt that could not run is left out, never counted as
+caught, and a task on which the grader paid past full marks is left out whole, because full marks
+are then not known. :func:`bohrin.scoring.scorecard.scorecard` also leaves out tasks whose
+reference the grader rejects, and puts correct-work acceptance beside this score.
+
 **Only grounded candidates count.** A lead — a candidate whose wrongness could not be
 established without asking the grader — says nothing about whether the grader is wrong, so
 it is never counted in either direction.
@@ -65,7 +70,12 @@ class Attempt:
 
     task_id: str
     candidate: Candidate
-    accepted: bool
+    #: Whether the grader paid full marks; None when the attempt could not run. An attempt that
+    #: could not run is left out of both sides of the score, never counted as caught.
+    accepted: bool | None
+    #: The grader paid more than full marks, so its scale is not the one assumed and neither
+    #: "accepted" nor "rejected" can be read: the whole task is left out of the score.
+    scale_exceeded: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,10 +136,14 @@ def coverage_score(attempts: Iterable[Attempt], operators: Sequence[MutationOper
     ops = list(operators) if operators is not None else discover()
     category = {op.id: op.category or OTHER for op in ops}
 
+    attempts = list(attempts)
+    past_full_marks = {a.task_id for a in attempts if a.scale_exceeded}
     got_through: dict[tuple[str, str], bool] = {}
     for attempt in attempts:
         if not attempt.candidate.known_wrong:
             continue  # a lead proves nothing about the grader, in either direction
+        if attempt.accepted is None or attempt.task_id in past_full_marks:
+            continue  # nothing was measured: a crash is not a catch, and an unknown scale is unread
         key = (attempt.task_id, category.get(attempt.candidate.provenance.operator, OTHER))
         got_through[key] = got_through.get(key, False) or attempt.accepted
 

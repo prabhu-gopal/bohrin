@@ -44,8 +44,9 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
   rewritings (comment-free, reformatted, renamed locals) and `certify.py` the mechanical proofs
   (same syntax tree; same bytecode up to local names). Third parties add rewritings through the
   `bohrin.relations` entry point.
-- **`scoring/`**: `coverage.py` (the Coverage Score, `BATTERY_VERSION`, `CATEGORIES`), `gap.py`
-  (the Verification Gap), `interval.py` (Wilson intervals).
+- **`scoring/`**: `coverage.py` (the Coverage Score, `BATTERY_VERSION`, `CATEGORIES`),
+  `scorecard.py` (correct-work acceptance beside it, per grader shape then overall, with the tasks
+  left out and why), `gap.py` (the Verification Gap), `interval.py` (Wilson intervals).
 - **`spec/`**: the standard as data.
   - `weaknesses.toml` and `weaknesses.py`: the weakness list and its loader.
   - `probes.toml` and `probes.py`: the probe manifests and their loader.
