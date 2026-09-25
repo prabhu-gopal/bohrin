@@ -8,6 +8,7 @@ of them can only ever remove a ground.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 
@@ -367,3 +368,58 @@ def test_no_hollow_program_is_accepted_by_a_correct_grader(name: str) -> None:
     grounded = battery(task(reference)).grounded
     assert grounded, "each program gives the battery something to try"
     assert [c.provenance.operator for c in grounded if accepts(text(c))] == []
+
+
+@pytest.mark.parametrize(
+    ("reference", "returns"),
+    [
+        ("def f(x):\n    y = 0\n    for i in x:\n        y = y + i\n    return y\n", "return 0"),
+        ("def f(x):\n    if x:\n        return x\n    return -1.5\n", "return 0.0"),
+        ("def f(xs):\n    out = b''\n    for x in xs:\n        out = out + x\n    return out\n", 'return b""'),
+        ("def f(x):\n    return x.value\n", "return None"),
+        ("def f(x):\n    return (x, x)\n", "return ()"),
+        ("def f(x):\n    return {x}\n", "return set()"),
+        ("def f(x):\n    return not x\n", "return False"),
+    ],
+    ids=["accumulator", "a signed float beside an untyped value", "bytes", "untyped", "tuple", "set", "not"],
+)
+def test_the_type_is_the_one_the_syntax_shows(reference: str, returns: str) -> None:
+    got = _constant(reference)
+    if returns == "return None":
+        assert got == [], "no type shown: the constant would be None, the empty implementation again"
+    else:
+        ((ground, body),) = got
+        assert ground is Ground.STRUCTURAL and returns in body
+
+
+def test_a_name_given_two_types_has_none() -> None:
+    assert _constant("def f(x):\n    y = 0\n    if x:\n        y = 'a'\n    return y\n") == []
+
+
+def test_returns_of_two_known_types_give_no_constant() -> None:
+    assert _constant("def f(x):\n    if not x:\n        return\n    return len(x)\n") == []
+
+
+def test_a_signed_number_is_a_literal_so_a_constant_reference_gives_only_a_lead() -> None:
+    ((ground, body),) = _constant("def f(x):\n    print(x)\n    return -1\n")
+    assert ground is None and "return 0" in body
+
+
+def test_lambdas_and_nested_classes_do_not_lend_their_returns() -> None:
+    reference = (
+        "def f(xs):\n    key = lambda x: str(x)\n    class Box:\n        def get(self):\n            return 'x'\n"
+        "    return sorted(xs, key=key)\n"
+    )
+    ((_, body),) = _constant(reference)
+    assert "return []" in body
+
+
+@pytest.mark.parametrize("operator", [ConstantImplementation(), RaiseNotImplemented()])
+def test_a_reference_that_does_not_parse_gives_nothing(operator: Any) -> None:
+    assert list(operator.apply(task("def broken(:\n"))) == []
+
+
+def test_code_after_an_unconditional_raise_is_not_work() -> None:
+    """It can never run, so raising in its place changes nothing, and nothing is submitted."""
+    reference = "def f():\n    raise NotImplementedError\n    x = 1\n"
+    assert list(RaiseNotImplemented().apply(task(reference))) == []

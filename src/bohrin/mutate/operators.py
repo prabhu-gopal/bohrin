@@ -13,7 +13,7 @@ cannot support: a ground is a claim about the candidate's *behaviour*, and a dif
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 
 import libcst as cst
 
@@ -168,10 +168,11 @@ class _BeyondRaising(cst.CSTVisitor):
         self.found = False
 
     def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
-        """A statement that is neither inert nor a ``raise`` is work beyond raising."""
+        """A statement that is neither inert nor a ``raise`` is work beyond raising. Nothing after an
+        unconditional ``raise`` can run, so it is not work."""
         for statement in _statements(node):
             if isinstance(statement, cst.Raise):
-                continue
+                break
             if isinstance(statement, cst.BaseSmallStatement) and _inert(statement):
                 continue
             self.found = True
@@ -260,6 +261,12 @@ _CALL_TYPES = {
 }
 
 
+def _one_type(kinds: Iterable[str | None]) -> str | None:
+    """The single type among those known, or None when none is known or two differ."""
+    known = {kind for kind in kinds if kind is not None}
+    return known.pop() if len(known) == 1 else None
+
+
 def _type_of_annotation(node: cst.BaseExpression) -> str | None:
     if isinstance(node, cst.Subscript):
         node = node.value
@@ -270,8 +277,17 @@ def _type_of_annotation(node: cst.BaseExpression) -> str | None:
     return None
 
 
-def _type_of_value(node: cst.BaseExpression, assigned: dict[str, cst.BaseExpression], depth: int = 0) -> str | None:
-    """The type a returned expression certainly has, or None when the syntax does not say."""
+def _type_of_value(
+    node: cst.BaseExpression, assigned: dict[str, list[cst.BaseExpression]], depth: int = 0
+) -> str | None:
+    """The type a returned expression certainly has, or None when the syntax does not say.
+
+    A local name has the one type its assigned values show; values whose type the syntax does not
+    show are passed over, and two different types mean none.
+    """
+    if isinstance(node, cst.UnaryOperation) and isinstance(node.operator, cst.Minus | cst.Plus):
+        inner = _type_of_value(node.expression, assigned, depth)
+        return inner if inner in ("int", "float", "complex") else None
     if isinstance(node, cst.Integer):
         return "int"
     if isinstance(node, cst.Float):
@@ -301,7 +317,7 @@ def _type_of_value(node: cst.BaseExpression, assigned: dict[str, cst.BaseExpress
         if node.value == "None":
             return "none"
         if node.value in assigned and depth < 5:
-            return _type_of_value(assigned[node.value], assigned, depth + 1)
+            return _one_type(_type_of_value(value, assigned, depth + 1) for value in assigned[node.value])
     return None
 
 
@@ -310,7 +326,8 @@ class _Returns(cst.CSTVisitor):
 
     def __init__(self) -> None:
         self.values: list[cst.BaseExpression | None] = []
-        self.assigned: dict[str, cst.BaseExpression] = {}
+        #: Every value assigned to each simple local name, so a name reassigned to another type has none.
+        self.assigned: dict[str, list[cst.BaseExpression]] = {}
         self.names: set[str] = set()
 
     def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
@@ -330,10 +347,10 @@ class _Returns(cst.CSTVisitor):
         self.values.append(node.value)
 
     def visit_Assign(self, node: cst.Assign) -> None:
-        """Remember the first value each simple name is given."""
+        """Remember every value each simple name is given."""
         for target in node.targets:
             if isinstance(target.target, cst.Name):
-                self.assigned.setdefault(target.target.value, node.value)
+                self.assigned.setdefault(target.target.value, []).append(node.value)
 
     def visit_Name(self, node: cst.Name) -> None:
         """Every name the body mentions, to tell whether it reads its parameters."""
@@ -350,9 +367,12 @@ _LITERALS = (
 
 
 def _is_literal(node: cst.BaseExpression | None) -> bool:
-    """A value the syntax fixes: a number, a plain string, True, False, None, or an empty collection."""
+    """A value the syntax fixes: a number (signed or not), a plain string, True, False, None, or an empty
+    collection."""
     if node is None or isinstance(node, _LITERALS):
         return True
+    if isinstance(node, cst.UnaryOperation) and isinstance(node.operator, cst.Minus | cst.Plus):
+        return isinstance(node.expression, cst.Integer | cst.Float | cst.Imaginary)
     if isinstance(node, cst.Name):
         return node.value in ("True", "False", "None")
     if isinstance(node, cst.List | cst.Tuple | cst.Set):
@@ -383,8 +403,7 @@ class _ConstantBodies(cst.CSTTransformer):
             line.visit(returns)
         kind = _type_of_annotation(original_node.returns.annotation) if original_node.returns else None
         if kind is None:
-            kinds = {_type_of_value(v, returns.assigned) if v is not None else "none" for v in returns.values}
-            kind = kinds.pop() if len(kinds) == 1 else None
+            kind = _one_type(_type_of_value(v, returns.assigned) if v is not None else "none" for v in returns.values)
         constant = _CONSTANT_OF_TYPE.get(kind or "none", "None")
         self.constants.append(constant)
         # ``self`` and ``cls`` are inputs too: a method reading ``self.n`` depends on the object.
