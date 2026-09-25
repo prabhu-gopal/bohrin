@@ -30,6 +30,12 @@ All notable changes to this project are documented here. The format follows
   Each has a manifest (`bohrin/oracle@1`, `…/comment-free-oracle@1`, `…/reformatted-oracle@1`,
   `…/renamed-oracle@1`). A differential test runs every emitted control beside its original on a
   corpus built to break naive renaming, and demands identical results.
+- **The decisions file format**, `.bohrin/decisions.toml` (`bohrin.decisions`): what a repository
+  decided about a finding, `ignore` (counted in the probe's dismissal rate) or `dispute` (counted
+  neither way until resolved), with a required reason, the decision date and an optional expiry.
+  An unreadable date is an error, never a permanent ignore, and a reason typed by a person is
+  written so it reads back exactly and cannot add a decision of its own. Each decision maps onto
+  a SARIF suppression.
 - **`bohrin.api`, the plugin seam**, with `PLUGIN_API = 1`: the one module a plugin or extension
   imports, re-exporting the stable types and functions; a test freezes the names of version 1, so
   one cannot be removed without changing the version. Four more entry-point groups:

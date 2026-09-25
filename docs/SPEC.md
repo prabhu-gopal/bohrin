@@ -521,6 +521,36 @@ and is at least 45 days after it unless `status` is `fixed` and the maintainer a
 publication. The example [examples/BVR-0000-00000.json](examples/BVR-0000-00000.json) describes the
 example grader in this repository; year `0000` marks an example.
 
+## The decisions file
+
+A repository records what it decided about findings in `.bohrin/decisions.toml`, committed so
+the whole team shares it (`bohrin.decisions`). The format is open, so any tool can read and write
+it.
+
+```toml
+version = 1
+
+[[decision]]
+finding = "BF-7K3Q9D2M1X"
+action = "ignore"
+reason = "the task's deliverable is the file's existence"
+decided = 2026-10-01
+expires = 2027-01-01
+```
+
+- **`action`**: `ignore` stops showing the finding and counts it in its probe's dismissal rate,
+  saying nothing about whether it is right; `dispute` says the finding is wrong, keeps it visible
+  as disputed, and counts it neither way in the error rate until the dispute is resolved.
+- **`reason`** is required and kept, because reasons are how a broken check is found.
+- **`decided`** and the optional **`expires`** are TOML dates, unquoted. On its expiry date a
+  decision stops holding and the finding shows again. A date that cannot be read is an error,
+  never read as "no expiry", and an expiry must be after the decision.
+- One decision per finding. No field names a person: the repository's history records who.
+- A tool writes the file sorted by finding ID, so a change reads as a small diff, and escapes any
+  reason so it reads back exactly and cannot add a decision of its own.
+- Each decision maps onto a SARIF suppression: `kind` external, `status` accepted for an ignore
+  and underReview for a dispute, the reason as its `justification`.
+
 ## Error rates
 
 A tool that accuses graders publishes how often it is wrong, and how much it misses, by a method
