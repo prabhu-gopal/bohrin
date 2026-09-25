@@ -383,7 +383,7 @@ What did a change do to the tests and the code, beside what its commits claim? `
 --since REF` compares the files at `REF` (default: where the branch started) with the working
 tree, uncommitted work included. It needs no account and no network, and it reports **facts**
 read from syntax trees, never "cheated": reformatting never looks like a removed assertion, and
-a test moved to another file never looks like a deleted one.
+a test moved to another file, or into, out of or between classes, never looks like a deleted one.
 
 | Rule | Reports | Kind | Weakness |
 |---|---|---|---|
@@ -408,7 +408,16 @@ a test moved to another file never looks like a deleted one.
 
 Test strength follows the eight-category taxonomy of
 [All Smoke, No Alarm](https://arxiv.org/abs/2606.18168) (strong: S1 value, S2 error, containment
-or type, S3 both; weak: W1 none, W2 existence, W3 truth, W4 mock calls, W5 snapshot).
+or type, S3 both; weak: W1 none, W2 existence, W3 truth, W4 mock calls, W5 snapshot). A check
+joined with `and` has the kinds of all its parts; one joined with `or` passes when any part holds,
+so it is only as strong as its weakest part. A comparison with `None` (`is`, `==` or `!=`) is an
+existence check, a comparison of a mock's call record (`call_count`, `called`) is a mock-call
+check, and `assertTrue(x == 5)` is read by its argument.
+
+A tolerance counts whether it is given by keyword or by position (`pytest.approx(x, 0.5)`), and
+NumPy's `isclose` is kept apart from the standard library's, whose arguments and defaults differ.
+A check is swallowed inside a `try` (or `try`/`except*`) whose handler catches `AssertionError`,
+`Exception` or everything, and inside `with suppress(...)` of one of those.
 
 A refactor can delete tests honestly, so facts alone exit 0. A fact beside a commit message that
 **claims success** exits 1: a subject line starting "Fix", "Resolves", "Implemented" and the like,
@@ -418,7 +427,10 @@ other than Python and pytest configuration; a report always says so.
 
 Reading history is safe in a hostile repository: only read-only git plumbing runs, with the
 programs a repository can name switched off, and the working tree is read directly, never
-diffed by git.
+diffed by git. A file over 2 MB is not read, and a committed one is refused from its size in the
+tree listing, before its content is loaded. Symlinks, and files reached through a symlinked
+directory outside the repository, are not read. A pytest configuration file that does not parse
+is listed as not checked rather than compared: pytest stops on it instead of running fewer tests.
 
 **On a pull request.** `--sarif FILE` also writes the facts as
 [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html), which GitHub code

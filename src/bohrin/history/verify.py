@@ -61,10 +61,13 @@ class VerifyReport:
         }
 
 
-def _read_disk(path: Path) -> str | None:
-    """A working-tree file, read without following a symlink and never past :data:`MAX_BYTES`."""
+def _read_disk(root: Path, path: Path) -> str | None:
+    """A working-tree file, read without following a symlink, never from outside ``root`` (through a
+    symlinked parent directory) and never past :data:`MAX_BYTES`."""
     if path.is_symlink() or not path.is_file():
         raise ValueError("not a regular file")
+    if not path.resolve().is_relative_to(root.resolve()):
+        raise ValueError("outside the repository")
     with path.open("rb") as handle:
         data = handle.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
@@ -80,7 +83,8 @@ def verify(start: Path, since: str | None = None) -> VerifyReport:
     """
     root = git.top_level(start)
     base = git.resolve(root, since) if since else git.default_base(root)
-    old_paths = {path for path in git.files_at(root, base) if _relevant(path)}
+    old_sizes = {path: size for path, size in git.files_at(root, base).items() if _relevant(path)}
+    old_paths = set(old_sizes)
     new_paths = {path for path in git.working_files(root) if _relevant(path)}
 
     before: dict[str, str | None] = {}
@@ -88,10 +92,10 @@ def verify(start: Path, since: str | None = None) -> VerifyReport:
     skipped: list[str] = []
     for path in sorted(old_paths | new_paths):
         try:
+            if old_sizes.get(path, 0) > MAX_BYTES:
+                raise ValueError("too large")  # checked before reading: a huge blob is never loaded
             old = git.read_at(root, base, path).decode("utf-8") if path in old_paths else None
-            if old is not None and len(old) > MAX_BYTES:
-                raise ValueError("too large")
-            new = _read_disk(root / path) if path in new_paths else None
+            new = _read_disk(root, root / path) if path in new_paths else None
         except (UnicodeDecodeError, ValueError, OSError):
             skipped.append(path)
             continue

@@ -266,6 +266,21 @@ def test_a_detectable_difference_beyond_the_whole_scale_is_said_plainly() -> Non
     assert "198" not in text
 
 
+def test_models_that_share_no_tasks_are_said_not_to_be_compared() -> None:
+    rows = _rows(*_binary("a", [1, 0]), *[{"task_id": f"u{i}", "model": "b", "score": 1.0} for i in range(2)])
+    report = analyse(rows)
+    assert report.comparisons == ()
+    assert "a and b share no tasks, so they were not compared." in report.notes
+    assert "not compared" in render(report)
+
+
+def test_models_sharing_one_task_are_said_to_be_too_few_to_compare() -> None:
+    rows = _rows(*_binary("a", [1, 0]), {"task_id": "t0", "model": "b", "score": 0.0})
+    report = analyse(rows)
+    assert "a and b share only 1 task, too few to compare." in report.notes
+    assert " − " not in render(report), "a comparison with no interval is not printed as one"
+
+
 def test_a_single_task_has_no_interval_and_says_so() -> None:
     text = render(analyse(_rows({"task_id": "t0", "model": "a", "score": 0.5})))
     assert "too small to estimate" in text

@@ -186,6 +186,10 @@ _INERT_REFERENCES = {
     "ellipsis": "class Store:\n    def get(self, key): ...\n",
     "only an empty nested function": "def outer():\n    def inner():\n        pass\n",
     "only an empty nested class": "def outer():\n    class Inner:\n        pass\n",
+    "only evaluates its parameter": "def f(x):\n    x\n",
+    "only a bare number": "def f():\n    0\n",
+    "a bare return": "def f():\n    return\n",
+    "returns None": "def f():\n    return None\n",
 }
 
 
@@ -211,3 +215,13 @@ def test_a_nested_function_that_does_work_still_grounds_the_candidate() -> None:
     reference = "def outer(items):\n    def total():\n        return sum(items)\n    return total()\n"
     (candidate,) = DropSideEffect().apply(task(reference))
     assert candidate.ground is Ground.STRUCTURAL
+
+
+@pytest.mark.parametrize("reference", ["def f():\n    return\n", "def f():\n    return None\n"])
+def test_the_operator_itself_never_emits_an_emptying_that_changes_nothing(reference: str) -> None:
+    """``return`` does work in form only: emptied to ``pass`` it compiles to the same program.
+
+    The battery also suppresses equivalent candidates, so this holds the operator's own guard
+    separately: each layer must stand without the other.
+    """
+    assert list(DropSideEffect().apply(task(reference))) == []

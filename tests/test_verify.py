@@ -19,7 +19,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from bohrin.cli import CANNOT_RUN, CLEAN, FINDINGS, main
-from bohrin.history import oracle
+from bohrin.history import git, oracle
 from bohrin.history.facts import facts, is_test_file, success_claims
 from bohrin.history.git import GitError, resolve
 from bohrin.history.verify import render, verify, verify_report_schema
@@ -198,12 +198,107 @@ def test_test_files_are_recognised_as_pytest_does(path: str, is_test: bool) -> N
         ("assert f(1)", "W3"),
         ("m.assert_called_once()", "W4"),
         ("assert f() == snapshot", "W5"),
+        # Compound and indirect forms: `and` checks both parts, `or` only its weakest, `not` its operand.
+        ("assert f(1) == 1 and f(2) == 2", "S1"),
+        ("assert f(1) == 1 and 1 in f()", "S3"),
+        ("assert f(1) == 1 or f(1) is None", "W2"),
+        ("assert not (f(1) is None)", "W2"),
+        ("assert not f(1) == 2", "S1"),
+        ("assert f(1) != None", "W2"),
+        ("assert None is not f(1)", "W2"),
+        ("assert m.call_count == 1", "W4"),
+        ("assert m.called", "W4"),
+        ("self.assertTrue(f(1) == 1)", "S1"),
+        ("self.assertTrue(f(1))", "W3"),
+        ("self.assertFalse(f(1) is None)", "W2"),
+        ("assert 0 < f(1) < 5", "S1"),
+        ("assert isinstance(f(1), int)", "S2"),
+        ("snapshot.assert_match(f(1))", "W5"),
+        ("self.assertMatchSnapshot(f(1))", "W5"),
+        ("self.assertIsNone(f(1))", "W2"),
     ],
 )
 def test_checks_are_classified_as_the_published_taxonomy_defines(body: str, category: str) -> None:
     node = ast.parse(_test(body)).body[1]
     assert isinstance(node, ast.FunctionDef)
     assert oracle.strength(node) == category
+
+
+def _one(body: str, name: str = "test_it") -> ast.FunctionDef:
+    node = ast.parse(_test(body, name)).body[1]
+    assert isinstance(node, ast.FunctionDef)
+    return node
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        ("assert f(1) == 1", "assert f(1) == 1 and f(2) == 2"),
+        ("assert f(1) == 1", "self.assertTrue(f(1) == 1)"),
+        ("assert f(1) == 1", "assert not f(1) != 1"),
+    ],
+    ids=["a second condition", "the same check through assertTrue", "a negated inequality"],
+)
+def test_a_stricter_or_equal_check_is_never_called_weakened(before: str, after: str) -> None:
+    assert "check-weakened" not in _rules({T: _test(before)}, {T: _test(after)})
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        ("assert f(1) == 1", "assert f(1) != None"),
+        ("assert f(1) == 1", "assert f(1) == 1 or f(1) is None"),
+        ("assert f(1) == [1]", "assert m.call_count == 1"),
+    ],
+    ids=["a value check became != None", "an escape hatch added with or", "a value check became a call count"],
+)
+def test_a_weaker_check_in_disguise_is_still_called_weakened(before: str, after: str) -> None:
+    assert "check-weakened" in _rules({T: _test(before)}, {T: _test(after)})
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "key"),
+    [
+        ("assert f() == pytest.approx(1)", "assert f() == pytest.approx(1, 0.5)", "approx.rel"),
+        ("assert np.allclose(f(), 1)", "assert np.allclose(f(), 1, 0.5)", "allclose.rtol"),
+        ("np.testing.assert_allclose(f(), 1)", "np.testing.assert_allclose(f(), 1, 0.5)", "assert_allclose.rtol"),
+        ("assert np.isclose(f(), 1)", "assert np.isclose(f(), 1, rtol=0.5)", "numpy.isclose.rtol"),
+        ("assert math.isclose(f(), 1)", "assert math.isclose(f(), 1, rel_tol=0.5)", "isclose.rel_tol"),
+    ],
+)
+def test_a_tolerance_loosened_positionally_or_through_numpy_is_seen(before: str, after: str, key: str) -> None:
+    loosened = [f for f in facts({T: _test(before)}, {T: _test(after)})[0] if f.rule == "tolerance-loosened"]
+    assert loosened and key in loosened[0].message
+
+
+def test_numpy_and_standard_library_isclose_are_not_confused() -> None:
+    """NumPy's isclose names its tolerances rtol and atol; they are not math.isclose's rel_tol."""
+    assert set(oracle.tolerances(_one("assert np.isclose(f(), 1)"))) == {"numpy.isclose.rtol", "numpy.isclose.atol"}
+    assert set(oracle.tolerances(_one("assert math.isclose(f(), 1)"))) == {"isclose.rel_tol", "isclose.abs_tol"}
+
+
+def test_an_expected_value_on_the_left_is_still_an_expected_value() -> None:
+    changed = _rules({T: _test("assert 5 == f(1)")}, {T: _test("assert 6 == f(1)")})
+    assert "expected-value-changed" in changed
+    assert oracle.expected_values(_one("assertEqual(5, f(1))")) == oracle.expected_values(_one("assert f(1) == 5"))
+    assert oracle.expected_values(_one("assert 1 == 1")) == {}, "two constants check nothing about the code"
+
+
+@pytest.mark.parametrize(
+    "after",
+    [
+        "with contextlib.suppress(AssertionError):\n    assert f(1) == 1",
+        "with suppress(Exception):\n    assert f(1) == 1",
+        "try:\n    assert f(1) == 1\nexcept* AssertionError:\n    pass",
+    ],
+)
+def test_a_check_silenced_by_suppress_or_except_star_is_seen(after: str) -> None:
+    assert "failure-swallowed" in _rules({T: _test("assert f(1) == 1")}, {T: _test(after)})
+
+
+def test_suppressing_an_unrelated_error_silences_nothing() -> None:
+    after = "with contextlib.suppress(FileNotFoundError):\n    os.remove('x')\nassert f(1) == 1"
+    assert "failure-swallowed" not in _rules({T: _test("assert f(1) == 1")}, {T: _test(after)})
 
 
 # --------------------------------------------------------------------------- claims of success
@@ -339,3 +434,208 @@ def test_json_output_conforms_to_its_schema(repo: Path, capsys: pytest.CaptureFi
 
     assert list(Draft202012Validator(verify_report_schema()).iter_errors(report)) == []
     assert report["facts"][0]["rule"] == "check-weakened"
+
+
+# --------------------------------------------------------------------------- moves, configs and limits
+
+_CLASS = (
+    "import unittest\n\nclass TestA(unittest.TestCase):\n    def test_x(self):\n        self.assertEqual(f(1), 2)\n"
+)
+
+
+@pytest.mark.parametrize(
+    "after",
+    [
+        _CLASS.replace("TestA", "TestParse"),
+        "def test_x():\n    assert f(1) == 2\n",
+        "import unittest\n\nclass TestA(unittest.TestCase):\n    pass\n\n"
+        + _CLASS.split("\n\n", 1)[1].replace("TestA", "TestB"),
+    ],
+    ids=["class renamed", "method made a function", "method moved to another class"],
+)
+def test_a_test_moved_between_classes_is_not_removed(after: str) -> None:
+    rules = _rules({T: _CLASS}, {T: after})
+    assert "tests-removed" not in rules and "check-weakened" not in rules
+
+
+def test_a_test_weakened_while_its_class_was_renamed_is_still_seen() -> None:
+    after = _CLASS.replace("TestA", "TestParse").replace("self.assertEqual(f(1), 2)", "self.assertIsNotNone(f(1))")
+    assert "check-weakened" in _rules({T: _CLASS}, {T: after})
+
+
+def test_a_test_method_really_removed_is_still_removed() -> None:
+    after = "import unittest\n\nclass TestA(unittest.TestCase):\n    pass\n"
+    assert "tests-removed" in _rules({T: _CLASS}, {T: after})
+
+
+def test_a_moved_test_without_assertions_is_not_reported_as_new() -> None:
+    before = "def test_smoke():\n    f(1)\n"
+    after = "class TestSmoke:\n    def test_smoke(self):\n        f(1)\n"
+    assert "tests-without-checks" not in _rules({T: before}, {T: after})
+
+
+@pytest.mark.parametrize(
+    ("path", "before", "after"),
+    [
+        ("pytest.ini", "[pytest]\naddopts = -q\n", "[pytest\naddopts = -k nothing\n"),
+        (
+            "pyproject.toml",
+            '[tool.pytest.ini_options]\naddopts = "-q"\n',
+            '[tool.pytest.ini_options\naddopts = "-k nothing"\n',
+        ),
+    ],
+)
+def test_a_configuration_that_no_longer_parses_is_not_checked_rather_than_changed(
+    path: str, before: str, after: str
+) -> None:
+    found, unreadable = facts({path: before}, {path: after})
+    assert "selection-changed" not in [f.rule for f in found]
+    assert unreadable == [path]
+
+
+@pytest.mark.parametrize(
+    ("rule", "before", "after"),
+    [
+        ("trivial-checks-added", {T: _test("assert f(1) == 1")}, {T: _test("assert f(1) == 1\nself.assertTrue(True)")}),
+        ("exit-added", {"src/a.py": "def f():\n    return 1\n"}, {"src/a.py": "def f():\n    raise SystemExit(0)\n"}),
+        (
+            "timer-reassigned",
+            {"src/a.py": "import time\n"},
+            {"src/a.py": "import time\nsetattr(time, 'perf_counter', lambda: 0.0)\n"},
+        ),
+        ("replaced-by-stub", {"src/a.py": "def f(x):\n    return x + 1\n"}, {"src/a.py": "def f(x):\n    pass\n"}),
+    ],
+    ids=["assertTrue(True)", "raise SystemExit", "setattr on a timer", "a body of pass"],
+)
+def test_each_indirect_form_of_a_rule_is_seen(
+    rule: str, before: dict[str, str | None], after: dict[str, str | None]
+) -> None:
+    assert rule in _rules(before, after)
+
+
+def test_a_test_file_that_never_had_tests_loses_none() -> None:
+    assert "tests-removed" not in _rules({T: "import pytest\n"}, {T: None})
+
+
+def test_a_huge_committed_file_is_refused_before_it_is_read(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Its size is read from the tree listing, so a huge blob in history is never loaded into memory."""
+    import bohrin.history.verify as verify_module
+
+    (repo / "tests" / "test_big.py").write_text("x = 1\n" * 50)
+    _run_git(repo, "add", "-A")
+    _commit(repo, "Add a big file")
+    (repo / "tests" / "test_big.py").write_text("x = 2\n")
+    monkeypatch.setattr(verify_module, "MAX_BYTES", 100)
+    reads: list[str] = []
+    original = git.read_at
+
+    def recording(root: Path, commit: str, path: str) -> bytes:
+        reads.append(path)
+        return original(root, commit, path)
+
+    monkeypatch.setattr(git, "read_at", recording)
+    report = verify(repo, "HEAD")
+
+    assert "tests/test_big.py" not in reads
+    assert any("tests/test_big.py" in item for item in report.not_checked)
+
+
+def test_the_tree_listing_gives_sizes_and_leaves_out_submodules(repo: Path) -> None:
+    sizes = git.files_at(repo, git.resolve(repo, "HEAD"))
+    assert sizes["src.py"] == len((repo / "src.py").read_bytes())
+    _run_git(repo, "update-index", "--add", "--cacheinfo", f"160000,{'a' * 40},vendor/lib")
+    _run_git(repo, "commit", "-q", "-m", "Add a submodule")
+    assert "vendor/lib" not in git.files_at(repo, git.resolve(repo, "HEAD"))
+
+
+def test_a_file_reached_through_a_symlinked_directory_is_not_read(repo: Path, tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "test_secret.py").write_text("def test_s():\n    assert 1 == 1\n")
+    (repo / "linked").symlink_to(outside, target_is_directory=True)
+    report = verify(repo, "HEAD")
+    assert all("test_secret" not in f.path for f in report.facts)
+    # git never lists a file behind a symlinked directory; the reader refuses one on its own too.
+    import bohrin.history.verify as verify_module
+
+    with pytest.raises(ValueError, match="outside the repository"):
+        verify_module._read_disk(repo, repo / "linked" / "test_secret.py")
+
+
+# --------------------------------------------------------------------------- where the comparison starts
+
+
+def test_with_no_remote_the_comparison_starts_at_the_previous_commit(repo: Path) -> None:
+    first = git.resolve(repo, "HEAD")
+    (repo / "src.py").write_text("def f(x):\n    return x + 2\n")
+    _commit(repo, "Change f")
+    assert git.default_base(repo) == first
+
+
+def test_a_repository_with_one_commit_compares_with_it(repo: Path) -> None:
+    assert git.default_base(repo) == git.resolve(repo, "HEAD")
+
+
+def test_a_branch_is_compared_with_where_it_left_the_remote_default(repo: Path, tmp_path: Path) -> None:
+    started = git.resolve(repo, "HEAD")
+    _run_git(repo, "update-ref", "refs/remotes/origin/main", started)
+    _run_git(repo, "checkout", "-q", "-b", "feature")
+    for n in (1, 2):
+        (repo / "src.py").write_text(f"def f(x):\n    return x + {n + 1}\n")
+        _commit(repo, f"Step {n}")
+    assert git.default_base(repo) == started, "both commits on the branch are compared, not only the last"
+
+
+def test_an_empty_repository_cannot_be_compared(tmp_path: Path) -> None:
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    _run_git(empty, "init", "-q")
+    with pytest.raises(git.GitError, match="no commits"):
+        git.default_base(empty)
+
+
+def test_git_missing_or_hanging_is_a_clear_error(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def missing(*_args: object, **_kwargs: object) -> None:
+        raise FileNotFoundError("git")
+
+    def hangs(*_args: object, **_kwargs: object) -> None:
+        raise subprocess.TimeoutExpired("git", git.TIMEOUT_S)
+
+    monkeypatch.setattr(subprocess, "run", missing)
+    with pytest.raises(git.GitError, match="not installed"):
+        git.top_level(repo)
+    monkeypatch.setattr(subprocess, "run", hangs)
+    with pytest.raises(git.GitError, match="did not answer"):
+        git.top_level(repo)
+
+
+def test_a_sarif_file_that_cannot_be_written_cannot_run(repo: Path, tmp_path: Path) -> None:
+    target = tmp_path / "missing-directory" / "out.sarif"
+    assert main(["verify", "--since", "HEAD", "--sarif", str(target), str(repo)]) == CANNOT_RUN
+
+
+def test_fewer_decimal_places_is_a_looser_tolerance() -> None:
+    before, after = "self.assertAlmostEqual(f(), 1.0, places=7)", "self.assertAlmostEqual(f(), 1.0, 2)"
+    loosened = [f for f in facts({T: _test(before)}, {T: _test(after)})[0] if f.rule == "tolerance-loosened"]
+    assert loosened and "assertAlmostEqual.places" in loosened[0].message
+
+
+def test_a_bare_except_swallows_a_check() -> None:
+    after = "try:\n    assert f(1) == 1\nexcept:\n    pass"
+    assert "failure-swallowed" in _rules({T: _test("assert f(1) == 1")}, {T: _test(after)})
+
+
+@pytest.mark.parametrize(
+    "patch",
+    [
+        "mock.patch.object(pkg, 'parse')",
+        "monkeypatch.setattr(pkg, 'parse', lambda x: 1)",
+        "monkeypatch.setattr('pkg.parse', lambda x: 1)",
+    ],
+)
+def test_each_way_of_patching_the_subject_is_seen(patch: str) -> None:
+    assert oracle.mocked_subjects(_one(patch, "test_parse")) == {"parse"}
+
+
+def test_a_patch_target_without_a_word_is_not_the_subject() -> None:
+    assert oracle.mocked_subjects(_one("monkeypatch.setattr(pkg, '_', 1)", "test_parse")) == set()
