@@ -30,6 +30,15 @@ All notable changes to this project are documented here. The format follows
   Each has a manifest (`bohrin/oracle@1`, `…/comment-free-oracle@1`, `…/reformatted-oracle@1`,
   `…/renamed-oracle@1`). A differential test runs every emitted control beside its original on a
   corpus built to break naive renaming, and demands identical results.
+- **Correct-work acceptance, beside the Coverage Score, per grader shape**
+  (`bohrin.scoring.scorecard`). A grader that rejects everything catches every cheat, so each
+  shape now gets two numbers, never merged: the Coverage Score and the share of correct rewritings
+  of the reference the grader accepted, each with its sample and a 95% Wilson interval. Then an
+  overall pair, and for each shape the weakness classes that apply to it but that nothing in the
+  run measured. Tasks that cannot be scored soundly are listed with the reason and left out: the
+  grader rejected the reference, or paid past full marks. The tutorial has a new step showing a
+  grader that checks the text catch every cheat (Coverage 100) and accept no correct rewriting
+  (acceptance 0).
 - **SARIF output and a GitHub Action for `bohrin verify`.** `--sarif FILE` writes the facts as
   SARIF 2.1.0 (validated against the OASIS schema), with a line for each fact, facts as warnings
   and observations as notes, and fingerprints that keep a fact's annotation when its counts
@@ -137,6 +146,11 @@ All notable changes to this project are documented here. The format follows
   checking, the principles every check is held to (no accusation without proof, every number
   with its uncertainty, what was not checked said out loud, an open method), and the scope.
   The PyPI description and keywords match it.
+- **The Coverage Score counts only what was measured.** `Attempt.accepted` may be `None` for an
+  attempt that could not run; it is left out of the score, so a crash no longer has to be passed
+  as a rejection, which counts as a catch. `Attempt.scale_exceeded=True` marks a reward past full
+  marks, and leaves that whole task out, since full marks are then not known. Both default to the
+  old behaviour for existing code.
 
 ### Fixed
 
