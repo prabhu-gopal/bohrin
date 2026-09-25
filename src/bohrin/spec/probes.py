@@ -37,6 +37,8 @@ SOLUTIONS: Mapping[str, str] = MappingProxyType(
         "reference-emptied": "the declared solution with every function body replaced by pass",
         "reference-constant": "the declared solution with every function returning a constant of its return type",
         "reference-raising": "the declared solution with every function body replaced by raise NotImplementedError",
+        "reference-exiting": "the declared solution with every function body replaced by sys.exit(0)",
+        "reference-spoofed": "the declared solution with every function returning an object that equals everything",
         "reference-rewritten": "the declared solution rewritten in a way certified not to change what it does",
     }
 )

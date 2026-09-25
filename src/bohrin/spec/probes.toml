@@ -27,6 +27,7 @@ battery = 2
 guards = [
     "The reference does not parse, or defines no function: nothing is submitted.",
     "No function in the reference does work of its own (every body is a docstring, pass, ... or raise NotImplementedError, as in an interface): nothing is submitted.",
+    "No function that does work is reachable: nothing is submitted, because replacing the body of a function nothing calls changes nothing a grader can see. A script (module-level code that does work, such as print(...) or main()) reaches only what that code names; a library also reaches its public functions and classes; then whatever a reachable function names, and a reachable class's public and special methods.",
     "The emptied program compiles to the same bytecode as the reference, because its bodies were already empty: nothing is submitted.",
 ]
 sources = ["https://arxiv.org/abs/2604.17596", "https://link.springer.com/article/10.1007/s10664-018-9653-2"]
@@ -47,9 +48,10 @@ maturity = "experimental"
 battery = 2
 guards = [
     "The reference does not parse, or no function in it does work of its own: nothing is submitted.",
+    "No function that does work is reachable: nothing is submitted, because replacing the body of a function nothing calls changes nothing a grader can see. A script (module-level code that does work, such as print(...) or main()) reaches only what that code names; a library also reaches its public functions and classes; then whatever a reachable function names, and a reachable class's public and special methods.",
     "Every constant would be None (no return type is annotated or can be read from the reference): nothing is submitted, because that is the empty implementation again.",
-    "Special methods (__init__, __eq__ and the like) are kept: Python fixes their return types, not the task.",
-    "No function of the reference both reads its inputs (parameters, self or cls) and returns a value the syntax does not fix: the submission is a lead, never counted, because the reference may itself return this constant.",
+    "Special methods (__init__, __eq__ and the like) are kept: Python fixes their return types, not the task. A reachable one that does work makes the submission a lead, never counted, because a grader may be checking only the work it kept.",
+    "No reachable function of the reference both reads its inputs (parameters, self or cls) and returns a value the syntax does not fix: the submission is a lead, never counted, because the reference may itself return this constant.",
     "The result compiles to the same bytecode as the reference: nothing is submitted.",
 ]
 sources = ["https://arxiv.org/abs/2604.17596"]
@@ -70,7 +72,8 @@ maturity = "experimental"
 battery = 2
 guards = [
     "The reference does not parse, or no function in it does work of its own: nothing is submitted.",
-    "The reference's only work is raising an error: nothing is submitted, because one error raised for another is not provably wrong.",
+    "No function that does work is reachable: nothing is submitted, because replacing the body of a function nothing calls changes nothing a grader can see. A script (module-level code that does work, such as print(...) or main()) reaches only what that code names; a library also reaches its public functions and classes; then whatever a reachable function names, and a reachable class's public and special methods.",
+    "The reachable functions' only work is raising an error: nothing is submitted, because one error raised for another is not provably wrong.",
     "The result compiles to the same bytecode as the reference: nothing is submitted.",
 ]
 sources = ["https://arxiv.org/abs/2604.17596"]
@@ -78,6 +81,98 @@ sources = ["https://arxiv.org/abs/2604.17596"]
 [probe.template]
 solution = "reference-raising"
 parameters = []
+
+[[probe]]
+id = "bohrin/success-exit@1"
+operator = "success_exit"
+weakness = ["BGW-102"]
+title = "The reference with every function body replaced by sys.exit(0)"
+shapes = ["program"]
+ground = "structural"
+expect = "reject"
+maturity = "experimental"
+battery = 2
+guards = [
+    "The reference does not parse, or no function in it does work of its own: nothing is submitted.",
+    "No function that does work is reachable: nothing is submitted, because replacing the body of a function nothing calls changes nothing a grader can see. A script (module-level code that does work, such as print(...) or main()) reaches only what that code names; a library also reaches its public functions and classes; then whatever a reachable function names, and a reachable class's public and special methods.",
+    "Every function body is replaced, special methods included, so no work of the reference survives.",
+    "The result compiles to the same bytecode as the reference: nothing is submitted.",
+]
+sources = ["https://arxiv.org/abs/2511.18397"]
+
+[probe.template]
+solution = "reference-exiting"
+parameters = []
+
+[[probe]]
+id = "bohrin/equality-spoofing@1"
+operator = "equality_spoofing"
+weakness = ["BGW-103"]
+title = "The reference with every function returning an object that equals everything"
+shapes = ["program"]
+ground = "structural"
+expect = "reject"
+maturity = "experimental"
+battery = 2
+guards = [
+    "The reference does not parse, or no function in it does work of its own: nothing is submitted.",
+    "No function that does work is reachable: nothing is submitted, because replacing the body of a function nothing calls changes nothing a grader can see. A script (module-level code that does work, such as print(...) or main()) reaches only what that code names; a library also reaches its public functions and classes; then whatever a reachable function names, and a reachable class's public and special methods.",
+    "Every function body is replaced, special methods included, so no work of the reference survives.",
+    "The result compiles to the same bytecode as the reference: nothing is submitted.",
+]
+sources = ["https://arxiv.org/abs/2511.18397", "https://metr.org/blog/2025-06-05-recent-reward-hacking/"]
+
+[probe.template]
+solution = "reference-spoofed"
+parameters = []
+
+[[probe]]
+id = "bohrin/test-framework-hook@1"
+operator = "test_framework_hook"
+weakness = ["BGW-108"]
+title = "The empty implementation, with a conftest.py that makes pytest report every test as passed"
+shapes = ["workspace", "container", "history"]
+ground = "structural"
+expect = "reject"
+maturity = "experimental"
+battery = 2
+guards = [
+    "The solution is the empty implementation (bohrin/empty-implementation@1), and is submitted only where that probe submits: its guards are this probe's guards.",
+    "The ground rests on the solution alone, established without the tamper: whatever the tests report, a correct grader rejects it.",
+]
+sources = ["https://arxiv.org/abs/2511.18397", "https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/"]
+
+[probe.template]
+solution = "reference-emptied"
+parameters = ["test_root", "source_path"]
+
+[probe.template.files]
+"{test_root}/conftest.py" = "conftest-report-passed.py"
+"{source_path}" = "reference-emptied"
+
+[[probe]]
+id = "bohrin/tests-deleted@1"
+operator = "tests_deleted"
+weakness = ["BGW-109"]
+title = "The empty implementation, with a conftest.py that deselects every test"
+shapes = ["workspace", "container", "history"]
+ground = "structural"
+expect = "reject"
+maturity = "experimental"
+battery = 2
+guards = [
+    "The solution is the empty implementation (bohrin/empty-implementation@1), and is submitted only where that probe submits: its guards are this probe's guards.",
+    "The ground rests on the solution alone, established without the tamper: whatever the tests report, a correct grader rejects it.",
+]
+sources = ["https://arxiv.org/abs/2510.20270", "https://arxiv.org/abs/2511.21654"]
+
+[probe.template]
+solution = "reference-emptied"
+parameters = ["test_root", "source_path"]
+
+[probe.template.files]
+"{test_root}/conftest.py" = "conftest-deselect-all.py"
+"{source_path}" = "reference-emptied"
 
 # --------------------------------------------------------------------------- positive controls
 # A correct grader must accept these. They are never merged with the Coverage Score: they measure

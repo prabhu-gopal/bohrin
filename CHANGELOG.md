@@ -96,10 +96,27 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
   returns, which a grader checking only types or that the call succeeds pays for; and
   `bohrin/raise-not-implemented@1` makes every function raise `NotImplementedError`, which a
   grader that scores an exception as a pass pays for. A constant is only a lead when the
-  reference may itself return it (no function reads its inputs and computes its result), and
-  raising is not submitted where the reference's only work is raising. Run over the 823
-  standard-library modules of Python 3.11 as references, every submission parsed and none
-  compiled to its reference.
+  reference may itself return it (no reachable function reads its inputs and computes its
+  result), or when a reachable special method, which keeps its body, does work a grader may be
+  checking alone; raising is not submitted where the reachable functions' only work is raising.
+  Run over the 823 standard-library modules of Python 3.11 as references, every submission
+  parsed and none compiled to its reference.
+- **Probes for four more weakness classes**, each submitting only where the reference has
+  reachable work (see Fixed, below):
+  - `bohrin/success-exit@1` (BGW-102, exit before the checks): every function body replaced by
+    `sys.exit(0)`, which a grader reading a zero exit status as success pays for;
+  - `bohrin/equality-spoofing@1` (BGW-103): every function returns an object whose `==` is always
+    true, which a grader comparing results without checking their type pays for;
+  - `bohrin/test-framework-hook@1` (BGW-108) and `bohrin/tests-deleted@1` (BGW-109), the first
+    workspace probes: the empty implementation at `{source_path}`, beside a
+    `{test_root}/conftest.py` that makes pytest report every test as passed, or deselects every
+    test. Their ground is the empty implementation's, established without the tamper; run
+    through real pytest, the first turns a failing test into exit status 0 and the second into
+    5 ("no tests ran"), and both fail once the tests run without the submitted `conftest.py`.
+
+  Every body is replaced, special methods included, so no work of the reference survives. Run
+  over the 1,675 compiling standard-library modules of Python 3.11 under 60 kB as references,
+  every submission compiled and none compiled to its reference.
 - **Correct-work acceptance, beside the Coverage Score, per grader shape**
   (`bohrin.scoring.scorecard`). A grader that rejects everything catches every cheat, so each
   shape now gets two numbers, never merged: the Coverage Score and the share of correct rewritings
@@ -210,8 +227,8 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
   now the weakness-list families a correct grader must reject — `hollow_program`,
   `harness_tampering`, `answer_access`, `weak_tests` and `grader_logic` — so scores from
   battery 1 and battery 2 are not comparable. The battery currently submits into
-  `hollow_program` (the reference with every function body emptied); a score states how many
-  of the five categories it measured.
+  `hollow_program` for program graders and `harness_tampering` for workspace, container and
+  history graders; a score states how many of the five categories it measured.
 - **The README says what Bohrin is for, not only what it does today:** why graders need
   checking, the principles every check is held to (no accusation without proof, every number
   with its uncertainty, what was not checked said out loud, an open method), and the scope.
@@ -224,6 +241,15 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
 
 ### Fixed
 
+- **The empty implementation no longer accuses a correct grader of a program whose work nothing
+  runs.** A script whose output comes from module-level code (`print(sum([2, 3]))`) beside a
+  function it never calls got a submission, marked structural, that prints exactly what the
+  reference prints. The work removed must now be reachable: in a script, a function its
+  module-level code names; in a library, also its public functions and classes and its special
+  functions; and the public and special methods of a reached class. Over the same 1,675
+  standard-library references this withdraws the submission for 473 of 1,463: 441 are test
+  scripts run by `unittest.main()`, whose test classes are found by introspection, which a
+  check by name does not follow.
 - **`SECURITY.md`'s command for checking a release's PyPI attestation now works.** It lacked the
   required `--repository` and `pypi:<file>` arguments; the corrected command was run against the
   published 0.3.0 wheel and verifies it.
@@ -305,6 +331,16 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
   being accused — suppression of a submission that is the reference, withdrawal of grounds on
   refusal and grader-state answers — still apply to every operator, including third-party
   ones. 0.3.0 keeps the answer-level battery for anyone who needs it.
+
+### Known limitations
+
+- **`bohrin/success-exit@1` ends the process that runs it.** Run each submission in a process of
+  its own, as a grader of untrusted code should anyway; a loop that runs submissions in its own
+  process and catches only `Exception` ends at this one, with exit status 0. The README and the
+  tutorial catch `BaseException` for this reason.
+- **Reachability is by name.** Code reached only by introspection (test classes that
+  `unittest.main()` finds, a plugin registry) counts as unreachable, so it gets no submission:
+  a probe that could have been tried is not, and nothing is falsely accused.
 
 ## [0.3.0] — 2026-09-22
 

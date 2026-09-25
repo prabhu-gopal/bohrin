@@ -14,13 +14,19 @@ accept grounded candidates, or a guard has simply switched the battery off.
 
 from __future__ import annotations
 
+import contextlib
+import io
+import os
+import subprocess
+import sys
 from collections.abc import Callable, Iterator, Sequence
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from _fixtures import LENIENT_CORRECT, REFERENCE, TRIVIAL_REFERENCE, behavioural_grader, task, text
-from bohrin.ir.task import Candidate, Ground, Provenance, Source, Task
+from bohrin.ir.task import Candidate, Ground, Provenance, Shape, Source, Task, Workspace
 from bohrin.mutate.base import MutationOperator
 from bohrin.mutate.battery import battery
 
@@ -83,6 +89,63 @@ def test_an_ungrounded_candidate_stays_a_lead() -> None:
     assert len(result.leads) == 1
 
 
+#: A reference whose work is all in special methods, beside a helper nothing calls. Replacing only
+#: the helper, and keeping the special methods, left every bit of the work in place.
+_WORK_IN_SPECIAL_METHODS = """class Vec:
+    def __init__(self, x):
+        self.x = x
+
+    def __add__(self, other):
+        return Vec(self.x + other.x)
+
+    def norm(self) -> int:
+        return abs(self.x)
+
+
+def _debug(v):
+    print(v.x)
+"""
+
+
+def _adds_vectors(payload: str) -> bool:
+    """A correct grader of vector addition: the exact type and the value, and nothing else."""
+    namespace: dict[str, Any] = {}
+    try:
+        exec(compile(payload, "<fixture>", "exec"), namespace)
+        vec = namespace["Vec"]
+        total = vec(2) + vec(3)
+        return type(total) is vec and total.x == 5
+    except BaseException:
+        return False
+
+
+def test_work_kept_in_special_methods_is_never_called_removed() -> None:
+    """A grader checking only what the special methods do is right to accept a submission that keeps them."""
+    assert _adds_vectors(_WORK_IN_SPECIAL_METHODS)
+    assert _accused(task(_WORK_IN_SPECIAL_METHODS), _adds_vectors) == []
+    assert battery(task(_WORK_IN_SPECIAL_METHODS)).grounded, "the special methods' work is still probed"
+
+
+#: A script whose output comes from module-level code; its one function is never called.
+_SCRIPT_WITH_DEAD_HELPER = "def _unused():\n    return 1\n\n\nprint(sum([2, 3]))\n"
+
+
+def _prints_five(payload: str) -> bool:
+    """A correct grader of the script: what it prints."""
+    printed = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(printed):
+            exec(compile(payload, "<fixture>", "exec"), {})
+    except BaseException:
+        return False
+    return printed.getvalue() == "5\n"
+
+
+def test_removing_work_nothing_calls_is_never_called_wrong() -> None:
+    assert _prints_five(_SCRIPT_WITH_DEAD_HELPER)
+    assert _accused(task(_SCRIPT_WITH_DEAD_HELPER), _prints_five) == []
+
+
 # ------------------------------------------------------------ third-party collisions
 
 
@@ -140,6 +203,59 @@ def test_a_grid_answer_keeps_its_reference_grounds() -> None:
 # ------------------------------------------------------------------- counterweights
 
 
+# ----------------------------------------------------------- workspaces, judged by real pytest
+
+#: The grader's own test, which the environment keeps in the test root.
+_GRADER_TEST = "from solution import solve\n\n\ndef test_solve():\n    assert solve([1, -2, 3]) == 4\n"
+
+
+def _pytest(workspace: Workspace, root: Path, *, isolated: bool) -> int:
+    """Instantiate the workspace as an environment would, beside the grader's test, and run pytest.
+
+    ``isolated`` is what a correct grader does: it runs its tests without any ``conftest.py`` the
+    submission wrote. Every run is a process of its own with a time limit.
+    """
+    (root / "tests").mkdir(parents=True)
+    (root / "tests" / "test_solve.py").write_text(_GRADER_TEST, encoding="utf-8")
+    for path, content in workspace.files.items():
+        target = root / path.replace("{test_root}", "tests").replace("{source_path}", "solution.py")
+        target.write_text(content or "", encoding="utf-8")
+    command = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"]
+    if isolated:
+        command.insert(-1, "--noconftest")
+    env = {**os.environ, "PYTHONPATH": str(root)}
+    env.pop("PYTEST_ADDOPTS", None)
+    return subprocess.run(command, cwd=root, env=env, capture_output=True, timeout=120, check=False).returncode
+
+
+def _workspaces(t: Task) -> list[tuple[str, Workspace]]:
+    out = []
+    for c in battery(t).grounded:
+        assert isinstance(c.payload, Workspace)
+        out.append((c.provenance.operator, c.payload))
+    return out
+
+
+def test_a_grader_running_its_tests_apart_from_the_submission_is_never_accused(tmp_path: Path) -> None:
+    """It passes the known-good solution, and rejects every tampered workspace."""
+    assert (
+        _pytest(
+            Workspace({"{source_path}": REFERENCE}, parameters=("source_path",)), tmp_path / "reference", isolated=True
+        )
+        == 0
+    )
+    candidates = _workspaces(task(REFERENCE, shape=Shape.WORKSPACE))
+    assert {operator for operator, _ in candidates} == {"test_framework_hook", "tests_deleted"}
+    for operator, workspace in candidates:
+        assert _pytest(workspace, tmp_path / operator, isolated=True) != 0, operator
+
+
+def test_a_grader_trusting_pytest_in_the_submitted_tree_is_caught(tmp_path: Path) -> None:
+    """It treats "no failures" (exit 0, or 5 for no tests ran) as a pass, in the tree the submission wrote."""
+    for operator, workspace in _workspaces(task(REFERENCE, shape=Shape.WORKSPACE)):
+        assert _pytest(workspace, tmp_path / operator, isolated=False) in (0, 5), operator
+
+
 def test_a_grader_that_only_checks_the_code_runs_is_still_caught() -> None:
     """The weak shape the README shows: it imports and calls the function, never checks the result."""
 
@@ -148,13 +264,18 @@ def test_a_grader_that_only_checks_the_code_runs_is_still_caught() -> None:
         try:
             exec(compile(payload, "<fixture>", "exec"), namespace)
             namespace["solve"]([1, 2])
-        except Exception:
+        except BaseException:
             return False
         return True
 
     hits = _accused(task(REFERENCE), runs)
-    # It pays for the empty and the constant body, which both run; the raising one does not run.
-    assert {hit.split(":", 1)[0] for hit in hits} == {"drop_side_effect", "constant_implementation"}
+    # It pays for the empty body, the constant and the object that equals everything, which all run;
+    # the raising and the exiting ones do not.
+    assert {hit.split(":", 1)[0] for hit in hits} == {
+        "drop_side_effect",
+        "constant_implementation",
+        "equality_spoofing",
+    }
 
 
 def test_a_grader_accepting_anything_is_caught_by_every_grounded_candidate() -> None:

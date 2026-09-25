@@ -118,8 +118,10 @@ def test_an_operator_that_names_no_shape_runs_on_every_shape() -> None:
         assert len(battery(task(REFERENCE, shape=shape), [_Proposes(_HOLLOW)]).candidates) == 1, shape
 
 
-def test_the_built_in_program_operator_does_not_run_on_a_container_task() -> None:
-    assert battery(task(REFERENCE, shape=Shape.CONTAINER)).candidates == ()
+def test_no_built_in_program_operator_runs_on_a_container_task() -> None:
+    program_only = [op for op in discover() if Shape.CONTAINER not in op.shapes]
+    assert {op.id for op in program_only} >= {"drop_side_effect", "success_exit"}
+    assert battery(task(REFERENCE, shape=Shape.CONTAINER), operators=program_only).candidates == ()
     assert all(op.shapes for op in discover()), "every built-in operator names its shapes"
 
 

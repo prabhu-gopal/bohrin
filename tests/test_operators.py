@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from _fixtures import REFERENCE, TRIVIAL_REFERENCE, behavioural_grader, task, text
-from bohrin.ir.task import Ground
+from bohrin.ir.task import Ground, Shape, Workspace
 from bohrin.mutate import discover
 from bohrin.mutate.battery import battery
 from bohrin.mutate.equivalence import (
@@ -23,7 +23,15 @@ from bohrin.mutate.equivalence import (
     reads_as_refusal,
     reads_as_structured_state,
 )
-from bohrin.mutate.operators import ConstantImplementation, DropSideEffect, RaiseNotImplemented
+from bohrin.mutate.operators import (
+    ConstantImplementation,
+    DropSideEffect,
+    EqualitySpoofing,
+    RaiseNotImplemented,
+    SuccessExit,
+    TestFrameworkHook,
+    TestsDeleted,
+)
 
 # ------------------------------------------------------------------------- the registry
 
@@ -31,7 +39,15 @@ from bohrin.mutate.operators import ConstantImplementation, DropSideEffect, Rais
 def test_operators_are_discoverable_and_explain_themselves() -> None:
     ops = discover()
 
-    assert [op.id for op in ops] == ["constant_implementation", "drop_side_effect", "raise_not_implemented"]
+    assert [op.id for op in ops] == [
+        "constant_implementation",
+        "drop_side_effect",
+        "equality_spoofing",
+        "raise_not_implemented",
+        "success_exit",
+        "test_framework_hook",
+        "tests_deleted",
+    ]
     assert all(op.rationale for op in ops), "an operator must explain why its output is wrong"
 
 
@@ -173,7 +189,13 @@ def test_it_stays_silent_where_emptying_proves_nothing(reference: str | None) ->
 
 def test_the_battery_grounds_it_on_a_real_program() -> None:
     grounded = [c.provenance.operator for c in battery(task(REFERENCE)).grounded]
-    assert grounded == ["constant_implementation", "drop_side_effect", "raise_not_implemented"]
+    assert grounded == [
+        "constant_implementation",
+        "drop_side_effect",
+        "equality_spoofing",
+        "raise_not_implemented",
+        "success_exit",
+    ]
 
 
 #: References whose functions do no work of their own: an interface, an abstract base, a protocol.
@@ -298,12 +320,20 @@ def test_a_reference_that_may_itself_be_constant_gives_only_a_lead(reference: st
 
 
 def test_a_method_that_reads_self_depends_on_its_inputs() -> None:
+    reference = "class A:\n    n = 3\n\n    def double(self) -> int:\n        return self.n * 2\n"
+    ((ground, body),) = _constant(reference)
+    assert ground is Ground.STRUCTURAL
+    assert "return 0" in body
+
+
+def test_work_kept_in_a_special_method_makes_the_constant_a_lead() -> None:
+    """Special methods keep their bodies, so their work survives, and a grader may check only that."""
     reference = (
         "class A:\n    def __init__(self, n):\n        self.n = n\n\n"
         "    def double(self) -> int:\n        return self.n * 2\n"
     )
     ((ground, body),) = _constant(reference)
-    assert ground is Ground.STRUCTURAL
+    assert ground is None
     assert "self.n = n" in body, "special methods keep their bodies"
     assert "return 0" in body
 
@@ -419,7 +449,196 @@ def test_a_reference_that_does_not_parse_gives_nothing(operator: Any) -> None:
     assert list(operator.apply(task("def broken(:\n"))) == []
 
 
+def test_a_nested_function_is_not_the_outer_functions_work_beyond_raising() -> None:
+    """Its body is its own; what counts is the outer function's, which here computes."""
+    reference = "def f(x):\n    def g():\n        raise ValueError\n    return g if x else x * 2\n"
+    (candidate,) = RaiseNotImplemented().apply(task(reference))
+    assert candidate.ground is Ground.STRUCTURAL
+
+
 def test_code_after_an_unconditional_raise_is_not_work() -> None:
     """It can never run, so raising in its place changes nothing, and nothing is submitted."""
     reference = "def f():\n    raise NotImplementedError\n    x = 1\n"
     assert list(RaiseNotImplemented().apply(task(reference))) == []
+
+
+# --------------------------------------------------------------------------- reachable work
+
+#: Every built-in operator that hollows out the reference, with the shape it runs on.
+_HOLLOWING = [
+    (ConstantImplementation(), Shape.PROGRAM),
+    (DropSideEffect(), Shape.PROGRAM),
+    (EqualitySpoofing(), Shape.PROGRAM),
+    (RaiseNotImplemented(), Shape.PROGRAM),
+    (SuccessExit(), Shape.PROGRAM),
+    (TestFrameworkHook(), Shape.WORKSPACE),
+    (TestsDeleted(), Shape.WORKSPACE),
+]
+
+
+def test_every_built_in_operator_is_held_to_reachable_work() -> None:
+    assert {op.id for op, _ in _HOLLOWING} == {op.id for op in discover()}
+
+
+#: The only work is in functions nothing a grader runs can reach, so removing it changes nothing.
+UNREACHABLE = {
+    "a script's unused helper": "def _unused():\n    return 1\n\n\nprint(sum([2, 3]))\n",
+    "a script's unused public function": "def double(x):\n    return x * 2\n\n\nprint(5)\n",
+    "a library's unused private helper": "def api():\n    pass\n\n\ndef _helper(x):\n    return x * 2\n",
+    "a private method of an unused class": "class _Impl:\n    def run(self):\n        return 1\n\n\nprint(5)\n",
+    "an unused private method of a public class": (
+        "class Api:\n    def run(self):\n        pass\n\n    def _old(self):\n        return 1\n"
+    ),
+    "a function whose name is only an attribute of something else": (
+        "import threading\n\n\ndef run():\n    return 1\n\n\nthreading.Thread(target=print).run()\n"
+    ),
+    "a main block that calls nothing defined": (
+        "def solve(x):\n    return x * 2\n\n\nif __name__ == '__main__':\n    print(4)\n"
+    ),
+}
+
+
+@pytest.mark.parametrize(("op", "shape"), _HOLLOWING, ids=[op.id for op, _ in _HOLLOWING])
+@pytest.mark.parametrize("reference", UNREACHABLE.values(), ids=UNREACHABLE.keys())
+def test_work_nothing_reaches_is_never_called_removed(op: Any, shape: Shape, reference: str) -> None:
+    assert list(op.apply(task(reference, shape=shape))) == []
+
+
+#: The work is reachable, by each route a grader has to it.
+REACHABLE = {
+    "a library's public function": "def double(x):\n    return x * 2\n",
+    "a script's called function": "def main():\n    print(sum([2, 3]))\n\n\nmain()\n",
+    "a main block's call": "def solve(x):\n    return x * 2\n\n\nif __name__ == '__main__':\n    print(solve(2))\n",
+    "a private helper a public function calls": (
+        "def api(x):\n    _helper(x)\n\n\ndef _helper(x):\n    print(x * 2)\n"
+    ),
+    "a private method called through self": (
+        "class Api:\n    def run(self):\n        self._go()\n\n    def _go(self):\n        print(1)\n"
+    ),
+    "a method of a nested public class": "class Outer:\n    class Inner:\n        def f(self):\n            print(1)\n",
+    "a special method of a class a script uses": ("class _V:\n    def __init__(self):\n        print(1)\n\n\n_V()\n"),
+    "a private member the module-level code names": (
+        "class Api:\n    def _go(self):\n        print(1)\n\n\nApi()._go()\n"
+    ),
+    "a method of a public class whose body prints at import": (
+        "class Api:\n    print('loaded')\n\n    def run(self):\n        return 1\n"
+    ),
+    "a module's __getattr__, which Python calls": "def __getattr__(name):\n    return name * 2\n",
+    "a method a public class inherits": (
+        "class _Base:\n    def run(self):\n        print(1)\n\n\nclass Api(_Base):\n    pass\n"
+    ),
+    "a decorator the module applies": ("def _deco(f):\n    print(f)\n    return f\n\n\n@_deco\ndef api():\n    pass\n"),
+}
+
+
+@pytest.mark.parametrize("reference", REACHABLE.values(), ids=REACHABLE.keys())
+def test_reachable_work_is_still_probed(reference: str) -> None:
+    (candidate,) = DropSideEffect().apply(task(reference))
+    assert candidate.ground is Ground.STRUCTURAL
+
+
+def test_a_constant_grounded_only_in_unreachable_code_is_a_lead() -> None:
+    """The script reaches main, which prints; the function whose result depends on its inputs is dead."""
+    reference = "def main():\n    print('hi')\n\n\ndef _double(x) -> int:\n    return x * 2\n\n\nmain()\n"
+    ((ground, body),) = _constant(reference)
+    assert ground is None and "return 0" in body
+
+
+def test_a_helper_whose_result_its_caller_discards_does_not_ground_a_constant() -> None:
+    """``api`` returns 0 whatever ``_record`` returns, so replacing both with 0 may change nothing."""
+    reference = "def api(x) -> int:\n    _record(x)\n    return 0\n\n\ndef _record(x) -> int:\n    return x * 2\n"
+    ((ground, _),) = _constant(reference)
+    assert ground is None
+
+
+# --------------------------------------------------------------------------- success exit
+
+
+def test_every_body_exiting_is_structurally_wrong() -> None:
+    (candidate,) = SuccessExit().apply(task(REFERENCE))
+    assert candidate.ground is Ground.STRUCTURAL
+    assert "sys.exit(0)" in text(candidate) and "total" not in text(candidate)
+
+
+def test_special_methods_exit_too() -> None:
+    """Kept, they could hold all of the work, and a grader checking only that would rightly accept."""
+    reference = (
+        "class V:\n    def __init__(self, x):\n        self.x = x\n\n"
+        "    def __add__(self, o):\n        return V(self.x + o.x)\n"
+    )
+    (candidate,) = SuccessExit().apply(task(reference))
+    assert "self.x" not in text(candidate) and text(candidate).count("sys.exit(0)") == 2
+
+
+def test_a_reference_that_already_exits_is_not_submitted() -> None:
+    """The result would be the reference, which the grader has just accepted as correct."""
+    assert list(SuccessExit().apply(task("def f():\n    import sys\n    sys.exit(0)\n"))) == []
+
+
+@pytest.mark.parametrize("reference", [None, "", "70", "not python at all (", TRIVIAL_REFERENCE])
+def test_success_exit_stays_silent_where_emptying_proves_nothing(reference: str | None) -> None:
+    assert list(SuccessExit().apply(task(reference))) == []
+
+
+# --------------------------------------------------------------------------- equality spoofing
+
+
+def test_every_body_spoofing_is_structurally_wrong() -> None:
+    (candidate,) = EqualitySpoofing().apply(task(REFERENCE))
+    assert candidate.ground is Ground.STRUCTURAL
+    assert "class _Spoof:" in text(candidate)
+    assert "return _Spoof()" in text(candidate)
+    namespace: dict[str, Any] = {}
+    exec(text(candidate), namespace)
+    assert namespace["solve"]([1, 2]) == 3 and namespace["solve"]([1, 2]) == "anything", "it equals everything"
+
+
+def test_the_spoof_goes_after_the_docstring_and_future_imports() -> None:
+    reference = '"""Doc."""\nfrom __future__ import annotations\n\n\ndef f(x: int) -> int:\n    return x * 2\n'
+    (candidate,) = EqualitySpoofing().apply(task(reference))
+    compile(text(candidate), "<spoof>", "exec", dont_inherit=True)
+    assert text(candidate).index("from __future__") < text(candidate).index("class _Spoof")
+    assert text(candidate).startswith('"""Doc."""')
+
+
+def test_the_spoof_goes_after_a_future_import_that_shares_its_line() -> None:
+    """Found running the standard library as references: ``from __future__ import x; import site``."""
+    reference = "from __future__ import annotations; import os\n\n\ndef f(x: int) -> int:\n    return x * 2\n"
+    (candidate,) = EqualitySpoofing().apply(task(reference))
+    compile(text(candidate), "<spoof>", "exec", dont_inherit=True)
+
+
+def test_the_spoof_takes_a_name_the_reference_does_not_use() -> None:
+    reference = "class _Spoof:\n    pass\n\n\ndef f(x):\n    return _Spoof() if x else x * 2\n"
+    (candidate,) = EqualitySpoofing().apply(task(reference))
+    namespace: dict[str, Any] = {}
+    exec(text(candidate), namespace)
+    assert namespace["f"](1) == "anything", "the reference's own class does not replace the spoof"
+
+
+@pytest.mark.parametrize("reference", [None, "", "70", "not python at all (", TRIVIAL_REFERENCE])
+def test_equality_spoofing_stays_silent_where_emptying_proves_nothing(reference: str | None) -> None:
+    assert list(EqualitySpoofing().apply(task(reference))) == []
+
+
+# --------------------------------------------------------------------------- workspace tampering
+
+
+@pytest.mark.parametrize(
+    ("op", "tamper"), [(TestFrameworkHook(), 'outcome = "passed"'), (TestsDeleted(), "items.clear()")]
+)
+def test_a_tamper_rides_on_the_empty_implementation(op: Any, tamper: str) -> None:
+    """The ground is the empty implementation's, established without the tamper."""
+    (candidate,) = op.apply(task(REFERENCE, shape=Shape.WORKSPACE))
+    (emptied,) = DropSideEffect().apply(task(REFERENCE))
+    assert candidate.ground is Ground.STRUCTURAL
+    assert isinstance(candidate.payload, Workspace)
+    assert candidate.payload.parameters == ("test_root", "source_path")
+    assert candidate.payload.files["{source_path}"] == text(emptied)
+    assert tamper in (candidate.payload.files["{test_root}/conftest.py"] or "")
+
+
+@pytest.mark.parametrize("op", [TestFrameworkHook(), TestsDeleted()])
+@pytest.mark.parametrize("reference", [None, "", "70", "not python at all (", TRIVIAL_REFERENCE])
+def test_a_tamper_is_not_submitted_where_emptying_proves_nothing(op: Any, reference: str | None) -> None:
+    assert list(op.apply(task(reference, shape=Shape.WORKSPACE))) == []

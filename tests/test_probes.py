@@ -11,7 +11,9 @@ from __future__ import annotations
 import pytest
 
 from _fixtures import REFERENCE, task
+from bohrin.ir.task import Source, Workspace
 from bohrin.mutate import discover
+from bohrin.mutate.base import MutationOperator
 from bohrin.relations import BASELINE
 from bohrin.relations import discover as discover_relations
 from bohrin.scoring.coverage import BATTERY_VERSION
@@ -49,6 +51,28 @@ def test_an_operator_emits_what_its_manifest_promises(operator: str) -> None:
     candidates = list(op.apply(task(REFERENCE)))
     assert candidates, "the fixture should give the operator something to emit"
     assert {c.ground for c in candidates} == {probe.ground}, "every submission carries the manifest's ground"
+    for c in candidates:
+        if isinstance(c.payload, Workspace):
+            assert set(c.payload.files) == set(probe.template.files), "the manifest names every file written"
+            assert c.payload.parameters == probe.template.parameters, "and every parameter to fill in"
+        else:
+            assert isinstance(c.payload, Source)
+            assert not probe.template.files and not probe.template.parameters, "a program needs no instantiation"
+
+
+def test_a_workspace_writes_the_solution_its_manifest_names() -> None:
+    """The empty implementation is the only solution a workspace probe writes; it is where its ground is."""
+    (emptied,) = discover_one("drop_side_effect").apply(task(REFERENCE))
+    for probe in probes():
+        if "{source_path}" in probe.template.files:
+            assert probe.template.solution == "reference-emptied", probe.id
+            (candidate,) = discover_one(probe.operator).apply(task(REFERENCE))
+            assert isinstance(candidate.payload, Workspace) and isinstance(emptied.payload, Source)
+            assert candidate.payload.files["{source_path}"] == emptied.payload.text, probe.id
+
+
+def discover_one(operator: str) -> MutationOperator:
+    return next(o for o in discover() if o.id == operator)
 
 
 @pytest.mark.parametrize("probe_id", [p.id for p in probes() if p.expect == "reject"])

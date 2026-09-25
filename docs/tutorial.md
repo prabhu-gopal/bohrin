@@ -55,20 +55,40 @@ drop_side_effect structural
 def add(a: int, b: int) -> int:
     pass
 
+equality_spoofing structural
+class _Spoof:
+    def __eq__(self, other):
+        return True
+    def __ne__(self, other):
+        return False
+    def __getattr__(self, name):
+        return lambda *a, **k: self
+def add(a: int, b: int) -> int:
+    return _Spoof()
+
 raise_not_implemented structural
 def add(a: int, b: int) -> int:
     raise NotImplementedError
 
+success_exit structural
+def add(a: int, b: int) -> int:
+    import sys
+    sys.exit(0)
+
 ```
 
 Each keeps the signature and does no work: one returns a constant of the declared type, one does
-nothing, one refuses to run. Their wrongness is *structural*: it holds by construction, without
+nothing, one returns an object that claims to equal everything, one refuses to run, and one exits
+the process with status 0. Their wrongness is *structural*: it holds by construction, without
 asking any grader.
 
 ## 4. Run two graders on it
 
 Bohrin never runs your grader; you do. Here are two small ones. The first only checks that the
-function exists and runs, a common weak shape. The second checks what it returns.
+function exists and runs, a common weak shape. The second checks what it returns, and its type.
+Both catch `BaseException`, not just `Exception`, because one submission calls `sys.exit(0)`: a
+grader that runs submissions in its own process must survive that, or it ends with the submission,
+with exit status 0.
 
 ```python
 def runs_it(submission):
@@ -77,7 +97,7 @@ def runs_it(submission):
         exec(submission, namespace)
         namespace["add"](2, 3)
         return True
-    except Exception:
+    except BaseException:
         return False
 
 
@@ -85,8 +105,9 @@ def checks_it(submission):
     namespace = {}
     try:
         exec(submission, namespace)
-        return namespace["add"](2, 3) == 5 and namespace["add"](-1, 1) == 0
-    except Exception:
+        r1, r2 = namespace["add"](2, 3), namespace["add"](-1, 1)
+        return type(r1) is int and r1 == 5 and type(r2) is int and r2 == 0
+    except BaseException:
         return False
 
 
@@ -95,15 +116,16 @@ for grader in (runs_it, checks_it):
 ```
 
 ```text
-runs_it [True, True, False]
-checks_it [False, False, False]
+runs_it [True, True, True, False, False]
+checks_it [False, False, False, False, False]
 ```
 
-`runs_it` paid for the constant and for the empty body; only the one that raises made it fail.
-`checks_it` refused all three.
+`runs_it` paid for the constant, the empty body and the object that equals everything; only the
+ones that raise or exit made it fail. `checks_it` refused all five. It checks the type as well as
+the value: with `==` alone, the object that equals everything would have passed it too.
 
-> Never `exec` untrusted code outside a sandbox. It is safe here only because every submission
-> comes from your own reference.
+> Never `exec` untrusted code outside a sandbox, and run each submission in a process of its own.
+> It is safe here only because every submission comes from your own reference.
 
 ## 5. Score them
 
@@ -193,12 +215,12 @@ checks_it
 program: 1 task scored
   COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
   CORRECT-WORK ACCEPTANCE: 100 / 100   95% CI 34–100   2 of 2 accepted   relations: 2
-  not run: 15 applicable weakness classes: BGW-102, BGW-103, BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
+  not run: 13 applicable weakness classes: BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
 matches_reference
 program: 1 task scored
   COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
   CORRECT-WORK ACCEPTANCE: 0 / 100   95% CI 0–66   0 of 2 accepted   relations: 2
-  not run: 15 applicable weakness classes: BGW-102, BGW-103, BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
+  not run: 13 applicable weakness classes: BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
 ```
 
 Both catch the empty body, but `matches_reference` rejects every correct rewriting: it checks the
