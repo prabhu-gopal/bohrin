@@ -1,0 +1,37 @@
+name: Fuzz
+
+# Coverage-guided fuzzing of every reader of untrusted input (fuzz/fuzz_readers.py) with Atheris,
+# weekly and on demand. The same check also runs on a fixed corpus and seeded mutations in every
+# ordinary test run (tests/test_fuzz.py), so this job looks further, not for the first time. Not a
+# required check: a fuzzer's find should be triaged, not block an unrelated pull request.
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readers:
+    name: fuzz the readers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12" # atheris 3.1 ships wheels for 3.12 and later
+      - name: Install
+        run: python -m pip install atheris==3.1.0 .
+      - name: Fuzz for ten minutes, from the corpus
+        run: |
+          mkdir -p findings
+          python fuzz/fuzz_readers.py -max_total_time=600 -artifact_prefix=findings/ fuzz/corpus
+      - name: Keep any crashing input
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-findings
+          path: findings/

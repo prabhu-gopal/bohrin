@@ -1,0 +1,8 @@
+version = 1
+
+[[decision]]
+finding = "BF-7K3Q9D2M1X"
+action = "ignore"
+reason = "r"
+decided = 2026-10-01
+expires = 2027-01-01

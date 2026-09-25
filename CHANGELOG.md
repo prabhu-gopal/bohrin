@@ -30,6 +30,15 @@ All notable changes to this project are documented here. The format follows
   Each has a manifest (`bohrin/oracle@1`, `…/comment-free-oracle@1`, `…/reformatted-oracle@1`,
   `…/renamed-oracle@1`). A differential test runs every emitted control beside its original on a
   corpus built to break naive renaming, and demands identical results.
+- **Releases are signed, and the release build takes nothing from a cache.** Each distribution on
+  a GitHub release now has a keyless Sigstore bundle (`<file>.sigstore.json`), beside PyPI's PEP 740
+  attestations; `SECURITY.md` shows how to check one. The job that builds what ships no longer
+  restores a cache another run could have written (found by the zizmor workflow audit), and the
+  release is created with GitHub's own CLI instead of a third-party action.
+- **Coverage-guided fuzzing of every reader of untrusted input** (`fuzz/fuzz_readers.py`, Atheris,
+  weekly), with the same check run on a corpus and 1,500 seeded mutations in every test run.
+  **CodeQL** static analysis and **Dependabot** updates for the pinned actions and locked
+  dependencies.
 - **The decisions file format**, `.bohrin/decisions.toml` (`bohrin.decisions`): what a repository
   decided about a finding, `ignore` (counted in the probe's dismissal rate) or `dispute` (counted
   neither way until resolved), with a required reason, the decision date and an optional expiry.
@@ -212,6 +221,14 @@ All notable changes to this project are documented here. The format follows
   old behaviour for existing code.
 
 ### Fixed
+
+- **`SECURITY.md`'s command for checking a release's PyPI attestation now works.** It lacked the
+  required `--repository` and `pypi:<file>` arguments; the corrected command was run against the
+  published 0.3.0 wheel and verifies it.
+- **A number too large for a float no longer crashes a reader.** JSON allows any number of
+  digits, and a results line with a 400-digit score made `bohrin power` stop with a traceback
+  (`OverflowError`) instead of refusing the line; the same reader serves rewards in finding and
+  registry records. Found by fuzzing; it is now refused with a message, exit code 2.
 
 - **An interface is no longer reported as paying for empty code.** On a task whose reference is
   an interface, an abstract base class or a protocol (every function body only a docstring,

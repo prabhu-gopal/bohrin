@@ -60,12 +60,17 @@ def integer(value: Any, where: str, *, minimum: int | None = None) -> int:
 
 
 def number(value: Any, where: str) -> float:
-    """A finite number (a boolean is not one). NaN and infinity are not JSON."""
+    """A finite number (a boolean is not one). NaN and infinity are not JSON, and an integer too
+    large for a float (JSON allows any number of digits) is refused rather than overflowing."""
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueError(f"{where}: expected a number")
-    if not math.isfinite(value):
+    try:
+        converted = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{where}: too large to be a number here") from exc
+    if not math.isfinite(converted):
         raise ValueError(f"{where}: must be finite")
-    return float(value)
+    return converted
 
 
 def array(value: Any, where: str, item: Callable[[Any, str], T]) -> tuple[T, ...]:

@@ -1,0 +1,19 @@
+# Weekly update pull requests for the actions the workflows pin by commit, and for the locked
+# Python dependencies. Each arrives as an ordinary pull request and must pass every required check
+# before it can merge, like any other change.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]

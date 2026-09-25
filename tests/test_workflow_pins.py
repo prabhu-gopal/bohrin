@@ -61,3 +61,12 @@ def test_the_guard_would_catch_a_tag() -> None:
     assert not _PINNED.match("actions/checkout@v7")
     assert not _PINNED.match("pypa/gh-action-pypi-publish@release/v1")
     assert _PINNED.match("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1")
+
+
+def test_the_build_that_ships_restores_no_cache_and_uses_no_third_party_release_action() -> None:
+    """A cache another run wrote must never feed the published files (zizmor: cache-poisoning)."""
+    release = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "release.yml").read_text()
+    build = release[release.index("  build:") : release.index("  publish-testpypi:")]
+    assert "enable-cache: false" in build
+    assert "softprops/" not in release
+    assert "sigstore/gh-action-sigstore-python@" in release and "dist/*.sigstore.json" in release

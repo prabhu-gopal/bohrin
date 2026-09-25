@@ -1,0 +1,48 @@
+{
+ "$schema": "https://bohrin.com/schema/finding/v1",
+ "id": "BF-W6YDC0TBE4",
+ "weakness": "BGW-101",
+ "probe": "bohrin/empty-implementation@1",
+ "level": "proven-experimental",
+ "task": {
+  "id": "task-1",
+  "shape": "program"
+ },
+ "battery": 2,
+ "submission": {
+  "kind": "source",
+  "sha256": "sha256:73b2dff8e2ac52eed9fd7c1861666ffb541e2722b4e9311a88411941ada363a2"
+ },
+ "ground": "differential",
+ "verdict": {
+  "reward": 1.0,
+  "passed": true
+ },
+ "baseline": {
+  "passed": true
+ },
+ "reproduce": {
+  "script": "reproduce.py",
+  "sha256": "sha256:abababababababababababababababababababababababababababababababab"
+ },
+ "differentiating_observation": {
+  "requirement": "Configure a swap file that the system uses.",
+  "observation": "swapon --show",
+  "reference_passed": true,
+  "presumed_correct_passed": [
+   true,
+   true,
+   true
+  ],
+  "submission_passed": false
+ },
+ "run": {
+  "tool": "example",
+  "tool_version": "1.0",
+  "conditions": {
+   "timeout_s": 600,
+   "egress": "blocked"
+  }
+ },
+ "fix": "Check return values against known outputs on inputs the submission cannot see."
+}
