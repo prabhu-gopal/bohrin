@@ -189,6 +189,15 @@ All notable changes to this project are documented here. The format follows
   empty nested function or class drew a grounded candidate from `drop_side_effect`, although it
   does no work; a nested function that does work still counts.
 
+- **The constant probe reads types more carefully, and the raising probe ignores unreachable
+  code.** A local name reassigned to a second type (`y = 0`, then `y = "a"`) is no longer typed by
+  its first value; values whose type the syntax does not show are passed over, so an accumulator
+  (`y = 0` … `y = y + i`) is still an `int`; a signed number (`return -1`) is a literal, so a
+  reference returning one gives only a lead. Code after an unconditional `raise` can never run, so
+  it no longer counts as work: a reference that only raises `NotImplementedError` draws no
+  "raises NotImplementedError" submission that behaves exactly like it. Over the 823
+  standard-library modules of Python 3.11, the constant probe now gives 376 grounded submissions
+  (from 349), with no submission that fails to parse or compiles to its reference.
 - **A function that only evaluates a name or a number no longer counts as work.** `def f(x): x`
   drew a grounded "emptied" candidate that behaves exactly like the reference.
 

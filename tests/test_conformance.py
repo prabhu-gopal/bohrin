@@ -223,14 +223,17 @@ def test_a_defect_flagged_under_the_wrong_weakness_is_a_misattribution() -> None
     report = _check(_results(also))
     (failed,) = [o for o in report.outcomes if not o.passed]
     assert failed.weakness == "BGW-126" and failed.detected and failed.misattributed == ("BGW-109",)
+    assert "also flagged BGW-109" in render(report)
 
 
 def test_a_defect_found_only_under_another_name_is_not_detected() -> None:
     def renamed(_: str, defect: bool, weakness: str) -> list[str]:
         return ["BGW-101"] if defect and weakness == "BGW-104" else _perfect(_, defect, weakness)
 
-    (failed,) = [o for o in _check(_results(renamed)).outcomes if not o.passed]
+    report = _check(_results(renamed))
+    (failed,) = [o for o in report.outcomes if not o.passed]
     assert failed.weakness == "BGW-104" and not failed.detected
+    assert "defect not flagged" in render(report) and "1 defect missed" in render(report)
 
 
 def test_a_fixture_that_did_not_run_is_never_passed() -> None:
@@ -241,6 +244,8 @@ def test_a_fixture_that_did_not_run_is_never_passed() -> None:
     (failed,) = [o for o in report.outcomes if not o.passed]
     assert failed.not_run == ("bcl-1/lenient-checker/correct",)
     assert not failed.clean, "a correct grader that was never checked is not clean"
+    rendered = render(report)
+    assert "correct grader flagged" in rendered and "did not run: bcl-1/lenient-checker/correct" in rendered
 
 
 def test_a_fixture_missing_from_the_results_is_never_passed() -> None:
