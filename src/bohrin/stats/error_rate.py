@@ -117,11 +117,7 @@ def read_lines(lines: Iterable[str], reader: Any) -> list[Any]:
     for number, text in enumerate(lines, start=1):
         if not text.strip():
             continue
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"line {number}: not JSON ({exc.msg})") from exc
-        rows.append(reader(data, number))
+        rows.append(reader(strict.load_json(text, f"line {number}"), number))
     return rows
 
 

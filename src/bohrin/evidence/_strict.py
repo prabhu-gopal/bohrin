@@ -9,6 +9,7 @@ field of each format against the schema).
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from collections.abc import Callable, Mapping
@@ -17,6 +18,17 @@ from typing import Any, TypeVar
 T = TypeVar("T")
 
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
+
+
+def load_json(text: str, where: str) -> Any:
+    """Parse untrusted JSON text, or raise ``ValueError``. Nesting deep enough to exhaust the
+    parser's recursion is refused like any other malformed input, never allowed to crash."""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{where}: not JSON ({exc.msg})") from exc
+    except RecursionError as exc:
+        raise ValueError(f"{where}: nested too deeply to read") from exc
 
 
 def obj(value: Any, where: str, allowed: frozenset[str], required: frozenset[str] = frozenset()) -> Mapping[str, Any]:

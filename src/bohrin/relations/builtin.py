@@ -29,7 +29,7 @@ class Reformatted(Relation):
         """``ast.unparse`` of the program, or ``None`` if it does not parse or does not change."""
         try:
             rewritten = ast.unparse(ast.parse(answer)) + "\n"
-        except (SyntaxError, ValueError, RecursionError):
+        except (SyntaxError, ValueError, RecursionError, MemoryError):
             return None
         if rewritten.strip() == answer.strip() or not same_syntax(answer, rewritten):
             return None
@@ -132,7 +132,7 @@ class RenamedLocals(Relation):
         """The program with locals renamed, or ``None`` when nothing can be renamed and certified."""
         try:
             tree = ast.parse(answer)
-        except (SyntaxError, ValueError, RecursionError):
+        except (SyntaxError, ValueError, RecursionError, MemoryError):
             return None
         taken = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
         taken |= {node.arg for node in ast.walk(tree) if isinstance(node, ast.arg)}

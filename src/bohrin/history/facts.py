@@ -77,13 +77,34 @@ def is_test_file(path: str) -> bool:
     )
 
 
+#: Deeper syntax trees are not analysed. Python's parser gives up (``MemoryError``) on very deep
+#: nesting, and trees that do parse but go deeper than this would exhaust the recursion of the
+#: functions that compare them (``ast.dump``). No real test file comes near it.
+MAX_DEPTH = 200
+
+
+def _depth(tree: ast.AST) -> int:
+    """The depth of a syntax tree, measured without recursion."""
+    deepest = 0
+    stack = [(tree, 1)]
+    while stack:
+        node, depth = stack.pop()
+        deepest = max(deepest, depth)
+        if deepest > MAX_DEPTH:
+            break
+        stack.extend((child, depth + 1) for child in ast.iter_child_nodes(node))
+    return deepest
+
+
 def _parse(text: str | None) -> ast.Module | None:
+    """The syntax tree of a file, or None when it cannot be read or is too deep to analyse safely."""
     if text is None:
         return None
     try:
-        return ast.parse(text)
-    except (SyntaxError, ValueError):
+        tree = ast.parse(text)
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
         return None
+    return tree if _depth(tree) <= MAX_DEPTH else None
 
 
 def _dotted(node: ast.AST) -> str:
@@ -478,7 +499,7 @@ def _selection(path: str, text: str | None) -> dict[str, str] | None:
                     for key in _SELECTION_KEYS
                     if parser.has_option(section_name, key)
                 }
-    except (tomllib.TOMLDecodeError, configparser.Error):
+    except (tomllib.TOMLDecodeError, configparser.Error, RecursionError):
         return None
     return {}
 
