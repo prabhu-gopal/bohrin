@@ -28,18 +28,6 @@ def _cand(op: str, base: str, detail: str, payload: str, ground: Ground | None) 
     )
 
 
-class _BodyStripper(cst.CSTTransformer):
-    """Replace every function body with a single ``pass``."""
-
-    def __init__(self) -> None:
-        self.changed = False
-
-    def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
-        """Replace this function's body; its signature, decorators and name are kept."""
-        self.changed = True
-        return updated_node.with_changes(body=cst.IndentedBlock(body=[cst.SimpleStatementLine(body=[cst.Pass()])]))
-
-
 def _inert(statement: cst.BaseSmallStatement) -> bool:
     """A statement that does nothing: ``pass``, ``...``, a bare string or number, a bare name, or
     ``raise NotImplementedError``.
@@ -60,25 +48,174 @@ def _inert(statement: cst.BaseSmallStatement) -> bool:
     return False
 
 
-class _WorkFinder(cst.CSTVisitor):
-    """Records whether any function in a module has a body that does work."""
+def _does_work(function: cst.FunctionDef) -> bool:
+    """Whether this function's own body holds anything but no-ops.
+
+    A nested function or class is not work in itself: it counts only where something calls it, and
+    a call is work of the function making it.
+    """
+    body = function.body
+    lines = body.body if isinstance(body, cst.IndentedBlock) else [body]
+    for line in lines:
+        if isinstance(line, cst.FunctionDef | cst.ClassDef):
+            continue
+        if not (isinstance(line, cst.SimpleStatementLine | cst.SimpleStatementSuite) and all(map(_inert, line.body))):
+            return True
+    return False
+
+
+def _special(name: str) -> bool:
+    return name.startswith("__") and name.endswith("__")
+
+
+class _Names(cst.CSTVisitor):
+    """Every name a piece of code mentions, bare or as an attribute (``self.helper``)."""
 
     def __init__(self) -> None:
-        self.does_work = False
+        self.names: set[str] = set()
 
-    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
-        """Mark the module as doing work if this function's body holds anything but no-ops."""
-        body = node.body
-        lines = body.body if isinstance(body, cst.IndentedBlock) else [body]
-        for line in lines:
-            # A nested function or class is not work in itself: its own methods and functions are
-            # visited separately, and count as work only if their bodies do something.
-            if isinstance(line, cst.FunctionDef | cst.ClassDef):
-                continue
-            if not (
-                isinstance(line, cst.SimpleStatementLine | cst.SimpleStatementSuite) and all(map(_inert, line.body))
-            ):
-                self.does_work = True
+    def visit_Name(self, node: cst.Name) -> None:
+        """Record the name."""
+        self.names.add(node.value)
+
+
+def _names_in(node: cst.CSTNode) -> set[str]:
+    names = _Names()
+    node.visit(names)
+    return names.names
+
+
+class _ModuleLevel(cst.CSTVisitor):
+    """What runs when the module itself runs: the names it mentions, and whether it does work.
+
+    Function bodies are not module-level code; their decorators are. A class body runs at import,
+    so the names in it count, but a class body is never the program's output: only a bare
+    expression outside every class and function (a call, typically) makes the module a script.
+    A bare name can reach a module-level definition; an attribute (``obj.run``) only a member.
+    """
+
+    def __init__(self) -> None:
+        self.names: set[str] = set()
+        self.attributes: set[str] = set()
+        self.runs = False
+        self._in_class = 0
+
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+        """Only the decorators run here."""
+        for decorator in node.decorators:
+            decorator.visit(self)
+        return False
+
+    def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+        """Everything but the class's own name, which is a definition, not a use."""
+        for part in (*node.decorators, *node.bases, *node.keywords):
+            part.visit(self)
+        self._in_class += 1
+        node.body.visit(self)
+        self._in_class -= 1
+        return False
+
+    def visit_Expr(self, node: cst.Expr) -> None:
+        """A bare expression that is not inert is the module doing work of its own."""
+        if not self._in_class and not _inert(node):
+            self.runs = True
+
+    def visit_Attribute(self, node: cst.Attribute) -> bool:
+        """Record the attribute's name apart from bare names; what it is read from is ordinary code."""
+        self.attributes.add(node.attr.value)
+        node.value.visit(self)
+        return False
+
+    def visit_Name(self, node: cst.Name) -> None:
+        """Record the name."""
+        self.names.add(node.value)
+
+
+class _Definitions(cst.CSTVisitor):
+    """Every function a grader could reach without entering another function: module-level functions,
+    and methods of module-level classes (nested classes included), each with the class that owns it."""
+
+    def __init__(self) -> None:
+        self.functions: list[tuple[cst.FunctionDef, cst.ClassDef | None]] = []
+        self.classes: list[tuple[cst.ClassDef, cst.ClassDef | None]] = []
+        self._owner: list[cst.ClassDef] = []
+
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+        """Record it; what it nests is part of it."""
+        self.functions.append((node, self._owner[-1] if self._owner else None))
+        return False
+
+    def visit_ClassDef(self, node: cst.ClassDef) -> None:
+        """Record it, and own the functions inside."""
+        self.classes.append((node, self._owner[-1] if self._owner else None))
+        self._owner.append(node)
+
+    def leave_ClassDef(self, original_node: cst.ClassDef) -> None:
+        """Stop owning."""
+        self._owner.pop()
+
+
+def _reached(name: str, owner: cst.ClassDef | None, names: set[str], members: set[str], classes: set[int]) -> bool:
+    """A module-level definition is reached when named; a class member when its class is reached and
+    it is public, special, or named as a name or an attribute."""
+    if owner is None:
+        return name in names
+    return id(owner) in classes and (not name.startswith("_") or _special(name) or name in names | members)
+
+
+def _live(module: cst.Module) -> set[int]:
+    """The functions (by ``id``) a grader can call, or that run when the module runs.
+
+    Emptying a function nothing ever calls changes nothing, so the ground of a hollow program needs
+    the removed work to be *reachable*. Where it starts depends on what the module is:
+
+    * **A script** (module-level code does work, such as ``print(...)`` or ``main()``): only what
+      that code names. A grader may judge it by what it prints, and a function it never names may be
+      dead code.
+    * **A library** (module-level code only defines): its public functions and classes too, since a
+      grader imports it and calls them, and its special functions (``__getattr__``), which Python
+      calls.
+
+    A reached class's public and special methods are reached too, and so is any member the
+    module-level code names. A function reached only because another calls it is not counted: the
+    call is work of the caller, which is reached, and its result is seen only through the caller.
+    Reachability is by name: a module-level function is reached by a bare name, never by an
+    attribute of something else (``thread.run()`` does not reach a function ``run``). A name rebound
+    at module level to something else still counts as reaching the function it once named.
+    """
+    top = _ModuleLevel()
+    module.visit(top)
+    found = _Definitions()
+    module.visit(found)
+    names = set(top.names)
+    if not top.runs:
+        defined = [f.name.value for f, owner in found.functions if owner is None]
+        defined += [c.name.value for c, owner in found.classes if owner is None]
+        # A module-level special function (``__getattr__``, ``__dir__``) is called by Python itself.
+        names |= {name for name in defined if not name.startswith("_") or _special(name)}
+    # A class is recorded before the classes nested in it, so one pass reaches every level.
+    classes: set[int] = set()
+    for cls, owner in found.classes:
+        if _reached(cls.name.value, owner, names, top.attributes, classes):
+            classes.add(id(cls))
+    return {
+        id(function)
+        for function, owner in found.functions
+        if _reached(function.name.value, owner, names, top.attributes, classes)
+    }
+
+
+def _reachable(module: cst.Module) -> list[cst.FunctionDef]:
+    """The reachable functions themselves (see :func:`_live`)."""
+    found = _Definitions()
+    module.visit(found)
+    live = _live(module)
+    return [function for function, _ in found.functions if id(function) in live]
+
+
+def _live_work(module: cst.Module) -> list[cst.FunctionDef]:
+    """The reachable functions that do work of their own: what a hollow program provably removes."""
+    return [function for function in _reachable(module) if _does_work(function)]
 
 
 def _parse(source: str) -> cst.Module | None:
@@ -86,6 +223,34 @@ def _parse(source: str) -> cst.Module | None:
         return cst.parse_module(source)
     except Exception:  # not Python, or not parseable — the operator simply does not apply
         return None
+
+
+class _ReplacedBodies(cst.CSTTransformer):
+    """Replace every function body, special methods included, with the same statements.
+
+    Special methods are replaced too: one left as it was could keep all of the reference's work (a
+    class whose only work is ``__add__``), and a grader checking only that would rightly accept.
+    """
+
+    def __init__(self, body: str) -> None:
+        self.body = cst.parse_module(body).body
+
+    def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
+        """Replace this function's body; its signature, decorators and name are kept."""
+        return updated_node.with_changes(body=cst.IndentedBlock(body=self.body))
+
+
+def _hollow(source: str, body: str) -> str | None:
+    """The reference with every function body replaced by ``body``, or None where that proves nothing:
+    the reference does not parse, no reachable function does work, or the result is the reference."""
+    module = _parse(source)
+    if module is None or not _live_work(module):
+        return None
+    mutated = module.visit(_ReplacedBodies(body)).code
+    # A reference whose bodies already are ``body`` gives back the reference, which the grader has
+    # just accepted as the known-good answer: reporting that would accuse it of accepting the
+    # correct solution.
+    return None if code_equivalent(mutated, source) else mutated
 
 
 class DropSideEffect(MutationOperator):
@@ -99,7 +264,8 @@ class DropSideEffect(MutationOperator):
     has functions whose bodies are only docstrings, ``pass``, ``...`` or ``raise
     NotImplementedError``; emptying them removes nothing, and a correct grader of that interface
     is right to accept the result. So the operator stays silent unless at least one function in
-    the reference does something else.
+    the reference does something else, and that function is reachable (see :func:`_live`): emptying
+    a helper nothing calls changes nothing a correct grader can see.
     """
 
     id = "drop_side_effect"
@@ -110,42 +276,16 @@ class DropSideEffect(MutationOperator):
 
     def apply(self, task: Task) -> Iterator[Candidate]:
         """The reference with every function body emptied, or nothing if that proves nothing."""
-        source = task.reference or ""
-        module = _parse(source)
-        if module is None:
-            return
-        finder = _WorkFinder()
-        module.visit(finder)
-        if not finder.does_work:
-            return
-        tf = _BodyStripper()
-        mutated = module.visit(tf)
-        # `changed` only records that the transformer fired. A reference whose bodies
-        # are already `pass` produces a mutant identical to the reference, which the
-        # verifier has just accepted as the known-good answer — reporting that as an
-        # exploit accuses a verifier of accepting the correct solution.
-        if not tf.changed or code_equivalent(mutated.code, source):
+        mutated = _hollow(task.reference or "", "pass\n")
+        if mutated is None:
             return
         yield _cand(
             self.id,
             "reference",
             "every function body replaced with `pass`; no work is performed",
-            mutated.code,
+            mutated,
             Ground.STRUCTURAL,
         )
-
-
-class _RaisingBodies(cst.CSTTransformer):
-    """Replace every function body with ``raise NotImplementedError``."""
-
-    def __init__(self) -> None:
-        self.changed = False
-
-    def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
-        """Replace this function's body; its signature, decorators and name are kept."""
-        self.changed = True
-        raising = cst.Raise(exc=cst.Name("NotImplementedError"))
-        return updated_node.with_changes(body=cst.IndentedBlock(body=[cst.SimpleStatementLine(body=[raising])]))
 
 
 def _statements(function: cst.FunctionDef) -> list[cst.CSTNode]:
@@ -161,21 +301,15 @@ def _statements(function: cst.FunctionDef) -> list[cst.CSTNode]:
     return out
 
 
-class _BeyondRaising(cst.CSTVisitor):
-    """Records whether any function does work other than raising an error."""
-
-    def __init__(self) -> None:
-        self.found = False
-
-    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
-        """A statement that is neither inert nor a ``raise`` is work beyond raising. Nothing after an
-        unconditional ``raise`` can run, so it is not work."""
-        for statement in _statements(node):
-            if isinstance(statement, cst.Raise):
-                break
-            if isinstance(statement, cst.BaseSmallStatement) and _inert(statement):
-                continue
-            self.found = True
+def _beyond_raising(function: cst.FunctionDef) -> bool:
+    """Whether the function does work other than raising an error: a statement that is neither inert
+    nor a ``raise``. Nothing after an unconditional ``raise`` can run, so it is not work."""
+    for statement in _statements(function):
+        if isinstance(statement, cst.Raise):
+            return False
+        if not (isinstance(statement, cst.BaseSmallStatement) and _inert(statement)):
+            return True
+    return False
 
 
 class RaiseNotImplemented(MutationOperator):
@@ -200,23 +334,15 @@ class RaiseNotImplemented(MutationOperator):
         """The reference with every function body raising, or nothing if that proves nothing."""
         source = task.reference or ""
         module = _parse(source)
-        if module is None:
+        # Work beyond raising cannot survive every body raising, so the result is never the reference.
+        if module is None or not any(map(_beyond_raising, _reachable(module))):
             return
-        finder = _WorkFinder()
-        module.visit(finder)
-        beyond = _BeyondRaising()
-        module.visit(beyond)
-        if not (finder.does_work and beyond.found):
-            return
-        tf = _RaisingBodies()
-        mutated = module.visit(tf)
-        if not tf.changed or code_equivalent(mutated.code, source):
-            return
+        mutated = module.visit(_ReplacedBodies("raise NotImplementedError\n")).code
         yield _cand(
             self.id,
             "reference",
             "every function body replaced with `raise NotImplementedError`; no work is performed",
-            mutated.code,
+            mutated,
             Ground.STRUCTURAL,
         )
 
@@ -388,15 +514,20 @@ class _ConstantBodies(cst.CSTTransformer):
     Special methods are left as they are: their return types are fixed by Python, not the task.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, live: set[int]) -> None:
+        #: The functions whose work a grader can observe (see :func:`_live`), by ``id``.
+        self.live = live
         self.constants: list[str] = []
-        #: Some replaced function read its parameters and returned something the syntax does not fix.
+        #: Some reachable replaced function read its parameters and returned something the syntax does not fix.
         self.grounded = False
+        #: Some reachable special method, kept as it is, does work: a grader may be judging only that.
+        self.kept_work = False
 
     def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
         """Replace this function's body with a constant of its return type."""
-        name = original_node.name.value
-        if name.startswith("__") and name.endswith("__"):
+        live = id(original_node) in self.live
+        if _special(original_node.name.value):
+            self.kept_work = self.kept_work or (live and _does_work(original_node))
             return updated_node
         returns = _Returns()
         for line in original_node.body.body if isinstance(original_node.body, cst.IndentedBlock) else []:
@@ -417,7 +548,7 @@ class _ConstantBodies(cst.CSTTransformer):
         }
         reads_inputs = bool(parameters & returns.names)
         computes = any(not _is_literal(v) for v in returns.values)
-        self.grounded = self.grounded or (reads_inputs and computes)
+        self.grounded = self.grounded or (live and reads_inputs and computes)
         statement = cst.Return(value=cst.parse_expression(constant))
         return updated_node.with_changes(body=cst.IndentedBlock(body=[cst.SimpleStatementLine(body=[statement])]))
 
@@ -432,8 +563,11 @@ class ConstantImplementation(MutationOperator):
 
     **The ground needs a reference whose result depends on its inputs.** If no function reads its
     parameters and returns a computed value, the reference may itself return this constant, so
-    the submission is a lead, never counted. If every constant would be ``None``, the submission is
-    the empty implementation again and nothing is submitted.
+    the submission is a lead, never counted. Only reachable functions count (see :func:`_live`),
+    and a reachable special method that does work makes it a lead too: special methods keep their
+    bodies, so their work survives, and a correct grader may be checking only that. If every
+    constant would be ``None``, the submission is the empty implementation again and nothing is
+    submitted.
     """
 
     id = "constant_implementation"
@@ -448,20 +582,20 @@ class ConstantImplementation(MutationOperator):
         module = _parse(source)
         if module is None:
             return
-        finder = _WorkFinder()
-        module.visit(finder)
-        if not finder.does_work:
+        if not _live_work(module):
             return
-        tf = _ConstantBodies()
+        tf = _ConstantBodies(_live(module))
         mutated = module.visit(tf)
         if all(c == "None" for c in tf.constants) or code_equivalent(mutated.code, source):
             return
-        ground = Ground.STRUCTURAL if tf.grounded else None
+        ground = Ground.STRUCTURAL if tf.grounded and not tf.kept_work else None
         detail = (
             f"every function returns a constant of its type ({', '.join(sorted(set(tf.constants)))}), "
             "whatever its inputs"
         )
-        if ground is None:
+        if tf.kept_work:
+            detail += "; a lead: a special method, which keeps its body, does work of its own"
+        elif ground is None:
             detail += "; a lead: no function of the reference reads its inputs and computes its result"
         yield _cand(self.id, "reference", detail, mutated.code, ground)
 
@@ -472,190 +606,182 @@ class ConstantImplementation(MutationOperator):
 # differentiating input.
 
 
-class _SysExitBodies(cst.CSTTransformer):
-    """Replace every function body with sys.exit(0)."""
-
-    def __init__(self) -> None:
-        self.changed = False
-
-    def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
-        """Replace the function body with sys.exit(0), unless it's a dunder method."""
-        name = original_node.name.value
-        if name.startswith("__") and name.endswith("__"):
-            return updated_node
-        self.changed = True
-        body = cst.parse_statement("import sys; sys.exit(0)\n")
-        return updated_node.with_changes(body=cst.IndentedBlock(body=[body]))
-
-
 class SuccessExit(MutationOperator):
-    """Replace every function body with sys.exit(0) (BGW-102, exit before the checks).
+    """Replace every function body with ``sys.exit(0)`` (BGW-102, exit before the checks).
 
-    A grader that checks only the exit code without verifying tests actually ran
-    will accept a program that simply exits cleanly.
+    A grader that reads a zero exit status as success, without a positive record that the checks
+    ran, pays for a program that ends cleanly before any of them.
+
+    **It ends the process that runs it.** A grader, or a loop around one, that runs submissions in
+    its own process and catches only ``Exception`` stops at this one with exit status 0. Run each
+    submission in a process of its own, as a grader of untrusted code must anyway.
+
+    The ground is the empty implementation's: every function body is replaced, special methods
+    included, so it needs a reachable function that does work.
     """
 
     id = "success_exit"
     category = "hollow_program"
     rationale = (
-        "The program exits before any checks can run, so only a verifier that checks "
-        "for a positive record of completion catches it."
+        "The program exits cleanly before any check can run, so only a verifier that looks for a "
+        "positive record of the checks catches it."
     )
     requires_code = True
     shapes = (Shape.PROGRAM,)
 
     def apply(self, task: Task) -> Iterator[Candidate]:
-        """The reference with every function body replaced by sys.exit(0)."""
-        source = task.reference or ""
-        module = _parse(source)
-        if module is None:
-            return
-        finder = _WorkFinder()
-        module.visit(finder)
-        if not finder.does_work:
-            return
-        tf = _SysExitBodies()
-        mutated = module.visit(tf)
-        if not tf.changed or code_equivalent(mutated.code, source):
+        """The reference with every function body exiting with status 0, or nothing if that proves nothing."""
+        mutated = _hollow(task.reference or "", "import sys\nsys.exit(0)\n")
+        if mutated is None:
             return
         yield _cand(
             self.id,
             "reference",
-            "every function body replaced with `import sys; sys.exit(0)`; no work is performed",
-            mutated.code,
+            "every function body replaced with `sys.exit(0)`; no work is performed",
+            mutated,
             Ground.STRUCTURAL,
         )
 
 
-class _SpoofBodies(cst.CSTTransformer):
-    """Replace every function body with return _Spoof()."""
+def _preamble(module: cst.Module) -> int:
+    """How many leading statements must stay first: the module docstring and ``from __future__`` imports."""
+    index = 0
+    body = module.body
+    if (
+        body
+        and isinstance(body[0], cst.SimpleStatementLine)
+        and len(body[0].body) == 1
+        and isinstance(body[0].body[0], cst.Expr)
+        and isinstance(body[0].body[0].value, cst.SimpleString | cst.ConcatenatedString)
+    ):
+        index = 1
+    while index < len(body) and _future_import(body[index]):
+        index += 1
+    return index
 
-    def __init__(self) -> None:
-        self.changed = False
 
-    def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
-        """Replace the function body with return _Spoof(), unless it's a dunder method."""
-        name = original_node.name.value
-        if name.startswith("__") and name.endswith("__"):
-            return updated_node
-        self.changed = True
-        body = cst.parse_statement("return _Spoof()\n")
-        return updated_node.with_changes(body=cst.IndentedBlock(body=[body]))
+def _future_import(line: cst.BaseStatement) -> bool:
+    """A line with a ``from __future__`` import in it, alone or beside other statements."""
+    return isinstance(line, cst.SimpleStatementLine) and any(
+        isinstance(s, cst.ImportFrom) and isinstance(s.module, cst.Name) and s.module.value == "__future__"
+        for s in line.body
+    )
 
 
 class EqualitySpoofing(MutationOperator):
-    """Return an object that equals everything (BGW-103, equality spoofing).
+    """Make every function return an object that equals everything (BGW-103, equality spoofing).
 
-    A grader that uses Python's `==` on the returned object without checking its type
-    will accept an object that overrides `__eq__`.
+    A grader that compares a result with ``==`` and never checks its type pays for an object whose
+    ``__eq__`` always says yes.
+
+    The ground is the empty implementation's: every function body is replaced, special methods
+    included, so it needs a reachable function that does work. The spoofing class takes a name the
+    reference does not use, and goes after its docstring and ``from __future__`` imports.
     """
 
     id = "equality_spoofing"
     category = "hollow_program"
-    rationale = (
-        "The returned object claims to equal everything, so only a check of its exact type or properties catches it."
-    )
+    rationale = "The returned object claims to equal everything, so only a check of its exact type or value catches it."
     requires_code = True
     shapes = (Shape.PROGRAM,)
 
     def apply(self, task: Task) -> Iterator[Candidate]:
-        """The reference with every function returning a spoofed object."""
+        """The reference with every function returning a spoofed object, or nothing if that proves nothing."""
         source = task.reference or ""
         module = _parse(source)
         if module is None:
             return
-        finder = _WorkFinder()
-        module.visit(finder)
-        if not finder.does_work:
+        name = "_Spoof"
+        used = _names_in(module)
+        while name in used:
+            name += "_"
+        mutated = _hollow(source, f"return {name}()\n")
+        if mutated is None:
             return
-        tf = _SpoofBodies()
-        mutated = module.visit(tf)
-        if not tf.changed or code_equivalent(mutated.code, source):
-            return
-
         spoof = cst.parse_statement(
-            "class _Spoof:\n"
+            f"class {name}:\n"
             "    def __eq__(self, other):\n        return True\n"
             "    def __ne__(self, other):\n        return False\n"
             "    def __getattr__(self, name):\n        return lambda *a, **k: self\n"
         )
-        mutated = mutated.with_changes(body=[spoof, *mutated.body])
-
+        hollow = cst.parse_module(mutated)
+        at = _preamble(hollow)
         yield _cand(
             self.id,
             "reference",
-            "every function returns a spoofed object that equals everything; no work is performed",
-            mutated.code,
+            "every function returns an object that equals everything; no work is performed",
+            hollow.with_changes(body=[*hollow.body[:at], spoof, *hollow.body[at:]]).code,
             Ground.STRUCTURAL,
         )
 
 
+def _tampered(operator: str, task: Task, conftest: str, detail: str) -> Iterator[Candidate]:
+    """The empty implementation at ``{source_path}``, with ``conftest`` written into ``{test_root}``.
+
+    The ground is the empty implementation's, established without the tamper: the solution does no
+    work, so whatever the tests report, a correct grader rejects it. The tamper is what a weak one
+    pays for.
+    """
+    hollow = _hollow(task.reference or "", "pass\n")
+    if hollow is None:
+        return
+    workspace = Workspace(
+        files={"{test_root}/conftest.py": conftest, "{source_path}": hollow},
+        parameters=("test_root", "source_path"),
+    )
+    yield Candidate(payload=workspace, provenance=Provenance(operator, "reference", detail), ground=Ground.STRUCTURAL)
+
+
 class TestFrameworkHook(MutationOperator):
-    """Patch pytest to mark every test as passed (BGW-108, test-framework hook)."""
+    """Patch pytest to report every test as passed (BGW-108, test-framework hook).
+
+    A ``conftest.py`` in the test directory wraps pytest's report hook and marks every outcome
+    passed, beside the empty implementation. A grader that runs the tests in the submitted tree and
+    trusts pytest's verdict pays for it.
+    """
 
     id = "test_framework_hook"
     category = "harness_tampering"
     rationale = (
-        "The test framework is patched to report success whatever happens, so only a "
-        "verifier that isolates the tests catches it."
+        "The test framework is patched to report success whatever happens, so only a verifier that runs "
+        "its tests apart from the submission catches it."
     )
-    requires_code = False
+    requires_code = True
     shapes = (Shape.WORKSPACE, Shape.CONTAINER, Shape.HISTORY)
 
     def apply(self, task: Task) -> Iterator[Candidate]:
-        """A workspace that patches pytest to report every test as passed, with a no-op solution."""
-        hollow = next(DropSideEffect().apply(task), None)
-        if hollow is None or not isinstance(hollow.payload, Source):
-            return
-
-        patch = (
-            "import pytest\n\n"
-            "@pytest.hookimpl(tryfirst=True, hookwrapper=True)\n"
+        """The empty implementation with a conftest.py that marks every test passed."""
+        conftest = (
+            "import pytest\n\n\n"
+            "@pytest.hookimpl(hookwrapper=True)\n"
             "def pytest_runtest_makereport(item, call):\n"
             "    outcome = yield\n"
-            "    rep = outcome.get_result()\n"
-            "    rep.outcome = 'passed'\n"
+            '    outcome.get_result().outcome = "passed"\n'
         )
-        workspace = Workspace(
-            files={"{test_root}/conftest.py": patch, "{source_path}": hollow.payload.text},
-            parameters=("test_root", "source_path"),
-        )
-        yield Candidate(
-            payload=workspace,
-            provenance=Provenance(self.id, "constant", "pytest is patched to mark every test as passed"),
-            ground=Ground.STRUCTURAL,
-        )
+        yield from _tampered(self.id, task, conftest, "pytest is patched to report every test as passed")
 
 
 class TestsDeleted(MutationOperator):
-    """Clear the test collection via conftest.py (BGW-109, tests edited, deleted or skipped)."""
+    """Deselect every test (BGW-109, tests edited, deleted or skipped).
+
+    A ``conftest.py`` in the test directory empties pytest's collection, beside the empty
+    implementation. Nothing runs, so nothing fails: a grader that counts failures, or treats pytest's
+    "no tests ran" status as a pass, pays for it.
+    """
 
     id = "tests_deleted"
     category = "harness_tampering"
     rationale = (
-        "The tests are deselected, so only a verifier that checks the test count or isolates the tests catches it."
+        "The tests are deselected, so only a verifier that checks how many tests ran, or runs its tests "
+        "apart from the submission, catches it."
     )
-    requires_code = False
+    requires_code = True
     shapes = (Shape.WORKSPACE, Shape.CONTAINER, Shape.HISTORY)
 
     def apply(self, task: Task) -> Iterator[Candidate]:
-        """A workspace that clears the pytest items list, with a no-op solution."""
-        hollow = next(DropSideEffect().apply(task), None)
-        if hollow is None or not isinstance(hollow.payload, Source):
-            return
-
-        workspace = Workspace(
-            files={
-                "{test_root}/conftest.py": "def pytest_collection_modifyitems(config, items):\n    items.clear()\n",
-                "{source_path}": hollow.payload.text,
-            },
-            parameters=("test_root", "source_path"),
-        )
-        yield Candidate(
-            payload=workspace,
-            provenance=Provenance(self.id, "constant", "pytest is told to collect no tests"),
-            ground=Ground.STRUCTURAL,
-        )
+        """The empty implementation with a conftest.py that deselects every test."""
+        conftest = "def pytest_collection_modifyitems(config, items):\n    items.clear()\n"
+        yield from _tampered(self.id, task, conftest, "pytest is told to run no tests")
 
 
 __all__ = [

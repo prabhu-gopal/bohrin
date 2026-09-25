@@ -28,20 +28,49 @@ category named after that class's family.
 | `bohrin/empty-implementation@1` | `drop_side_effect` | the reference with every function body replaced by `pass` | BGW-101 | Structural | `hollow_program` |
 | `bohrin/constant-implementation@1` | `constant_implementation` | the reference with every function returning a constant of its return type (`0`, `""`, `[]`, `{}`, `False`, …) | BGW-101 | Structural, or a lead (below) | `hollow_program` |
 | `bohrin/raise-not-implemented@1` | `raise_not_implemented` | the reference with every function body replaced by `raise NotImplementedError` | BGW-101 | Structural | `hollow_program` |
+| `bohrin/success-exit@1` | `success_exit` | the reference with every function body replaced by `sys.exit(0)` | BGW-102 | Structural | `hollow_program` |
+| `bohrin/equality-spoofing@1` | `equality_spoofing` | the reference with every function returning an object whose `==` is always true | BGW-103 | Structural | `hollow_program` |
+| `bohrin/test-framework-hook@1` | `test_framework_hook` | a workspace: the empty implementation at `{source_path}`, and a `{test_root}/conftest.py` that makes pytest report every test as passed | BGW-108 | Structural | `harness_tampering` |
+| `bohrin/tests-deleted@1` | `tests_deleted` | a workspace: the empty implementation at `{source_path}`, and a `{test_root}/conftest.py` that deselects every test | BGW-109 | Structural | `harness_tampering` |
 
-All three need a reference in which some function does work: one whose functions are only
-docstrings, `pass`, `...` or `raise NotImplementedError` (an interface) gets no submission.
+Every one of them removes the reference's work, so every one needs that work to exist and to be
+**reachable**: removing work nothing runs changes nothing a grader can see.
 
+- **Work** is a function body holding anything but a docstring, `pass`, `...`, a bare name or
+  number, or `raise NotImplementedError`. A reference with none (an interface) gets no submission.
+- **Reachable** depends on what the module is. A *script* (module-level code that does work, such
+  as `print(...)` or `main()`) reaches only what that code names: a grader may judge it by what it
+  prints. A *library* (module-level code only defines) also reaches its public functions and
+  classes, and its special functions (`__getattr__`), which a grader or Python calls. A reached
+  class reaches its public and special methods, and any member the module-level code names; a
+  module-level function is reached by its bare name, never by an attribute of something else.
+  Reachability is by name, so code reached only by introspection (a test class `unittest.main()`
+  finds, a plugin registry) counts as unreachable, and gets no submission.
+- **Every body is replaced, special methods included**, except by the constant (below): a special
+  method left as it was could hold all of the work.
+- A result that compiles to the same bytecode as the reference is not submitted.
 - **The constant's type** comes from the function's return annotation, or else from what the
   reference returns: a literal, a comprehension, a comparison, a built-in call with a fixed type
   (`len`, `sorted`, `str`, …), or a local name's first assigned value. Where neither fixes one
   type the constant is `None`; if every constant would be `None` nothing is submitted, because
-  that is the empty implementation again. Special methods keep their bodies.
-- **A constant is only a lead** when no function of the reference both reads its inputs (its
-  parameters, `self` or `cls`) and returns a value the syntax does not fix: such a reference may
-  itself return the constant.
-- **Raising is not submitted** when the reference's only work is raising an error: one error
-  raised in place of another is not provably wrong.
+  that is the empty implementation again. Special methods keep their bodies, because Python fixes
+  their return types.
+- **A constant is only a lead** when no reachable function both reads its inputs (its parameters,
+  `self` or `cls`) and returns a value the syntax does not fix, because such a reference may itself
+  return the constant; and when a reachable special method does work, because that work survives
+  and a grader may be checking only it. A function reached only through another's call does not
+  count: its result is seen only through the caller.
+- **Raising is not submitted** when the reachable functions' only work is raising an error: one
+  error raised in place of another is not provably wrong.
+- **Exiting ends the process that runs it.** Run each submission in a process of its own; a loop
+  that runs submissions in its own process and catches only `Exception` ends at this one, with
+  exit status 0.
+- **The spoofing class** takes a name the reference does not use, and goes after its docstring and
+  `from __future__` imports.
+- **A workspace probe's ground is its solution's**, the empty implementation, established without
+  the tamper: whatever the tests report, a correct grader rejects it. It is submitted only where
+  the empty implementation is. Its template names two parameters, `test_root` and `source_path`,
+  which an instantiation fills in.
 
 Every probe is also published as a manifest in `src/bohrin/spec/probes.toml`, readable without
 importing Bohrin: its weaknesses, grader shapes, template, ground, what a correct grader does

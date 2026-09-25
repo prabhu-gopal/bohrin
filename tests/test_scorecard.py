@@ -50,6 +50,7 @@ def _run(
 
 
 def _text(payload: object) -> str:
+    """Program text; a workspace reaches these program graders as its repr, which none accepts."""
     if isinstance(payload, Source):
         return payload.text
     return str(payload)

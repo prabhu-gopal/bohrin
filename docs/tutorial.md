@@ -72,18 +72,23 @@ def add(a: int, b: int) -> int:
 
 success_exit structural
 def add(a: int, b: int) -> int:
-    import sys; sys.exit(0)
+    import sys
+    sys.exit(0)
 
 ```
 
-Each keeps the signature and does no work: one returns a constant, one does
-nothing, one returns a spoofed object, one refuses to run, and one exits early. Their wrongness is *structural*: it holds by construction, without
+Each keeps the signature and does no work: one returns a constant of the declared type, one does
+nothing, one returns an object that claims to equal everything, one refuses to run, and one exits
+the process with status 0. Their wrongness is *structural*: it holds by construction, without
 asking any grader.
 
 ## 4. Run two graders on it
 
 Bohrin never runs your grader; you do. Here are two small ones. The first only checks that the
-function exists and runs, a common weak shape. The second checks what it returns.
+function exists and runs, a common weak shape. The second checks what it returns, and its type.
+Both catch `BaseException`, not just `Exception`, because one submission calls `sys.exit(0)`: a
+grader that runs submissions in its own process must survive that, or it ends with the submission,
+with exit status 0.
 
 ```python
 def runs_it(submission):
@@ -115,11 +120,12 @@ runs_it [True, True, True, False, False]
 checks_it [False, False, False, False, False]
 ```
 
-`runs_it` paid for the constant, the empty body, and the spoof; only the ones that raise or exit made it fail.
-`checks_it` refused all five. Notice how `checks_it` verifies the exact type: a grader that uses `==` without checking types is fooled by equality spoofing.
+`runs_it` paid for the constant, the empty body and the object that equals everything; only the
+ones that raise or exit made it fail. `checks_it` refused all five. It checks the type as well as
+the value: with `==` alone, the object that equals everything would have passed it too.
 
-> Never `exec` untrusted code outside a sandbox. It is safe here only because every submission
-> comes from your own reference.
+> Never `exec` untrusted code outside a sandbox, and run each submission in a process of its own.
+> It is safe here only because every submission comes from your own reference.
 
 ## 5. Score them
 
