@@ -1,0 +1,26 @@
+{
+  "$schema": "https://bohrin.com/schema/registry-record/v1",
+  "schema_version": "1.0.0",
+  "id": "BVR-0000-00000",
+  "modified": "2026-11-20T09:00:00Z",
+  "published": "2026-11-20T09:00:00Z",
+  "summary": "The example grader pays full marks for an add whose body does no work",
+  "details": "An example record, about the example grader in this repository. `grade()` in `docs/examples/toy_grader.py` checks that `add` exists and runs, never what it returns, so the reference with its body replaced by `pass` scores 1.0. The ID's year, 0000, marks it as an example; no real record uses it.",
+  "weakness": ["BGW-101"],
+  "probe": "bohrin/empty-implementation@1",
+  "findings": ["BF-GZW6R2M9CJ"],
+  "affected": [
+    {
+      "artifact": {"kind": "grader", "name": "docs/examples/toy_grader.py", "repository": "https://github.com/prabhu-gopal/bohrin"},
+      "shape": "program"
+    }
+  ],
+  "submission": {"kind": "source", "sha256": "sha256:60a654efdbfdbd6b99d73610003be0292733d39aed50c04b60887ab167db3ddd"},
+  "score_received": {"reward": 1.0, "passed": true},
+  "ground": "structural",
+  "reproduce": {"script": "reproduce_BF-GZW6R2M9CJ.py", "sha256": "sha256:474ed901e234e60076059de3812b2f05d86ab10fac8c98be7e1e8c59acf45349"},
+  "status": "confirmed",
+  "numbering_authority": "Bohrin",
+  "disclosure": {"maintainer_notified": "2026-10-01T09:00:00Z"},
+  "references": [{"type": "EVIDENCE", "url": "https://github.com/prabhu-gopal/bohrin/blob/main/docs/examples/reproduce_BF-GZW6R2M9CJ.py"}]
+}

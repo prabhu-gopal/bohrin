@@ -51,6 +51,8 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
   (`conformance-results.v1.json`) and `check()`, which compares a tool's results with them. The
   fixture graders themselves live outside the package, in `conformance/` at the repository root:
   they run submissions, and the library never does.
+- **`registry/`**: the registry record (`record.v1.json`) and `read_record()`, which applies the
+  schema and the rules it cannot express, including the 45-day notification policy.
 - **`spec/`**: the standard as data.
   - `weaknesses.toml` and `weaknesses.py`: the weakness list and its loader.
   - `probes.toml` and `probes.py`: the probe manifests and their loader.
