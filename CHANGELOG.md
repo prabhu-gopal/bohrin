@@ -225,6 +225,18 @@ All notable changes to this project are documented here. The format follows
 - **`SECURITY.md`'s command for checking a release's PyPI attestation now works.** It lacked the
   required `--repository` and `pypi:<file>` arguments; the corrected command was run against the
   published 0.3.0 wheel and verifies it.
+- **Deeply nested input no longer crashes a command.** Found by coverage-guided fuzzing: a few
+  kilobytes of nested brackets made Python's JSON and TOML parsers exhaust their recursion, so
+  `bohrin power`, `bohrin conformance check`, the decisions file and a reproduction script's
+  metadata or output stopped with a traceback; a test file with a 200,000-long chain of `-` made
+  `verify` stop with `MemoryError`, and one about 1,500 levels deep parsed but then exhausted
+  recursion while being compared. All are now refused with a message (exit code 2), and `verify`
+  lists such a file as not checked. Every file Bohrin reads may come from someone else.
+- **Removing comments from a reference no longer risks gigabytes of memory.** On Python 3.12.0 to
+  3.12.3 (Ubuntu 24.04 ships 3.12.3) the standard tokenizer takes gigabytes on one very long line
+  (CPython issue #119118); a hostile reference reached it through the comment-free positive control
+  and took 15 GB in seven seconds on a CI machine. The rewriting now tokenizes only a program that
+  has a `#`, parses, and has no line over 10,000 characters.
 - **A number too large for a float no longer crashes a reader.** JSON allows any number of
   digits, and a results line with a 400-digit score made `bohrin power` stop with a traceback
   (`OverflowError`) instead of refusing the line; the same reader serves rewards in finding and

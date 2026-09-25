@@ -91,7 +91,10 @@ def script_metadata(text: str) -> dict[str, Any]:
     content = "".join(
         line[2:] if line.startswith("# ") else line[1:] for line in blocks[0].group("content").splitlines(keepends=True)
     )
-    return tomllib.loads(content)
+    try:
+        return tomllib.loads(content)
+    except (tomllib.TOMLDecodeError, RecursionError) as exc:
+        raise ValueError(f"the '# /// script' block is not TOML: {exc}") from exc
 
 
 def check_script(text: str, finding: Finding) -> list[str]:
@@ -122,7 +125,7 @@ def check_script(text: str, finding: Finding) -> list[str]:
         problems.append(f"[tool.bohrin] runs must be an integer of at least {MIN_RUNS}")
     try:
         tree = ast.parse(text)
-    except SyntaxError as exc:
+    except (SyntaxError, ValueError, RecursionError, MemoryError) as exc:
         return [*problems, f"not valid Python: {exc}"]
     imported = _imports(tree)
     if "bohrin" in imported:
@@ -202,10 +205,7 @@ def parse_result(stdout: str, exit_code: int) -> ReproductionResult:
     lines = [line for line in stdout.splitlines() if line.strip()]
     if not lines:
         raise ValueError("the script printed nothing")
-    try:
-        data = json.loads(lines[-1])
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"the last line is not JSON: {exc}") from exc
+    data = strict.load_json(lines[-1], "the last line")
     record = strict.obj(data, "result", _RESULT_FIELDS, _RESULT_REQUIRED)
     if record["$schema"] != RESULT_SCHEMA:
         raise ValueError(f"the last line is not a {RESULT_SCHEMA} result")

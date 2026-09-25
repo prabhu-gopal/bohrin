@@ -26,6 +26,7 @@ from typing import NoReturn
 from bohrin import conformance
 from bohrin._plugins import COMMANDS, load_plugin_classes
 from bohrin.command import CANNOT_RUN, CLEAN, FINDINGS, USAGE, Command
+from bohrin.evidence import _strict as strict
 from bohrin.history import verify as history
 from bohrin.history.git import GitError
 from bohrin.report.sarif import to_sarif
@@ -242,11 +243,11 @@ def _verify(args: argparse.Namespace) -> int:
 def _conformance(args: argparse.Namespace) -> int:
     path: Path = args.file
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = strict.load_json(path.read_text(encoding="utf-8"), str(path))
     except OSError as exc:
         print(f"bohrin: cannot open {path}: {exc.strerror}. Check the path and try again.", file=sys.stderr)
         return CANNOT_RUN
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, ValueError):
         print(f"bohrin: {path} is not a JSON document. See 'Conformance' in docs/SPEC.md.", file=sys.stderr)
         return CANNOT_RUN
     try:

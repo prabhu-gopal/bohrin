@@ -98,7 +98,7 @@ def read_decisions(text: str) -> tuple[Decision, ...]:
     """Every decision in a decisions file, read strictly, or ``ValueError`` naming the one at fault."""
     try:
         data = tomllib.loads(text)
-    except tomllib.TOMLDecodeError as exc:
+    except (tomllib.TOMLDecodeError, RecursionError) as exc:
         raise ValueError(f"not TOML: {exc}") from exc
     return read_decisions_data(data)
 

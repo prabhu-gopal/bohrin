@@ -447,6 +447,8 @@ diffed by git. A file over 2 MB is not read, and a committed one is refused from
 tree listing, before its content is loaded. Symlinks, and files reached through a symlinked
 directory outside the repository, are not read. A pytest configuration file that does not parse
 is listed as not checked rather than compared: pytest stops on it instead of running fewer tests.
+A Python file nested deeper than 200 levels is listed as not checked too: deeper trees can exhaust
+the recursion of the code that compares them, and no real test file comes near that depth.
 
 **On a pull request.** `--sarif FILE` also writes the facts as
 [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html), which GitHub code

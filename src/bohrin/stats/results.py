@@ -66,11 +66,7 @@ def read_results(lines: Iterable[str]) -> list[Row]:
     for number, text in enumerate(lines, start=1):
         if not text.strip():
             continue
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"line {number}: not JSON ({exc.msg})") from exc
-        rows.append(read_row(data, number))
+        rows.append(read_row(strict.load_json(text, f"line {number}"), number))
     if not rows:
         raise ValueError("the file has no results")
     return rows

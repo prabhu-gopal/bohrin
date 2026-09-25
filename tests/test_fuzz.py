@@ -71,7 +71,7 @@ def test_seeded_mutations_of_the_corpus_never_crash_a_reader() -> None:
         seed = rng.choice(seeds)
         try:
             parsed = json.loads(seed)
-        except ValueError:
+        except (ValueError, RecursionError):  # not JSON, or nested past the parser's recursion
             HARNESS.check(_mutate_bytes(seed, rng))
             continue
         HARNESS.check(
