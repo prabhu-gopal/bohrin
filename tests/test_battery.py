@@ -148,13 +148,17 @@ def test_a_grader_that_only_checks_the_code_runs_is_still_caught() -> None:
         try:
             exec(compile(payload, "<fixture>", "exec"), namespace)
             namespace["solve"]([1, 2])
-        except Exception:
+        except BaseException:
             return False
         return True
 
     hits = _accused(task(REFERENCE), runs)
     # It pays for the empty and the constant body, which both run; the raising one does not run.
-    assert {hit.split(":", 1)[0] for hit in hits} == {"drop_side_effect", "constant_implementation"}
+    assert {hit.split(":", 1)[0] for hit in hits} == {
+        "drop_side_effect",
+        "constant_implementation",
+        "equality_spoofing",
+    }
 
 
 def test_a_grader_accepting_anything_is_caught_by_every_grounded_candidate() -> None:

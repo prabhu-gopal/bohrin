@@ -70,7 +70,11 @@ Changelog = "https://github.com/prabhu-gopal/bohrin/blob/main/CHANGELOG.md"
 [project.entry-points."bohrin.mutators"]
 constant_implementation = "bohrin.mutate.operators:ConstantImplementation"
 drop_side_effect = "bohrin.mutate.operators:DropSideEffect"
+equality_spoofing = "bohrin.mutate.operators:EqualitySpoofing"
 raise_not_implemented = "bohrin.mutate.operators:RaiseNotImplemented"
+success_exit = "bohrin.mutate.operators:SuccessExit"
+test_framework_hook = "bohrin.mutate.operators:TestFrameworkHook"
+tests_deleted = "bohrin.mutate.operators:TestsDeleted"
 
 # Subcommands of `bohrin`. The built-in ones register here exactly as a plugin's would.
 [project.entry-points."bohrin.commands"]

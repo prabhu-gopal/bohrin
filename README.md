@@ -48,7 +48,7 @@ def my_grader(task, submission):
         exec(submission, namespace)
         namespace["add"](2, 3)
         return True
-    except Exception:
+    except BaseException:
         return False
 
 

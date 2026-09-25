@@ -50,8 +50,9 @@ def _run(
 
 
 def _text(payload: object) -> str:
-    assert isinstance(payload, Source)
-    return payload.text
+    if isinstance(payload, Source):
+        return payload.text
+    return str(payload)
 
 
 def _correct(t: Task) -> Callable[[str], bool]:
@@ -257,9 +258,9 @@ def test_every_shape_names_the_weaknesses_it_did_not_measure() -> None:
 
     assert {"BGW-101", "BGW-120", "BGW-124"} <= set(program.measured)
     assert not set(program.measured) & set(program.not_run)
-    assert "BGW-102" in program.not_run, "an applicable class nothing tried is named, not hidden"
-    assert "BGW-108" in workspace.not_run and "BGW-108" not in program.not_run, "only classes the shape can have"
-    assert f"not run: {len(program.not_run)} applicable weakness classes: BGW-102" in str(card)
+    assert "BGW-104" in program.not_run, "an applicable class nothing tried is named, not hidden"
+    assert "BGW-112" in workspace.not_run and "BGW-112" not in program.not_run, "only classes the shape can have"
+    assert f"not run: {len(program.not_run)} applicable weakness classes: BGW-104" in str(card)
 
 
 def test_a_lead_or_an_unmanifested_operator_measures_no_weakness() -> None:

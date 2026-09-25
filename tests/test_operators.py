@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from _fixtures import REFERENCE, TRIVIAL_REFERENCE, behavioural_grader, task, text
-from bohrin.ir.task import Ground
+from bohrin.ir.task import Ground, Shape, Workspace
 from bohrin.mutate import discover
 from bohrin.mutate.battery import battery
 from bohrin.mutate.equivalence import (
@@ -23,7 +23,15 @@ from bohrin.mutate.equivalence import (
     reads_as_refusal,
     reads_as_structured_state,
 )
-from bohrin.mutate.operators import ConstantImplementation, DropSideEffect, RaiseNotImplemented
+from bohrin.mutate.operators import (
+    ConstantImplementation,
+    DropSideEffect,
+    EqualitySpoofing,
+    RaiseNotImplemented,
+    SuccessExit,
+    TestFrameworkHook,
+    TestsDeleted,
+)
 
 # ------------------------------------------------------------------------- the registry
 
@@ -31,7 +39,15 @@ from bohrin.mutate.operators import ConstantImplementation, DropSideEffect, Rais
 def test_operators_are_discoverable_and_explain_themselves() -> None:
     ops = discover()
 
-    assert [op.id for op in ops] == ["constant_implementation", "drop_side_effect", "raise_not_implemented"]
+    assert [op.id for op in ops] == [
+        "constant_implementation",
+        "drop_side_effect",
+        "equality_spoofing",
+        "raise_not_implemented",
+        "success_exit",
+        "test_framework_hook",
+        "tests_deleted",
+    ]
     assert all(op.rationale for op in ops), "an operator must explain why its output is wrong"
 
 
@@ -173,7 +189,13 @@ def test_it_stays_silent_where_emptying_proves_nothing(reference: str | None) ->
 
 def test_the_battery_grounds_it_on_a_real_program() -> None:
     grounded = [c.provenance.operator for c in battery(task(REFERENCE)).grounded]
-    assert grounded == ["constant_implementation", "drop_side_effect", "raise_not_implemented"]
+    assert grounded == [
+        "constant_implementation",
+        "drop_side_effect",
+        "equality_spoofing",
+        "raise_not_implemented",
+        "success_exit",
+    ]
 
 
 #: References whose functions do no work of their own: an interface, an abstract base, a protocol.
@@ -423,3 +445,58 @@ def test_code_after_an_unconditional_raise_is_not_work() -> None:
     """It can never run, so raising in its place changes nothing, and nothing is submitted."""
     reference = "def f():\n    raise NotImplementedError\n    x = 1\n"
     assert list(RaiseNotImplemented().apply(task(reference))) == []
+
+
+# --------------------------------------------------------------------------- success exit
+
+
+def test_every_body_exiting_is_structurally_wrong() -> None:
+    (candidate,) = SuccessExit().apply(task(REFERENCE))
+    assert candidate.ground is Ground.STRUCTURAL
+    assert "sys.exit(0)" in text(candidate) and "total" not in text(candidate)
+
+
+@pytest.mark.parametrize("reference", [None, "", "70", "not python at all (", TRIVIAL_REFERENCE])
+def test_success_exit_stays_silent_where_emptying_proves_nothing(reference: str | None) -> None:
+    assert list(SuccessExit().apply(task(reference))) == []
+
+
+# --------------------------------------------------------------------------- equality spoofing
+
+
+def test_every_body_spoofing_is_structurally_wrong() -> None:
+    (candidate,) = EqualitySpoofing().apply(task(REFERENCE))
+    assert candidate.ground is Ground.STRUCTURAL
+    assert "class _Spoof:" in text(candidate)
+    assert "return _Spoof()" in text(candidate)
+
+
+@pytest.mark.parametrize("reference", [None, "", "70", "not python at all (", TRIVIAL_REFERENCE])
+def test_equality_spoofing_stays_silent_where_emptying_proves_nothing(reference: str | None) -> None:
+    assert list(EqualitySpoofing().apply(task(reference))) == []
+
+
+# --------------------------------------------------------------------------- test framework hook
+
+
+def test_test_framework_hook_is_structurally_wrong() -> None:
+    (candidate,) = TestFrameworkHook().apply(task(shape=Shape.WORKSPACE))
+    assert candidate.ground is Ground.STRUCTURAL
+    assert isinstance(candidate.payload, Workspace)
+    assert "{test_root}/conftest.py" in candidate.payload.files
+    content = candidate.payload.files["{test_root}/conftest.py"]
+    assert content is not None
+    assert "rep.outcome = 'passed'" in content
+
+
+# --------------------------------------------------------------------------- tests deleted
+
+
+def test_tests_deleted_is_structurally_wrong() -> None:
+    (candidate,) = TestsDeleted().apply(task(shape=Shape.WORKSPACE))
+    assert candidate.ground is Ground.STRUCTURAL
+    assert isinstance(candidate.payload, Workspace)
+    assert "{test_root}/conftest.py" in candidate.payload.files
+    content = candidate.payload.files["{test_root}/conftest.py"]
+    assert content is not None
+    assert "items.clear()" in content

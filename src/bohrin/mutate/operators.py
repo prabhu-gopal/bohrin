@@ -17,7 +17,7 @@ from collections.abc import Iterable, Iterator
 
 import libcst as cst
 
-from bohrin.ir.task import Candidate, Ground, Provenance, Shape, Source, Task
+from bohrin.ir.task import Candidate, Ground, Provenance, Shape, Source, Task, Workspace
 from bohrin.mutate.base import MutationOperator
 from bohrin.mutate.equivalence import code_equivalent
 
@@ -471,4 +471,188 @@ class ConstantImplementation(MutationOperator):
 # so none of them could establish wrongness without executing both programs on a
 # differentiating input.
 
-__all__ = ["ConstantImplementation", "DropSideEffect", "RaiseNotImplemented"]
+
+class _SysExitBodies(cst.CSTTransformer):
+    """Replace every function body with sys.exit(0)."""
+
+    def __init__(self) -> None:
+        self.changed = False
+
+    def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
+        """Replace the function body with sys.exit(0), unless it's a dunder method."""
+        name = original_node.name.value
+        if name.startswith("__") and name.endswith("__"):
+            return updated_node
+        self.changed = True
+        body = cst.parse_statement("import sys; sys.exit(0)\n")
+        return updated_node.with_changes(body=cst.IndentedBlock(body=[body]))
+
+
+class SuccessExit(MutationOperator):
+    """Replace every function body with sys.exit(0) (BGW-102, exit before the checks).
+
+    A grader that checks only the exit code without verifying tests actually ran
+    will accept a program that simply exits cleanly.
+    """
+
+    id = "success_exit"
+    category = "hollow_program"
+    rationale = (
+        "The program exits before any checks can run, so only a verifier that checks "
+        "for a positive record of completion catches it."
+    )
+    requires_code = True
+    shapes = (Shape.PROGRAM,)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """The reference with every function body replaced by sys.exit(0)."""
+        source = task.reference or ""
+        module = _parse(source)
+        if module is None:
+            return
+        finder = _WorkFinder()
+        module.visit(finder)
+        if not finder.does_work:
+            return
+        tf = _SysExitBodies()
+        mutated = module.visit(tf)
+        if not tf.changed or code_equivalent(mutated.code, source):
+            return
+        yield _cand(
+            self.id,
+            "reference",
+            "every function body replaced with `import sys; sys.exit(0)`; no work is performed",
+            mutated.code,
+            Ground.STRUCTURAL,
+        )
+
+
+class _SpoofBodies(cst.CSTTransformer):
+    """Replace every function body with return _Spoof()."""
+
+    def __init__(self) -> None:
+        self.changed = False
+
+    def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
+        """Replace the function body with return _Spoof(), unless it's a dunder method."""
+        name = original_node.name.value
+        if name.startswith("__") and name.endswith("__"):
+            return updated_node
+        self.changed = True
+        body = cst.parse_statement("return _Spoof()\n")
+        return updated_node.with_changes(body=cst.IndentedBlock(body=[body]))
+
+
+class EqualitySpoofing(MutationOperator):
+    """Return an object that equals everything (BGW-103, equality spoofing).
+
+    A grader that uses Python's `==` on the returned object without checking its type
+    will accept an object that overrides `__eq__`.
+    """
+
+    id = "equality_spoofing"
+    category = "hollow_program"
+    rationale = (
+        "The returned object claims to equal everything, so only a check of its exact type or properties catches it."
+    )
+    requires_code = True
+    shapes = (Shape.PROGRAM,)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """The reference with every function returning a spoofed object."""
+        source = task.reference or ""
+        module = _parse(source)
+        if module is None:
+            return
+        finder = _WorkFinder()
+        module.visit(finder)
+        if not finder.does_work:
+            return
+        tf = _SpoofBodies()
+        mutated = module.visit(tf)
+        if not tf.changed or code_equivalent(mutated.code, source):
+            return
+
+        spoof = cst.parse_statement(
+            "class _Spoof:\n"
+            "    def __eq__(self, other):\n        return True\n"
+            "    def __ne__(self, other):\n        return False\n"
+            "    def __getattr__(self, name):\n        return lambda *a, **k: self\n"
+        )
+        mutated = mutated.with_changes(body=[spoof, *mutated.body])
+
+        yield _cand(
+            self.id,
+            "reference",
+            "every function returns a spoofed object that equals everything; no work is performed",
+            mutated.code,
+            Ground.STRUCTURAL,
+        )
+
+
+class TestFrameworkHook(MutationOperator):
+    """Patch pytest to mark every test as passed (BGW-108, test-framework hook)."""
+
+    id = "test_framework_hook"
+    category = "harness_tampering"
+    rationale = (
+        "The test framework is patched to report success whatever happens, so only a "
+        "verifier that isolates the tests catches it."
+    )
+    requires_code = False
+    shapes = (Shape.WORKSPACE, Shape.CONTAINER, Shape.HISTORY)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """A workspace that patches pytest to report every test as passed."""
+        patch = (
+            "import pytest\n\n"
+            "@pytest.hookimpl(tryfirst=True, hookwrapper=True)\n"
+            "def pytest_runtest_makereport(item, call):\n"
+            "    outcome = yield\n"
+            "    rep = outcome.get_result()\n"
+            "    rep.outcome = 'passed'\n"
+        )
+        workspace = Workspace(
+            files={"{test_root}/conftest.py": patch},
+            parameters=("test_root",),
+        )
+        yield Candidate(
+            payload=workspace,
+            provenance=Provenance(self.id, "constant", "pytest is patched to mark every test as passed"),
+            ground=Ground.STRUCTURAL,
+        )
+
+
+class TestsDeleted(MutationOperator):
+    """Clear the test collection via conftest.py (BGW-109, tests edited, deleted or skipped)."""
+
+    id = "tests_deleted"
+    category = "harness_tampering"
+    rationale = (
+        "The tests are deselected, so only a verifier that checks the test count or isolates the tests catches it."
+    )
+    requires_code = False
+    shapes = (Shape.WORKSPACE, Shape.CONTAINER, Shape.HISTORY)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """A workspace that clears the pytest items list."""
+        workspace = Workspace(
+            files={"{test_root}/conftest.py": "def pytest_collection_modifyitems(config, items):\n    items.clear()\n"},
+            parameters=("test_root",),
+        )
+        yield Candidate(
+            payload=workspace,
+            provenance=Provenance(self.id, "constant", "pytest is told to collect no tests"),
+            ground=Ground.STRUCTURAL,
+        )
+
+
+__all__ = [
+    "ConstantImplementation",
+    "DropSideEffect",
+    "EqualitySpoofing",
+    "RaiseNotImplemented",
+    "SuccessExit",
+    "TestFrameworkHook",
+    "TestsDeleted",
+]

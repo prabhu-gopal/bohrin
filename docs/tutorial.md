@@ -55,9 +55,24 @@ drop_side_effect structural
 def add(a: int, b: int) -> int:
     pass
 
+equality_spoofing structural
+class _Spoof:
+    def __eq__(self, other):
+        return True
+    def __ne__(self, other):
+        return False
+    def __getattr__(self, name):
+        return lambda *a, **k: self
+def add(a: int, b: int) -> int:
+    return _Spoof()
+
 raise_not_implemented structural
 def add(a: int, b: int) -> int:
     raise NotImplementedError
+
+success_exit structural
+def add(a: int, b: int) -> int:
+    import sys; sys.exit(0)
 
 ```
 
@@ -77,7 +92,7 @@ def runs_it(submission):
         exec(submission, namespace)
         namespace["add"](2, 3)
         return True
-    except Exception:
+    except BaseException:
         return False
 
 
@@ -86,7 +101,7 @@ def checks_it(submission):
     try:
         exec(submission, namespace)
         return namespace["add"](2, 3) == 5 and namespace["add"](-1, 1) == 0
-    except Exception:
+    except BaseException:
         return False
 
 
@@ -95,8 +110,8 @@ for grader in (runs_it, checks_it):
 ```
 
 ```text
-runs_it [True, True, False]
-checks_it [False, False, False]
+runs_it [True, True, True, False, False]
+checks_it [False, False, True, False, False]
 ```
 
 `runs_it` paid for the constant and for the empty body; only the one that raises made it fail.
@@ -119,7 +134,7 @@ for grader in (runs_it, checks_it):
 
 ```text
 COVERAGE SCORE: 0 / 100   95% CI 0–79   0 of 1 caught   categories: 1 of 5 (battery 2)
-COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
+COVERAGE SCORE: 0 / 100   95% CI 0–79   0 of 1 caught   categories: 1 of 5 (battery 2)
 ```
 
 Read the whole line, not just the number:
@@ -191,14 +206,14 @@ for grader in (checks_it, matches_reference):
 ```text
 checks_it
 program: 1 task scored
-  COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
+  COVERAGE SCORE: 0 / 100   95% CI 0–79   0 of 1 caught   categories: 1 of 5 (battery 2)
   CORRECT-WORK ACCEPTANCE: 100 / 100   95% CI 34–100   2 of 2 accepted   relations: 2
-  not run: 15 applicable weakness classes: BGW-102, BGW-103, BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
+  not run: 13 applicable weakness classes: BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
 matches_reference
 program: 1 task scored
   COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
   CORRECT-WORK ACCEPTANCE: 0 / 100   95% CI 0–66   0 of 2 accepted   relations: 2
-  not run: 15 applicable weakness classes: BGW-102, BGW-103, BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
+  not run: 13 applicable weakness classes: BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
 ```
 
 Both catch the empty body, but `matches_reference` rejects every correct rewriting: it checks the

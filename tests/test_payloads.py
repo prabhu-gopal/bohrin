@@ -119,7 +119,9 @@ def test_an_operator_that_names_no_shape_runs_on_every_shape() -> None:
 
 
 def test_the_built_in_program_operator_does_not_run_on_a_container_task() -> None:
-    assert battery(task(REFERENCE, shape=Shape.CONTAINER)).candidates == ()
+    from bohrin.mutate.operators import DropSideEffect
+
+    assert battery(task(REFERENCE, shape=Shape.CONTAINER), operators=[DropSideEffect()]).candidates == ()
     assert all(op.shapes for op in discover()), "every built-in operator names its shapes"
 
 
