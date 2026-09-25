@@ -110,3 +110,8 @@ mechanism, never the project, until its maintainers have been told.
 You do not need to change this repository to use a probe. Subclass `MutationOperator` in your own
 package and register it under the `bohrin.mutators` entry point; `battery()` will run it with the
 same rules as a built-in one. Use your own namespace for its ID (`acme/constant-implementation@1`).
+
+Import what you need from `bohrin.api`, the one module whose names are promised to stay, and set
+`plugin_api = 1` on your class: a release whose seam has changed then skips your plugin with a
+warning instead of failing mid-run. Choose an entry-point name no one else uses; a name already
+taken, by Bohrin or by a package installed before yours, keeps its first owner.

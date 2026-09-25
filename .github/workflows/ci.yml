@@ -108,6 +108,9 @@ jobs:
           assert len(suite().fixtures) == 14 and suite().level == 'BCL-1', 'the conformance suite index did not ship'
           from bohrin.registry import REGISTRY_RECORD_SCHEMA, registry_record_schema
           assert registry_record_schema()['\$id'] == REGISTRY_RECORD_SCHEMA, 'the registry schema did not ship'
+          import bohrin.api as api
+          from bohrin.cli import _commands
+          assert api.PLUGIN_API == 1 and {c.name for c in _commands()} >= {'power', 'verify', 'conformance'}, 'the commands did not register from the wheel'
           print('finding schema', SCHEMA)
           from bohrin.evidence.reproduction import RESULT_SCHEMA, reproduction_result_schema
           assert reproduction_result_schema()['\$id'] == RESULT_SCHEMA, 'the reproduction schema did not ship'

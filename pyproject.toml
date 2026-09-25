@@ -72,6 +72,12 @@ constant_implementation = "bohrin.mutate.operators:ConstantImplementation"
 drop_side_effect = "bohrin.mutate.operators:DropSideEffect"
 raise_not_implemented = "bohrin.mutate.operators:RaiseNotImplemented"
 
+# Subcommands of `bohrin`. The built-in ones register here exactly as a plugin's would.
+[project.entry-points."bohrin.commands"]
+conformance = "bohrin.cli:ConformanceCommand"
+power = "bohrin.cli:PowerCommand"
+verify = "bohrin.cli:VerifyCommand"
+
 # Certified meaning-preserving rewritings of a correct solution: positive controls. Their order is
 # fixed in `bohrin.relations._BUILTIN_ORDER`, not by this table.
 [project.entry-points."bohrin.relations"]
