@@ -88,7 +88,7 @@ packages = ["src/bohrin"]
 [tool.hatch.build.targets.sdist]
 include = [
   "src/", "tests/", "docs/", "conformance/", "README.md", "ARCHITECTURE.md", "CONTRIBUTING.md", "CHANGELOG.md",
-  "SECURITY.md", "CODE_OF_CONDUCT.md", "CITATION.cff", "LICENSE", "NOTICE",
+  "SECURITY.md", "CODE_OF_CONDUCT.md", "CITATION.cff", "LICENSE", "NOTICE", "ERRATA.md",
 ]
 
 # ---------------------------------------------------------------------------------------

@@ -66,7 +66,9 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
 - **`stats/`**: `bohrin power`. `estimates.py` (standard errors, clustered and paired, and the
   minimum detectable difference, each tied to its published equation), `results.py` (the results
   file format and its strict reader, with `results-row.v1.json`), and `power.py` (the analysis,
-  the aggregation audit, the report and `power-report.v1.json`).
+  the aggregation audit, the report and `power-report.v1.json`). Also `error_rate.py`, the
+  error-rate method: false accusations per 1,000 proven findings and recall on planted weaknesses,
+  from two published line formats (`finding-outcome.v1.json`, `recall-row.v1.json`).
 - **`history/`**: `bohrin verify`. `git.py` (the one module that starts a process: read-only
   git, safe in a hostile repository), `facts.py` (the rules, on syntax trees), `oracle.py` (how
   strongly a test checks, and how a change can weaken it), and `verify.py` (the report and

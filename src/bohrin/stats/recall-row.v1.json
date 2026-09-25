@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bohrin.com/schema/recall-row/v1",
+  "title": "Bohrin recall row",
+  "description": "One line of a JSON Lines file: what a tool did with one known, planted weakness in a corpus. Modelled on Magma's reached, triggered and detected: tried (a probe for the weakness was submitted), accepted (the grader paid for it, so the defect was exercised) and proven (a finding with a reproduction). Each implies the one before.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["weakness", "instance", "tried", "accepted", "proven"],
+  "properties": {
+    "weakness": {"type": "string", "pattern": "^BGW-[1-9][0-9]*$"},
+    "instance": {"description": "The planted weakness: a task or environment ID in the corpus.", "type": "string", "minLength": 1},
+    "tried": {"type": "boolean"},
+    "accepted": {"type": "boolean"},
+    "proven": {"type": "boolean"},
+    "method": {"description": "How the instance was found, such as the fixed battery or a search.", "type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {"if": {"properties": {"accepted": {"const": true}}, "required": ["accepted"]}, "then": {"properties": {"tried": {"const": true}}}},
+    {"if": {"properties": {"proven": {"const": true}}, "required": ["proven"]}, "then": {"properties": {"accepted": {"const": true}}}}
+  ]
+}
