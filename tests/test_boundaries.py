@@ -113,3 +113,43 @@ def test_the_git_module_runs_only_read_only_plumbing() -> None:
     }
     assert subcommands, "the check must see the git calls"
     assert subcommands <= READ_ONLY_GIT, f"not read-only plumbing: {sorted(subcommands - READ_ONLY_GIT)}"
+
+
+# --------------------------------------------------------------------------- at run time
+
+
+def test_every_test_runs_with_the_network_blocked() -> None:
+    """The guard in conftest.py is active: a real connection attempt and a DNS lookup both fail."""
+    import socket
+
+    import pytest
+
+    from conftest import NetworkBlocked
+
+    with pytest.raises(NetworkBlocked):
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    with pytest.raises(NetworkBlocked):
+        socket.create_connection(("example.org", 443), timeout=1)
+    with pytest.raises(NetworkBlocked):
+        socket.getaddrinfo("example.org", 443)
+
+
+def test_local_unix_sockets_are_still_allowed() -> None:
+    """An asyncio event loop needs them; they never leave the machine."""
+    import asyncio
+
+    async def nothing() -> int:
+        return 1
+
+    assert asyncio.run(nothing()) == 1
+    asyncio.set_event_loop_policy(None)
+
+
+def test_every_plugin_the_tests_ran_with_is_this_package() -> None:
+    """Works with the private parts deleted: every entry point in Bohrin's groups comes from this
+    distribution, so the suite passed with nothing else attached."""
+    from importlib.metadata import entry_points
+
+    for group in ("bohrin.mutators", "bohrin.relations"):
+        for entry in entry_points(group=group):
+            assert entry.dist is not None and entry.dist.name == "bohrin", f"{group}: {entry.name}"
