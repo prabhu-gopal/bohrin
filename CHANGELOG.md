@@ -30,6 +30,16 @@ All notable changes to this project are documented here. The format follows
   Each has a manifest (`bohrin/oracle@1`, `…/comment-free-oracle@1`, `…/reformatted-oracle@1`,
   `…/renamed-oracle@1`). A differential test runs every emitted control beside its original on a
   corpus built to break naive renaming, and demands identical results.
+- **Two more hollow-program probes** for BGW-101, trivial implementation:
+  `bohrin/constant-implementation@1` makes every function return a constant of its own return
+  type (`0`, `""`, `[]`, `{}`, `False`, …), read from the annotation or from what the reference
+  returns, which a grader checking only types or that the call succeeds pays for; and
+  `bohrin/raise-not-implemented@1` makes every function raise `NotImplementedError`, which a
+  grader that scores an exception as a pass pays for. A constant is only a lead when the
+  reference may itself return it (no function reads its inputs and computes its result), and
+  raising is not submitted where the reference's only work is raising. Run over the 823
+  standard-library modules of Python 3.11 as references, every submission parsed and none
+  compiled to its reference.
 - **Correct-work acceptance, beside the Coverage Score, per grader shape**
   (`bohrin.scoring.scorecard`). A grader that rejects everything catches every cheat, so each
   shape now gets two numbers, never merged: the Coverage Score and the share of correct rewritings

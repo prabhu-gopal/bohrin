@@ -198,7 +198,7 @@ def test_a_positive_control_past_full_marks_excludes_the_task_too() -> None:
 def test_coverage_alone_leaves_out_a_task_paid_past_full_marks() -> None:
     """I5 holds for the Coverage Score on its own, not only inside the scorecard."""
     t = task(REFERENCE)
-    (candidate,) = battery(t).candidates
+    candidate = battery(t).candidates[0]
     other = Candidate(Source("pass\n"), Provenance("drop_side_effect", "reference", "second"), Ground.STRUCTURAL)
     attempts = [Attempt(t.id, candidate, False), Attempt(t.id, other, True, scale_exceeded=True)]
 

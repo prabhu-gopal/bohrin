@@ -88,7 +88,7 @@ jobs:
           from bohrin.mutate.battery import battery
           print('bohrin', bohrin.__version__)
           operators = discover()
-          assert 'drop_side_effect' in {o.id for o in operators}, f'the built-in operators did not load: {operators}'
+          assert {'constant_implementation', 'drop_side_effect', 'raise_not_implemented'} <= {o.id for o in operators}, f'the built-in operators did not load: {operators}'
           reference = 'def add(a, b):\n    return a + b\n'
           result = battery(Task(id='0', prompt='Write add(a, b).', reference=reference, reward_fns=('r',)))
           assert result.grounded, 'the battery produced no grounded candidate'

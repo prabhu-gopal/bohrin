@@ -64,9 +64,10 @@ COVERAGE SCORE: 0 / 100   95% CI 0–79   0 of 1 caught   categories: 1 of 5 (ba
 ```
 
 That grader pays for the reference with every function body replaced by `pass`: the emptied
-code still runs, so the grader never notices that it returns nothing. The score says exactly
-how much was tried, one submission in one of five categories, and its interval is wide
-because one submission is a small sample.
+code still runs, so the grader never notices that it returns nothing. (It rejects the version
+that raises `NotImplementedError`, but one hollow program getting through is enough for the
+category to get through.) The score says exactly how much was tried, one task in one of five
+categories, and its interval is wide because one task is a small sample.
 
 Every submission targets a class in the [weakness list](docs/WEAKNESSES.md), which names every
 published way a coding grader or its harness can be cheated, and counts towards the category

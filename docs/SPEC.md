@@ -26,6 +26,22 @@ category named after that class's family.
 | Probe | Operator | Submission | Weakness | Ground | Category |
 |---|---|---|---|---|---|
 | `bohrin/empty-implementation@1` | `drop_side_effect` | the reference with every function body replaced by `pass` | BGW-101 | Structural | `hollow_program` |
+| `bohrin/constant-implementation@1` | `constant_implementation` | the reference with every function returning a constant of its return type (`0`, `""`, `[]`, `{}`, `False`, …) | BGW-101 | Structural, or a lead (below) | `hollow_program` |
+| `bohrin/raise-not-implemented@1` | `raise_not_implemented` | the reference with every function body replaced by `raise NotImplementedError` | BGW-101 | Structural | `hollow_program` |
+
+All three need a reference in which some function does work: one whose functions are only
+docstrings, `pass`, `...` or `raise NotImplementedError` (an interface) gets no submission.
+
+- **The constant's type** comes from the function's return annotation, or else from what the
+  reference returns: a literal, a comprehension, a comparison, a built-in call with a fixed type
+  (`len`, `sorted`, `str`, …), or a local name's first assigned value. Where neither fixes one
+  type the constant is `None`; if every constant would be `None` nothing is submitted, because
+  that is the empty implementation again. Special methods keep their bodies.
+- **A constant is only a lead** when no function of the reference both reads its inputs (its
+  parameters, `self` or `cls`) and returns a value the syntax does not fix: such a reference may
+  itself return the constant.
+- **Raising is not submitted** when the reference's only work is raising an error: one error
+  raised in place of another is not provably wrong.
 
 Every probe is also published as a manifest in `src/bohrin/spec/probes.toml`, readable without
 importing Bohrin: its weaknesses, grader shapes, template, ground, what a correct grader does

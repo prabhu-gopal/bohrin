@@ -21,7 +21,7 @@ A task is an ID, the prompt the model saw, and a reference solution you know is 
 ```python
 from bohrin.ir.task import Task
 
-reference = "def add(a, b):\n    return a + b\n"
+reference = "def add(a: int, b: int) -> int:\n    return a + b\n"
 task = Task(id="add", prompt="Write add(a, b) that returns the sum.", reference=reference)
 print(task.shape)
 ```
@@ -47,13 +47,23 @@ for candidate in result.candidates:
 ```
 
 ```text
+constant_implementation structural
+def add(a: int, b: int) -> int:
+    return 0
+
 drop_side_effect structural
-def add(a, b):
+def add(a: int, b: int) -> int:
     pass
+
+raise_not_implemented structural
+def add(a: int, b: int) -> int:
+    raise NotImplementedError
+
 ```
 
-The reference with its body replaced by `pass` keeps the signature and does no work, so its
-wrongness is *structural*: it holds by construction, without asking any grader.
+Each keeps the signature and does no work: one returns a constant of the declared type, one does
+nothing, one refuses to run. Their wrongness is *structural*: it holds by construction, without
+asking any grader.
 
 ## 4. Run two graders on it
 
@@ -85,11 +95,12 @@ for grader in (runs_it, checks_it):
 ```
 
 ```text
-runs_it [True]
-checks_it [False]
+runs_it [True, True, False]
+checks_it [False, False, False]
 ```
 
-`runs_it` paid for code that does nothing. `checks_it` refused it.
+`runs_it` paid for the constant and for the empty body; only the one that raises made it fail.
+`checks_it` refused all three.
 
 > Never `exec` untrusted code outside a sandbox. It is safe here only because every submission
 > comes from your own reference.
@@ -113,7 +124,8 @@ COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5
 
 Read the whole line, not just the number:
 
-- **`95% CI 21–100`**: one submission is a small sample, so a perfect score is still uncertain.
+- **`95% CI 21–100`**: the score counts tasks and categories, not submissions, and one task in
+  one category is a small sample, so a perfect score is still uncertain.
   Two out of two and three hundred out of three hundred must never read the same.
 - **`categories: 1 of 5`**: only one of the five categories was measured for this task. The other
   four were not tried, and a category that was not tried is never counted as caught.
