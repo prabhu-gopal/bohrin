@@ -493,6 +493,34 @@ Weaknesses of the level with no fixtures yet are named, and the level is claimed
 others. Exit codes: 0 achieved, 1 not achieved, 2 the file cannot be checked (another level or
 version, an unknown or repeated fixture, or a record the schema refuses).
 
+## Registry records
+
+A registry record is the public, citable form of a defect in a coding grader or its harness, as a
+CVE record is of a software vulnerability. It is published as the JSON Schema
+`https://bohrin.com/schema/registry-record/v1` (`src/bohrin/registry/record.v1.json`) and read by
+`bohrin.registry.read_record`. The records themselves are one JSON file each, published under
+CC-BY-4.0 as a git repository.
+
+- **OSV field names where they fit:** `schema_version`, `id` (`BVR-<year>-<number>`), `aliases`,
+  `related`, `modified`, `published`, `withdrawn`, `summary` (one line, at most 120 characters),
+  `details`, `affected` (with OSV `ranges` of type `GIT`, `SEMVER` or `ECOSYSTEM`, and events
+  `introduced`, `fixed`, `last_affected` or `limit`, one per event), `references` and `credits`
+  with OSV's types.
+- **What a stranger needs to check it:** `weakness` (one or more `BGW-` classes), `probe`,
+  `findings` (the `BF-` records it rests on), `submission` (a digest, never the submission
+  itself, defined exactly as in the finding record), `score_received`, `ground`, `reproduce`.
+- **Its standing:** `status` (`reported`, `confirmed`, `fixed`, `disputed`, `withdrawn`; a
+  withdrawn record says when), `numbering_authority`, and `disclosure`.
+- **An artefact, never a person:** `affected[].artifact` is an environment, benchmark, grader or
+  harness.
+
+Three rules no JSON Schema can express are checked by the reader: every date is a real calendar
+date; every weakness is a class of the weakness list; and the notification policy
+([disclosure.md](disclosure.md)): `published` is never before `disclosure.maintainer_notified`,
+and is at least 45 days after it unless `status` is `fixed` and the maintainer agreed to earlier
+publication. The example [examples/BVR-0000-00000.json](examples/BVR-0000-00000.json) describes the
+example grader in this repository; year `0000` marks an example.
+
 ## Identifiers
 
 Every artefact has a permanent identifier, following conventions the security field already

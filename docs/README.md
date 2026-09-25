@@ -16,6 +16,7 @@ says why.
 | see what a change did to the tests, beside what its commits claim | `bohrin verify`, described in [SPEC.md](SPEC.md#bohrin-verify) | reference |
 | find out whether an evaluation is big enough, or scored correctly | `bohrin power FILE`, described in [SPEC.md](SPEC.md#bohrin-power) | reference |
 | prove a grader-checking tool flags every known defect and no correct grader | the fixtures in [conformance/](../conformance/README.md) and `bohrin conformance check`, described in [SPEC.md](SPEC.md#conformance) | reference |
+| know how a defect becomes a public record, and when a maintainer hears first | [disclosure.md](disclosure.md), and the record format in [SPEC.md](SPEC.md#registry-records) | explanation |
 | know the exact rules behind a number | [SPEC.md](SPEC.md) | reference |
 | look up a weakness class | [WEAKNESSES.md](WEAKNESSES.md) (generated from `src/bohrin/spec/weaknesses.toml`) | reference |
 | see what a reproduction script looks like, and run one | [examples/reproduce_BF-GZW6R2M9CJ.py](examples/reproduce_BF-GZW6R2M9CJ.py), described in [SPEC.md](SPEC.md#reproduction-scripts) | reference |

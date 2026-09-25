@@ -30,6 +30,16 @@ All notable changes to this project are documented here. The format follows
   Each has a manifest (`bohrin/oracle@1`, `…/comment-free-oracle@1`, `…/reformatted-oracle@1`,
   `…/renamed-oracle@1`). A differential test runs every emitted control beside its original on a
   corpus built to break naive renaming, and demands identical results.
+- **The registry record format and the notification policy** (`bohrin.registry`,
+  `docs/disclosure.md`). A record is the public, citable form of a defect in a coding grader
+  (`BVR-<year>-<number>`), with OSV's field names where they fit (ranges and events, reference and
+  credit types, timestamps) and what a stranger needs to check it: the weakness, the probe, the
+  finding IDs, the submission as a digest (defined exactly as in the finding record), what the
+  grader paid, the ground and the reproduction script. It names an artefact, never a person. The
+  reader enforces the policy: a record published before the maintainer was told, or less than 45
+  days after (CERT/CC's default), is refused unless the defect is fixed and the maintainer agreed.
+  The schema and the reader agree on every single-field breakage. The example record describes
+  the example grader in this repository.
 - **The BCL-1 conformance suite, and `bohrin conformance check`.** A way to prove a
   grader-checking tool is sound: 14 fixture graders in `conformance/bcl-1/`, a correct one and one
   with exactly that defect for each of seven weaknesses (BGW-101, 104, 120, 123, 124, 126, 127),
