@@ -76,8 +76,8 @@ def add(a: int, b: int) -> int:
 
 ```
 
-Each keeps the signature and does no work: one returns a constant of the declared type, one does
-nothing, one refuses to run. Their wrongness is *structural*: it holds by construction, without
+Each keeps the signature and does no work: one returns a constant, one does
+nothing, one returns a spoofed object, one refuses to run, and one exits early. Their wrongness is *structural*: it holds by construction, without
 asking any grader.
 
 ## 4. Run two graders on it
@@ -100,7 +100,8 @@ def checks_it(submission):
     namespace = {}
     try:
         exec(submission, namespace)
-        return namespace["add"](2, 3) == 5 and namespace["add"](-1, 1) == 0
+        r1, r2 = namespace["add"](2, 3), namespace["add"](-1, 1)
+        return type(r1) is int and r1 == 5 and type(r2) is int and r2 == 0
     except BaseException:
         return False
 
@@ -111,11 +112,11 @@ for grader in (runs_it, checks_it):
 
 ```text
 runs_it [True, True, True, False, False]
-checks_it [False, False, True, False, False]
+checks_it [False, False, False, False, False]
 ```
 
-`runs_it` paid for the constant and for the empty body; only the one that raises made it fail.
-`checks_it` refused all three.
+`runs_it` paid for the constant, the empty body, and the spoof; only the ones that raise or exit made it fail.
+`checks_it` refused all five. Notice how `checks_it` verifies the exact type: a grader that uses `==` without checking types is fooled by equality spoofing.
 
 > Never `exec` untrusted code outside a sandbox. It is safe here only because every submission
 > comes from your own reference.
@@ -134,7 +135,7 @@ for grader in (runs_it, checks_it):
 
 ```text
 COVERAGE SCORE: 0 / 100   95% CI 0–79   0 of 1 caught   categories: 1 of 5 (battery 2)
-COVERAGE SCORE: 0 / 100   95% CI 0–79   0 of 1 caught   categories: 1 of 5 (battery 2)
+COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
 ```
 
 Read the whole line, not just the number:
@@ -206,7 +207,7 @@ for grader in (checks_it, matches_reference):
 ```text
 checks_it
 program: 1 task scored
-  COVERAGE SCORE: 0 / 100   95% CI 0–79   0 of 1 caught   categories: 1 of 5 (battery 2)
+  COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
   CORRECT-WORK ACCEPTANCE: 100 / 100   95% CI 34–100   2 of 2 accepted   relations: 2
   not run: 13 applicable weakness classes: BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
 matches_reference

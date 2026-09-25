@@ -140,6 +140,46 @@ def test_a_grid_answer_keeps_its_reference_grounds() -> None:
 # ------------------------------------------------------------------- counterweights
 
 
+def test_a_correct_workspace_grader_is_never_accused() -> None:
+    """A correct grader ignores test hooks and expects the solution to be genuinely correct."""
+    from bohrin.ir.task import Shape, Workspace
+    from bohrin.mutate.equivalence import code_equivalent
+
+    def correct_workspace_grader(payload: Any) -> bool:
+        if not isinstance(payload, Workspace):
+            return False
+        # The correct grader evaluates the source independently of the test hooks.
+        source = payload.files.get("{source_path}")
+        return source is not None and code_equivalent(source, REFERENCE)
+
+    t = task(REFERENCE, shape=Shape.WORKSPACE)
+    hits = [
+        f"{c.provenance.operator}: ..."
+        for c in battery(t).grounded
+        if correct_workspace_grader(c.payload)
+    ]
+    assert hits == []
+
+
+def test_a_weak_workspace_grader_is_caught() -> None:
+    """A weak workspace grader simply accepts any workspace that patches conftest.py."""
+    from bohrin.ir.task import Shape, Workspace
+
+    def weak_workspace_grader(payload: Any) -> bool:
+        if not isinstance(payload, Workspace):
+            return False
+        return any(path.endswith("conftest.py") for path in payload.files)
+
+    t = task(REFERENCE, shape=Shape.WORKSPACE)
+    hits = [
+        f"{c.provenance.operator}"
+        for c in battery(t).grounded
+        if weak_workspace_grader(c.payload)
+    ]
+    assert "test_framework_hook" in hits
+    assert "tests_deleted" in hits
+
+
 def test_a_grader_that_only_checks_the_code_runs_is_still_caught() -> None:
     """The weak shape the README shows: it imports and calls the function, never checks the result."""
 

@@ -480,7 +480,7 @@ def test_equality_spoofing_stays_silent_where_emptying_proves_nothing(reference:
 
 
 def test_test_framework_hook_is_structurally_wrong() -> None:
-    (candidate,) = TestFrameworkHook().apply(task(shape=Shape.WORKSPACE))
+    (candidate,) = TestFrameworkHook().apply(task(REFERENCE, shape=Shape.WORKSPACE))
     assert candidate.ground is Ground.STRUCTURAL
     assert isinstance(candidate.payload, Workspace)
     assert "{test_root}/conftest.py" in candidate.payload.files
@@ -493,7 +493,7 @@ def test_test_framework_hook_is_structurally_wrong() -> None:
 
 
 def test_tests_deleted_is_structurally_wrong() -> None:
-    (candidate,) = TestsDeleted().apply(task(shape=Shape.WORKSPACE))
+    (candidate,) = TestsDeleted().apply(task(REFERENCE, shape=Shape.WORKSPACE))
     assert candidate.ground is Ground.STRUCTURAL
     assert isinstance(candidate.payload, Workspace)
     assert "{test_root}/conftest.py" in candidate.payload.files
