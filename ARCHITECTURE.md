@@ -78,9 +78,17 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
   means, which a test holds to the rules the code emits and to docs/SPEC.md.
 - **`action.yml`** (repository root): the GitHub Action that runs `bohrin verify` on a pull request
   and uploads the SARIF. Inputs reach its shell only through environment variables.
-- **`cli.py`**: the `bohrin` command (also `python -m bohrin`), with the exit codes every verb
+- **`cli.py`**: the `bohrin` command (also `python -m bohrin`). It builds its command list from the
+  `bohrin.commands` entry-point group, where `power`, `verify` and `conformance` register exactly
+  as a plugin's command would; `command.py` is the `Command` base and the exit codes every command
   shares.
-- **`_plugins.py`**: entry-point discovery, shared by operators and relations.
+- **`api.py`**: the seam. The one module a plugin or an extension imports; it re-exports the stable
+  types and functions and declares `PLUGIN_API = 1`, which changes only when the seam breaks. A
+  test freezes the names of version 1.
+- **`_plugins.py`**: entry-point discovery for every group (`bohrin.mutators`, `bohrin.relations`,
+  `bohrin.commands`, `bohrin.adapters`, `bohrin.probes`, `bohrin.renderers`). A plugin that fails
+  to load or was written for another `PLUGIN_API` is skipped with a warning, and a name belongs to
+  its first owner, this package first, so no installed package can silently replace a built-in.
 
 `tests/` mirrors the package. `tests/_fixtures.py` holds graders with known behaviour, correct and
 weak; most tests are "no correct grader is accused, and a weak one is still caught".

@@ -24,14 +24,14 @@ from pathlib import Path
 from typing import NoReturn
 
 from bohrin import conformance
+from bohrin._plugins import COMMANDS, load_plugin_classes
+from bohrin.command import CANNOT_RUN, CLEAN, FINDINGS, USAGE, Command
 from bohrin.history import verify as history
 from bohrin.history.git import GitError
 from bohrin.report.sarif import to_sarif
 from bohrin.stats.power import analyse, render
 from bohrin.stats.results import read_results
 from bohrin.version import __version__
-
-CLEAN, FINDINGS, CANNOT_RUN, USAGE = 0, 1, 2, 64
 
 
 class _Parser(argparse.ArgumentParser):
@@ -50,7 +50,20 @@ def _fraction(text: str) -> float:
     return value
 
 
-def _parser() -> _Parser:
+def _commands() -> list[Command]:
+    """Every registered command: this package's in its fixed order, then others by name."""
+    found = {name: cls for name, cls in load_plugin_classes(COMMANDS).items() if issubclass(cls, Command)}
+    order = [*(n for n in _BUILTIN_ORDER if n in found), *sorted(set(found) - set(_BUILTIN_ORDER))]
+    commands = []
+    for name in order:
+        command = found[name]()
+        if not command.name:
+            command.name = name
+        commands.append(command)
+    return commands
+
+
+def _parser(commands: Sequence[Command]) -> _Parser:
     parser = _Parser(
         prog="bohrin",
         description="Check the checker: find where a grader pays for work that was not done.",
@@ -58,75 +71,120 @@ def _parser() -> _Parser:
     )
     parser.add_argument("--version", action="version", version=f"bohrin {__version__}")
     verbs = parser.add_subparsers(dest="verb", metavar="COMMAND")
-    power = verbs.add_parser(
-        "power",
-        help="check whether an evaluation is big enough to support what it is used to claim",
-        description=(
-            "Read a JSON Lines results file (task_id, model, score; optionally max_score, cluster, sample) and "
-            "report each model's score with its interval, the smallest difference the evaluation can detect, "
-            "paired comparisons between models, and an audit of how the scores were aggregated."
-        ),
-    )
-    power.add_argument("file", type=Path, help="the results file, one JSON object per line")
-    power.add_argument(
-        "--min-difference",
-        type=_fraction,
-        metavar="FRACTION",
-        help="the smallest difference you need to detect, such as 0.02; without it, size is reported but not judged",
-    )
-    power.add_argument("--json", action="store_true", help="print only the JSON report")
-    check = verbs.add_parser(
-        "verify",
-        help="report what a change did to the tests and the code, beside what its commits claim",
-        description=(
-            "Compare the files at a commit with the working tree, uncommitted work included, and report facts read "
-            "from syntax trees: tests deleted or weakened, checks removed, skips added, tolerances loosened, test "
-            "hooks planted, functions replaced by stubs. Facts alone exit 0; facts beside a commit message that "
-            "claims success exit 1. Needs no account and makes no network call."
-        ),
-    )
-    check.add_argument(
-        "--since",
-        metavar="REF",
-        help="the commit to compare from, such as HEAD~1 or main (default: where this branch started)",
-    )
-    check.add_argument("--strict", action="store_true", help="exit 1 on any fact, for CI")
-    check.add_argument("--json", action="store_true", help="print only the JSON report")
-    check.add_argument(
-        "--sarif",
-        type=Path,
-        metavar="FILE",
-        help="also write the facts as SARIF 2.1.0 to FILE, for code-scanning annotations on a pull request",
-    )
-    check.add_argument("path", nargs="?", type=Path, default=Path("."), help="a path inside the repository")
-
+    for command in commands:
+        sub = verbs.add_parser(
+            command.name,
+            help=argparse.SUPPRESS if command.rare else command.help,
+            description=command.description or command.help,
+        )
+        command.configure(sub)
+        sub.set_defaults(command=command)
     more = verbs.add_parser("help", help="show the rarely used commands: bohrin help more")
     more.add_argument("topic", nargs="?", choices=["more"], help="more: the rarely used commands")
-
-    conformance = verbs.add_parser(
-        "conformance",
-        help=argparse.SUPPRESS,
-        description=(
-            "Check a checking tool's results on the conformance suite's fixture graders, and print the level it "
-            "achieves. The tool must flag every grader with a defect, with that defect's ID, and no correct grader. "
-            "Runs no grader: it compares the results file with the suite's expected results."
-        ),
-    )
     # argparse lists a subcommand even with help=SUPPRESS; rare commands are listed by `help more` only.
-    verbs._choices_actions = [a for a in verbs._choices_actions if a.dest != "conformance"]
-    actions = conformance.add_subparsers(dest="action", metavar="ACTION", required=True)
-    conformance_check = actions.add_parser("check", help="check a results file and print the level achieved")
-    conformance_check.add_argument("file", type=Path, help="the tool's results, a conformance-results/v1 JSON file")
-    conformance_check.add_argument("--json", action="store_true", help="print only the JSON report")
+    rare = {command.name for command in commands if command.rare}
+    verbs._choices_actions = [a for a in verbs._choices_actions if a.dest not in rare]
     return parser
 
 
-#: The rarely used commands, shown by ``bohrin help more``.
-MORE = """Rarely used commands:
+def _more(commands: Sequence[Command]) -> str:
+    """The text of ``bohrin help more``: every rare command and what it does."""
+    rare = [command for command in commands if command.rare]
+    if not rare:
+        return "There are no rarely used commands in this installation.\n"
+    lines = ["Rarely used commands:", ""]
+    lines += [f"  bohrin {command.usage or command.name:<28} {command.help}" for command in rare]
+    return "\n".join(lines) + "\n"
 
-  bohrin conformance check FILE   check a checking tool's results on the conformance suite, and print
-                                  the level it achieves (BCL-1)
-"""
+
+class PowerCommand(Command):
+    """``bohrin power``: is an evaluation big enough, and were its scores aggregated honestly?"""
+
+    name = "power"
+    help = "check whether an evaluation is big enough to support what it is used to claim"
+    description = (
+        "Read a JSON Lines results file (task_id, model, score; optionally max_score, cluster, sample) and "
+        "report each model's score with its interval, the smallest difference the evaluation can detect, "
+        "paired comparisons between models, and an audit of how the scores were aggregated."
+    )
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """The results file, the difference that matters, and JSON output."""
+        parser.add_argument("file", type=Path, help="the results file, one JSON object per line")
+        parser.add_argument(
+            "--min-difference",
+            type=_fraction,
+            metavar="FRACTION",
+            help="the smallest difference you need to detect, such as 0.02; without it, size is reported, not judged",
+        )
+        parser.add_argument("--json", action="store_true", help="print only the JSON report")
+
+    def run(self, args: argparse.Namespace) -> int:
+        """Analyse the file and print the report."""
+        return _power(args)
+
+
+class VerifyCommand(Command):
+    """``bohrin verify``: what a change did to the tests and the code, beside what its commits claim."""
+
+    name = "verify"
+    help = "report what a change did to the tests and the code, beside what its commits claim"
+    description = (
+        "Compare the files at a commit with the working tree, uncommitted work included, and report facts read "
+        "from syntax trees: tests deleted or weakened, checks removed, skips added, tolerances loosened, test "
+        "hooks planted, functions replaced by stubs. Facts alone exit 0; facts beside a commit message that "
+        "claims success exit 1. Needs no account and makes no network call."
+    )
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """Where to compare from, how strict to be, and the output formats."""
+        parser.add_argument(
+            "--since",
+            metavar="REF",
+            help="the commit to compare from, such as HEAD~1 or main (default: where this branch started)",
+        )
+        parser.add_argument("--strict", action="store_true", help="exit 1 on any fact, for CI")
+        parser.add_argument("--json", action="store_true", help="print only the JSON report")
+        parser.add_argument(
+            "--sarif",
+            type=Path,
+            metavar="FILE",
+            help="also write the facts as SARIF 2.1.0 to FILE, for code-scanning annotations on a pull request",
+        )
+        parser.add_argument("path", nargs="?", type=Path, default=Path("."), help="a path inside the repository")
+
+    def run(self, args: argparse.Namespace) -> int:
+        """Read the history and print the facts."""
+        return _verify(args)
+
+
+class ConformanceCommand(Command):
+    """``bohrin conformance check``: the level a grader-checking tool's results achieve."""
+
+    name = "conformance"
+    help = "check a checking tool's results on the conformance suite, and print the level it achieves"
+    description = (
+        "Check a checking tool's results on the conformance suite's fixture graders, and print the level it "
+        "achieves. The tool must flag every grader with a defect, with that defect's ID, and no correct grader. "
+        "Runs no grader: it compares the results file with the suite's expected results."
+    )
+    rare = True
+    usage = "conformance check FILE"
+
+    def configure(self, parser: argparse.ArgumentParser) -> None:
+        """One action for now: check."""
+        actions = parser.add_subparsers(dest="action", metavar="ACTION", required=True)
+        check = actions.add_parser("check", help="check a results file and print the level achieved")
+        check.add_argument("file", type=Path, help="the tool's results, a conformance-results/v1 JSON file")
+        check.add_argument("--json", action="store_true", help="print only the JSON report")
+
+    def run(self, args: argparse.Namespace) -> int:
+        """Compare the results with the suite."""
+        return _conformance(args)
+
+
+#: This package's commands, in the order the command list shows them.
+_BUILTIN_ORDER = ("power", "verify", "conformance")
 
 
 def _power(args: argparse.Namespace) -> int:
@@ -205,17 +263,15 @@ def _conformance(args: argparse.Namespace) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run ``bohrin`` with ``argv`` (default: the process's arguments) and return its exit code."""
-    parser = _parser()
+    commands = _commands()
+    parser = _parser(commands)
     args = parser.parse_args(argv)
-    if args.verb == "power":
-        return _power(args)
-    if args.verb == "verify":
-        return _verify(args)
-    if args.verb == "conformance":
-        return _conformance(args)
+    command: Command | None = getattr(args, "command", None)
+    if command is not None:
+        return command.run(args)
     if args.verb == "help":
         if args.topic == "more":
-            print(MORE, end="")
+            print(_more(commands), end="")
             return CLEAN
         parser.print_help()
         return CLEAN
@@ -228,4 +284,14 @@ def run() -> NoReturn:
     sys.exit(main())
 
 
-__all__ = ["CANNOT_RUN", "CLEAN", "FINDINGS", "USAGE", "main", "run"]
+__all__ = [
+    "CANNOT_RUN",
+    "CLEAN",
+    "FINDINGS",
+    "USAGE",
+    "ConformanceCommand",
+    "PowerCommand",
+    "VerifyCommand",
+    "main",
+    "run",
+]

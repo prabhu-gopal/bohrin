@@ -30,6 +30,17 @@ All notable changes to this project are documented here. The format follows
   Each has a manifest (`bohrin/oracle@1`, `…/comment-free-oracle@1`, `…/reformatted-oracle@1`,
   `…/renamed-oracle@1`). A differential test runs every emitted control beside its original on a
   corpus built to break naive renaming, and demands identical results.
+- **`bohrin.api`, the plugin seam**, with `PLUGIN_API = 1`: the one module a plugin or extension
+  imports, re-exporting the stable types and functions; a test freezes the names of version 1, so
+  one cannot be removed without changing the version. Four more entry-point groups:
+  `bohrin.commands` (subcommands; `power`, `verify` and `conformance` now register there exactly as
+  a plugin's command would), and `bohrin.adapters`, `bohrin.probes` and `bohrin.renderers`, reserved
+  for extensions. Plugin discovery now keeps a name for its first owner, this package first, so no
+  installed package can replace a built-in such as `verify`, and skips a plugin written for another
+  `PLUGIN_API`, each with a warning.
+- **Every test runs with the network blocked** (Internet sockets and name lookups raise; local
+  Unix sockets stay allowed for event loops), and a test checks the suite ran with only this
+  package's plugins attached.
 - **The error-rate method** (`bohrin.stats.error_rate`, "Error rates" in `docs/SPEC.md`), open so
   anyone can apply it to any tool. Precision: false accusations per 1,000 proven findings, per
   battery, overall and per probe, with a Wilson interval (none in 40 reads "0–88 per 1,000",
