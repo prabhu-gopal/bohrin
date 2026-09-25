@@ -27,7 +27,9 @@ from bohrin.conformance import read_results as read_conformance_results
 from bohrin.decisions import read_decisions
 from bohrin.evidence.finding import Finding
 from bohrin.history.facts import facts
+from bohrin.ir.task import Task
 from bohrin.registry import read_record
+from bohrin.relations import positive_controls
 from bohrin.stats.error_rate import read_outcome, read_planted
 from bohrin.stats.results import read_row
 
@@ -58,6 +60,8 @@ def check(data: bytes) -> None:
                 reader(parsed)
     with contextlib.suppress(*REFUSALS):
         read_decisions(text)
+    # A reference solution, from an environment someone else wrote: its positive controls.
+    positive_controls(Task(id="fuzz", prompt="", reference=text))
     # A test file changed into arbitrary text: facts must report, or list it as not checked.
     facts({"tests/test_fuzz.py": "def test_a():\n    assert f(1) == 1\n"}, {"tests/test_fuzz.py": text})
 

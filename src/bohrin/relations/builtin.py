@@ -36,6 +36,11 @@ class Reformatted(Relation):
         return rewritten
 
 
+#: A source with a longer line is not tokenized (see :meth:`CommentFree.render`). No program a
+#: reference solution is written as comes near it.
+MAX_LINE = 10_000
+
+
 class CommentFree(Relation):
     """The program with its comments removed and its layout otherwise kept."""
 
@@ -43,7 +48,19 @@ class CommentFree(Relation):
     certification = "comments are not part of the syntax tree, and the tree is unchanged"
 
     def render(self, answer: str) -> str | None:
-        """The program without ``#`` comments, or ``None`` if it has none or does not tokenize."""
+        """The program without ``#`` comments, or ``None`` if it has none or does not tokenize.
+
+        Three checks run before the tokenizer, because on Python 3.12.0 to 3.12.3 it can take
+        gigabytes on one very long line (CPython issue #119118, seen at 15 GB in seconds): no
+        ``#`` means no comment to remove; the program must parse, which refuses deep nesting
+        cheaply; and no line may be longer than :data:`MAX_LINE`.
+        """
+        if "#" not in answer or any(len(line) > MAX_LINE for line in answer.splitlines()):
+            return None
+        try:
+            ast.parse(answer)
+        except (SyntaxError, ValueError, RecursionError, MemoryError):
+            return None
         try:
             tokens = list(tokenize.generate_tokens(io.StringIO(answer).readline))
         except (tokenize.TokenError, SyntaxError, IndentationError):

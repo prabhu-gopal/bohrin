@@ -232,6 +232,11 @@ All notable changes to this project are documented here. The format follows
   `verify` stop with `MemoryError`, and one about 1,500 levels deep parsed but then exhausted
   recursion while being compared. All are now refused with a message (exit code 2), and `verify`
   lists such a file as not checked. Every file Bohrin reads may come from someone else.
+- **Removing comments from a reference no longer risks gigabytes of memory.** On Python 3.12.0 to
+  3.12.3 (Ubuntu 24.04 ships 3.12.3) the standard tokenizer takes gigabytes on one very long line
+  (CPython issue #119118); a hostile reference reached it through the comment-free positive control
+  and took 15 GB in seven seconds on a CI machine. The rewriting now tokenizes only a program that
+  has a `#`, parses, and has no line over 10,000 characters.
 - **A number too large for a float no longer crashes a reader.** JSON allows any number of
   digits, and a results line with a 400-digit score made `bohrin power` stop with a traceback
   (`OverflowError`) instead of refusing the line; the same reader serves rewards in finding and

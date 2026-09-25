@@ -89,3 +89,33 @@ def test_an_ordinary_file_is_nowhere_near_the_depth_limit() -> None:
 def test_positive_controls_skip_a_reference_too_deep_to_parse() -> None:
     reference = "def f(x):\n    return " + "-" * 200_000 + "x\n"
     assert [c.relation for c in positive_controls(Task(id="t", prompt="", reference=reference))] == ["oracle"]
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "def f(x):\n    return " + "-" * 200_000 + "x  # deep\n",
+        "def f(x):\n    # a comment\n    return " + " + ".join(["x"] * 20_000) + "\n",
+    ],
+    ids=["deep, with a comment", "a 100,000-character line, with a comment"],
+)
+def test_comment_removal_never_hands_the_tokenizer_a_pathological_line(reference: str) -> None:
+    """Python 3.12.0-3.12.3's tokenizer takes gigabytes on one very long line (CPython #119118).
+
+    Either input reached it before: on Ubuntu's Python 3.12.3 the first took 15 GB in seven seconds
+    and stopped the machine. Now neither is tokenized, and the reference gets no comment-free control.
+    """
+    import tokenize
+    from unittest import mock
+
+    # Record calls rather than raise: the catalogue swallows a relation's exception by design.
+    with mock.patch.object(tokenize, "generate_tokens", wraps=tokenize.generate_tokens) as spy:
+        relations = [c.relation for c in positive_controls(Task(id="t", prompt="", reference=reference))]
+    assert spy.call_count == 0, "the tokenizer was handed the pathological input"
+    assert "comment_free" not in relations
+
+
+def test_an_ordinary_commented_reference_still_loses_its_comments() -> None:
+    reference = "def f(x):\n    # doubles it\n    return x * 2\n"
+    controls = {c.relation: c.payload.text for c in positive_controls(Task(id="t", prompt="", reference=reference))}
+    assert "comment_free" in controls and "#" not in controls["comment_free"]
