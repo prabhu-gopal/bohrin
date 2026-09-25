@@ -104,6 +104,8 @@ jobs:
           print(f'{len(probes())} probe manifests')
           from bohrin.evidence import SCHEMA, finding_schema
           assert finding_schema()['\$id'] == SCHEMA, 'the finding schema did not ship'
+          from bohrin.conformance import suite
+          assert len(suite().fixtures) == 14 and suite().level == 'BCL-1', 'the conformance suite index did not ship'
           print('finding schema', SCHEMA)
           from bohrin.evidence.reproduction import RESULT_SCHEMA, reproduction_result_schema
           assert reproduction_result_schema()['\$id'] == RESULT_SCHEMA, 'the reproduction schema did not ship'

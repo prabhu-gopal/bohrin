@@ -1,0 +1,117 @@
+# The BCL-1 conformance suite: its fixtures and the result each one must get.
+#
+# Every fixture is a grader, written by Bohrin, in conformance/bcl-1/ of the repository (and the
+# source distribution). Each weakness has a pair: a grader without the defect, and one with exactly
+# that defect. A checking tool must flag every grader with a defect, with that defect's ID, and must
+# flag no correct grader. `bohrin conformance check` compares a tool's results with this file; it
+# runs no grader itself.
+#
+# The rules for this file are in docs/SPEC.md ("Conformance") and are enforced by
+# tests/test_conformance.py.
+
+[suite]
+level = "BCL-1"
+version = 1
+shapes = ["program", "io"]
+# Every weakness the level covers, in ID order.
+weaknesses = ["BGW-101", "BGW-102", "BGW-103", "BGW-104", "BGW-105", "BGW-120", "BGW-123", "BGW-124", "BGW-126", "BGW-127"]
+# Weaknesses of the level with no fixture yet. A level is achieved over the others, and says so.
+pending = ["BGW-102", "BGW-103", "BGW-105"]
+
+[[fixture]]
+id = "bcl-1/trivial-implementation/correct"
+file = "trivial-implementation-correct.py"
+weakness = "BGW-101"
+shape = "program"
+defect = false
+
+[[fixture]]
+id = "bcl-1/trivial-implementation/defect"
+file = "trivial-implementation-defect.py"
+weakness = "BGW-101"
+shape = "program"
+defect = true
+
+[[fixture]]
+id = "bcl-1/hard-coded-outputs/correct"
+file = "hard-coded-outputs-correct.py"
+weakness = "BGW-104"
+shape = "program"
+defect = false
+
+[[fixture]]
+id = "bcl-1/hard-coded-outputs/defect"
+file = "hard-coded-outputs-defect.py"
+weakness = "BGW-104"
+shape = "program"
+defect = true
+
+[[fixture]]
+id = "bcl-1/tests-too-narrow/correct"
+file = "tests-too-narrow-correct.py"
+weakness = "BGW-120"
+shape = "program"
+defect = false
+
+[[fixture]]
+id = "bcl-1/tests-too-narrow/defect"
+file = "tests-too-narrow-defect.py"
+weakness = "BGW-120"
+shape = "program"
+defect = true
+
+[[fixture]]
+id = "bcl-1/lenient-checker/correct"
+file = "lenient-checker-correct.py"
+weakness = "BGW-123"
+shape = "io"
+defect = false
+
+[[fixture]]
+id = "bcl-1/lenient-checker/defect"
+file = "lenient-checker-defect.py"
+weakness = "BGW-123"
+shape = "io"
+defect = true
+
+[[fixture]]
+id = "bcl-1/reference-wrong/correct"
+file = "reference-wrong-correct.py"
+weakness = "BGW-124"
+shape = "program"
+defect = false
+
+[[fixture]]
+id = "bcl-1/reference-wrong/defect"
+file = "reference-wrong-defect.py"
+weakness = "BGW-124"
+shape = "program"
+defect = true
+
+[[fixture]]
+id = "bcl-1/failure-scored-as-success/correct"
+file = "failure-scored-as-success-correct.py"
+weakness = "BGW-126"
+shape = "program"
+defect = false
+
+[[fixture]]
+id = "bcl-1/failure-scored-as-success/defect"
+file = "failure-scored-as-success-defect.py"
+weakness = "BGW-126"
+shape = "program"
+defect = true
+
+[[fixture]]
+id = "bcl-1/nondeterministic-grader/correct"
+file = "nondeterministic-grader-correct.py"
+weakness = "BGW-127"
+shape = "program"
+defect = false
+
+[[fixture]]
+id = "bcl-1/nondeterministic-grader/defect"
+file = "nondeterministic-grader-defect.py"
+weakness = "BGW-127"
+shape = "program"
+defect = true

@@ -47,6 +47,10 @@ Task ──► operators ──► battery rules ──► Candidates ──► 
 - **`scoring/`**: `coverage.py` (the Coverage Score, `BATTERY_VERSION`, `CATEGORIES`),
   `scorecard.py` (correct-work acceptance beside it, per grader shape then overall, with the tasks
   left out and why), `gap.py` (the Verification Gap), `interval.py` (Wilson intervals).
+- **`conformance/`**: the conformance suite's expected results (`bcl-1.toml`), the results format
+  (`conformance-results.v1.json`) and `check()`, which compares a tool's results with them. The
+  fixture graders themselves live outside the package, in `conformance/` at the repository root:
+  they run submissions, and the library never does.
 - **`spec/`**: the standard as data.
   - `weaknesses.toml` and `weaknesses.py`: the weakness list and its loader.
   - `probes.toml` and `probes.py`: the probe manifests and their loader.

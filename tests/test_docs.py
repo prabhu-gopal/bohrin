@@ -53,7 +53,7 @@ def test_every_example_prints_what_the_page_shows(page: str) -> None:
 
 
 def _pages() -> list[Path]:
-    return sorted([*ROOT.glob("*.md"), *DOCS.rglob("*.md")])
+    return sorted([*ROOT.glob("*.md"), *DOCS.rglob("*.md"), *(ROOT / "conformance").glob("*.md")])
 
 
 def _anchors(page: Path) -> set[str]:
