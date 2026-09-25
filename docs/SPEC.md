@@ -521,6 +521,42 @@ and is at least 45 days after it unless `status` is `fixed` and the maintainer a
 publication. The example [examples/BVR-0000-00000.json](examples/BVR-0000-00000.json) describes the
 example grader in this repository; year `0000` marks an example.
 
+## Error rates
+
+A tool that accuses graders publishes how often it is wrong, and how much it misses, by a method
+anyone can apply to any tool (`bohrin.stats.error_rate`). It reads what a tool reported and what
+became of it; it runs nothing.
+
+**Precision: false accusations per 1,000 proven findings.** One line per reported finding in the
+`https://bohrin.com/schema/finding-outcome/v1` format: its `finding` ID, `probe`, `battery`,
+`level`, `outcome` and whether a user `dismissed` it.
+
+| Outcome | Counted |
+|---|---|
+| `stands` | resolved, correct |
+| `withdrawn-after-dispute` | resolved, a false accusation |
+| `contradicted-by-fixture` | resolved, a false accusation: a correct conformance fixture was flagged |
+| `disputed` | neither way until resolved; reported |
+
+- Per battery, overall and per probe, with a Wilson 95% interval. No false accusation in 40
+  findings reads "0 per 1,000 (95% CI 0–88)", never "never wrong".
+- Only `proven` findings enter the headline; `proven-experimental` ones are reported apart.
+- The **dismissal rate** per probe (findings a user dismissed without disputing, of those
+  reported) is printed beside it. It is not an error, but a signal: Google counts a result
+  developers do not act on as an "effective false positive".
+
+**Recall on planted weaknesses.** One line per known, planted weakness in a corpus, in the
+`https://bohrin.com/schema/recall-row/v1` format, with three stages modelled on Magma's reached,
+triggered and detected ([Hazimeh, Herrera and Payer, 2020](https://arxiv.org/abs/2009.01120)):
+**tried** (a probe for the weakness was submitted), **accepted** (the grader paid, so the defect was
+exercised) and **proven** (a finding with a reproduction). Each implies the one before, and each is
+reported per weakness class as a share of the planted instances, with its interval.
+
+**Errata.** A mistake found in a released part of the standard (the weakness list, the battery,
+the conformance fixtures, a published format) is recorded in [ERRATA.md](../ERRATA.md) with what it
+affects and what a result produced with it means now, the way LiveCodeBench keeps a public errata
+list for its benchmark.
+
 ## Identifiers
 
 Every artefact has a permanent identifier, following conventions the security field already

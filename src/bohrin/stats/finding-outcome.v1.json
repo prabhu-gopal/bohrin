@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bohrin.com/schema/finding-outcome/v1",
+  "title": "Bohrin finding outcome",
+  "description": "One line of a JSON Lines file: what became of one reported finding. The error-rate method counts false accusations per 1,000 proven findings from these lines.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["finding", "probe", "battery", "level", "outcome", "dismissed"],
+  "properties": {
+    "finding": {"type": "string", "pattern": "^BF-[0-9A-HJKMNP-TV-Z]{10}$"},
+    "probe": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*@[1-9][0-9]*$"},
+    "battery": {"type": "integer", "minimum": 1},
+    "level": {"description": "Only proven findings are counted; experimental ones are reported apart.", "enum": ["proven", "proven-experimental"]},
+    "outcome": {
+      "description": "stands: not overturned. disputed: a dispute is open, so it counts neither way yet. withdrawn-after-dispute and contradicted-by-fixture are false accusations.",
+      "enum": ["stands", "disputed", "withdrawn-after-dispute", "contradicted-by-fixture"]
+    },
+    "dismissed": {"description": "A user dismissed it (bohrin ignore) without disputing it.", "type": "boolean"}
+  }
+}

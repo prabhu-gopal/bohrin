@@ -30,6 +30,16 @@ All notable changes to this project are documented here. The format follows
   Each has a manifest (`bohrin/oracle@1`, `…/comment-free-oracle@1`, `…/reformatted-oracle@1`,
   `…/renamed-oracle@1`). A differential test runs every emitted control beside its original on a
   corpus built to break naive renaming, and demands identical results.
+- **The error-rate method** (`bohrin.stats.error_rate`, "Error rates" in `docs/SPEC.md`), open so
+  anyone can apply it to any tool. Precision: false accusations per 1,000 proven findings, per
+  battery, overall and per probe, with a Wilson interval (none in 40 reads "0–88 per 1,000",
+  never "never wrong"); a false accusation is a finding withdrawn after a dispute or contradicted
+  by a correct conformance fixture; an open dispute counts neither way; experimental findings are
+  reported apart; the dismissal rate is printed beside it. Recall: per weakness class, the share
+  of planted instances tried, accepted and proven, modelled on Magma's reached, triggered and
+  detected. Two new line formats, `finding-outcome/v1` and `recall-row/v1`, each agreeing with its
+  schema on every single-field breakage. And `ERRATA.md`, where a mistake in a released part of
+  the standard is recorded with what it affects.
 - **The registry record format and the notification policy** (`bohrin.registry`,
   `docs/disclosure.md`). A record is the public, citable form of a defect in a coding grader
   (`BVR-<year>-<number>`), with OSV's field names where they fit (ranges and events, reference and
