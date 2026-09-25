@@ -1,0 +1,1 @@
+{"$schema": "https://bohrin.com/schema/conformance-results/v1", "suite": {"level": "BCL-1", "version": 1}, "tool": {"name": "t", "version": "1"}, "results": [{"fixture": "bcl-1/lenient-checker/correct", "status": "ran", "flagged": []}]}

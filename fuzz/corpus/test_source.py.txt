@@ -1,0 +1,11 @@
+import pytest
+
+
+class TestA:
+    def test_x(self):
+        self.assertEqual(f(1), 2)
+
+
+@pytest.mark.skip
+def test_b():
+    assert f(1) is not None

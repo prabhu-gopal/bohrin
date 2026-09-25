@@ -93,7 +93,7 @@ packages = ["src/bohrin"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-  "src/", "tests/", "docs/", "conformance/", "README.md", "ARCHITECTURE.md", "CONTRIBUTING.md", "CHANGELOG.md",
+  "src/", "tests/", "docs/", "conformance/", "fuzz/", "README.md", "ARCHITECTURE.md", "CONTRIBUTING.md", "CHANGELOG.md",
   "SECURITY.md", "CODE_OF_CONDUCT.md", "CITATION.cff", "LICENSE", "NOTICE", "ERRATA.md",
 ]
 
@@ -134,7 +134,7 @@ known-first-party = ["bohrin"]
 
 [tool.mypy]
 strict = true
-files = ["src", "tests", "conformance"]
+files = ["src", "tests", "conformance", "fuzz"]
 mypy_path = "tests"
 warn_unreachable = true
 warn_redundant_casts = true

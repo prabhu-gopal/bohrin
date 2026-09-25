@@ -64,13 +64,23 @@ vulnerability.
 
 ## Verifying what you installed
 
-Releases are published from tagged CI through PyPI Trusted Publishing, with no stored API
-token, and carry [PEP 740](https://peps.python.org/pep-0740/) digital attestations. You can
-confirm a wheel was built by this repository's workflow from the tag it claims, rather than
-trusting that PyPI served it:
+Every release is built by `.github/workflows/release.yml` from a tag, never on a laptop, and
+published through PyPI Trusted Publishing, with no stored API token. Two independent checks tie a
+file to that workflow, rather than trusting the server that handed it to you:
 
-```bash
-pip install pypi-attestations
-pypi-attestations verify pypi bohrin
-```
+- **From PyPI:** each file carries a [PEP 740](https://peps.python.org/pep-0740/) attestation.
 
+  ```console
+  $ uvx pypi-attestations verify pypi --repository https://github.com/prabhu-gopal/bohrin \
+      pypi:bohrin-X.Y.Z-py3-none-any.whl
+  OK: bohrin-X.Y.Z-py3-none-any.whl
+  ```
+
+- **From the GitHub release:** each file has a `<file>.sigstore.json` bundle, signed keylessly
+  with Sigstore and recorded in its public transparency log.
+
+  ```console
+  $ uvx sigstore verify github bohrin-X.Y.Z-py3-none-any.whl \
+      --bundle bohrin-X.Y.Z-py3-none-any.whl.sigstore.json \
+      --cert-identity https://github.com/prabhu-gopal/bohrin/.github/workflows/release.yml@refs/tags/vX.Y.Z
+  ```
