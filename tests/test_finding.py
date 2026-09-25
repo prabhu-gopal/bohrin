@@ -212,6 +212,10 @@ def test_an_observation_needs_no_verdict() -> None:
         battery=2,
     )
     assert fact.verdict is None
+    record = fact.to_json()
+    assert not {"submission", "ground", "verdict", "baseline", "reproduce", "run", "fix", "reason"} & set(record)
+    assert list(Draft202012Validator(finding_schema()).iter_errors(record)) == []
+    assert Finding.from_json(record) == fact, "a record with no optional evidence round-trips"
 
 
 # --------------------------------------------------------------------------- the published schema

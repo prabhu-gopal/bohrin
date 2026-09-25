@@ -41,11 +41,19 @@ class _BodyStripper(cst.CSTTransformer):
 
 
 def _inert(statement: cst.BaseSmallStatement) -> bool:
-    """A statement that does nothing: ``pass``, ``...``, a bare string, or ``raise NotImplementedError``."""
+    """A statement that does nothing: ``pass``, ``...``, a bare string or number, a bare name, or
+    ``raise NotImplementedError``.
+
+    A bare name is inert only in the sense that matters here: evaluating it changes nothing, so a
+    function whose body is ``x`` does exactly what ``pass`` does whenever it runs at all.
+    """
     if isinstance(statement, cst.Pass):
         return True
     if isinstance(statement, cst.Expr):
-        return isinstance(statement.value, cst.Ellipsis | cst.SimpleString | cst.ConcatenatedString)
+        return isinstance(
+            statement.value,
+            cst.Ellipsis | cst.SimpleString | cst.ConcatenatedString | cst.Integer | cst.Float | cst.Name,
+        )
     if isinstance(statement, cst.Raise) and statement.exc is not None:
         raised = statement.exc.func if isinstance(statement.exc, cst.Call) else statement.exc
         return isinstance(raised, cst.Name) and raised.value == "NotImplementedError"

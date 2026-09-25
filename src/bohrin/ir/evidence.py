@@ -81,21 +81,21 @@ class Flake:
 
 @dataclass(frozen=True, slots=True)
 class GroundTruthRejected:
-    """The verifier refused every certified rendering of the taskset's own answer.
+    """The grader refused every certified rewriting of the task's own reference solution.
 
-    The rejection half of the gap. A verifier that rejects correct work trains a model away
-    from it — the gradient says the right answer was wrong — which is the same defect as
+    The rejection half of the gap. A grader that rejects correct work trains a model away
+    from it — the gradient says the right solution was wrong — which is the same defect as
     accepting wrong work with the sign reversed.
 
-    **What this does and does not establish.** It records a *search budget*: N certified
-    meaning-preserving renderings were submitted and none passed. It does not claim the
-    verifier is broken, because three different situations produce an identical result:
+    **What this does and does not establish.** It records a *search budget*: N rewritings, each
+    proved to do what the reference does, were submitted and none passed. It does not claim the
+    grader is broken, because three different situations produce an identical result:
 
-    * the comparison really is broken, and correct answers are being thrown away;
-    * the verifier enforces an **output contract the prompt documents** — a task that wants
-      the answer inside tags but stores the bare answer, so refusing the stored value is that
-      verifier working correctly;
-    * the reward **never reads the reply at all** — it scores a value set elsewhere in the
+    * the grader really is too narrow, and correct solutions are being thrown away;
+    * the grader enforces a **contract the task documents** — a required file layout, module
+      name or output format that a rewriting of the bare reference does not follow, so refusing
+      it is that grader working correctly;
+    * the reward **never reads the submission at all** — it scores state set elsewhere in the
       episode, so nothing submitted offline can ever pass and nothing was really "refused".
 
     Only the first is a defect. That is why this record carries a weight of zero and
@@ -156,13 +156,13 @@ class HarnessDisruption:
 
 @dataclass(frozen=True, slots=True)
 class AnswerInPrompt:
-    """A task's declared answer is written, verbatim, in that task's own prompt.
+    """A task's reference solution is written, verbatim, in that task's own prompt (BGW-115).
 
-    A task whose answer can be copied does not test whether the answer can be produced, and a
-    grader checking only that the answer *appears* in the reply pays full marks for the copy.
+    A task whose solution can be copied does not test whether it can be produced, and a grader
+    that only runs the submission pays full marks for the copy.
 
-    **A lead, never a verdict.** An extractive task — reading comprehension, a look-up — is
-    meant to contain its answer, and it produces exactly this record. So it carries a weight
+    **A lead, never a verdict.** Some tasks are meant to contain their solution — "apply this
+    patch", "make this code compile unchanged" — and they produce exactly this record. So it carries a weight
     of zero and ``summary`` states what was found, not what it means. ``compared_with`` is
     the size of the control group: tasks with a provably different answer whose prompts were
     checked and did *not* contain this one.

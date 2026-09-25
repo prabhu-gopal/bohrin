@@ -110,6 +110,11 @@ def _checks(tree: ast.AST) -> int:
     return sum(1 for node in ast.walk(tree) if _is_check(node))
 
 
+def _bare(name: str) -> str:
+    """A test's function name without its class: ``TestParse.test_x`` is ``test_x``."""
+    return name.rsplit(".", 1)[-1]
+
+
 def _tests(tree: ast.Module) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
     """Test functions and methods by name (``Class.test_x`` for methods)."""
     found: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
@@ -280,18 +285,24 @@ def _pairs(
     """``(path, name, before, after)`` for every test in the new version, matched to its old self.
 
     A test is matched in the same file first; a test that moved to another file is matched by its
-    name when that name is unique, so a move never reads as a new or a weakened test.
+    name when that name is unique, and a test that moved into, out of or between classes by its
+    function name when that is unique, so a move never reads as a new test and a test weakened while
+    it moved is still seen.
     """
     old_index = {(path, name): node for path, (old, _) in tests.items() if old for name, node in _tests(old).items()}
     new_index = {(path, name): node for path, (_, new) in tests.items() if new for name, node in _tests(new).items()}
     by_name: dict[str, list[oracle.Test]] = {}
+    by_bare: dict[str, list[oracle.Test]] = {}
     for (_, name), node in old_index.items():
         by_name.setdefault(name, []).append(node)
+        by_bare.setdefault(_bare(name), []).append(node)
     pairs = []
     for (path, name), node in sorted(new_index.items(), key=lambda item: item[0]):
         before = old_index.get((path, name))
         if before is None and len(by_name.get(name, [])) == 1:
             before = by_name[name][0]
+        if before is None and len(by_bare.get(_bare(name), [])) == 1:
+            before = by_bare[_bare(name)][0]
         pairs.append((path, name, before, node))
     return pairs
 
@@ -445,8 +456,12 @@ def _plural(count: int, word: str) -> str:
     return f"{count} {word}{'' if count == 1 else 's'}"
 
 
-def _selection(path: str, text: str | None) -> dict[str, str]:
-    """pytest's test-selection settings in a configuration file, by key."""
+def _selection(path: str, text: str | None) -> dict[str, str] | None:
+    """pytest's test-selection settings in a configuration file, by key; None if it does not parse.
+
+    A file that does not parse selects nothing: pytest stops with an error on it rather than
+    running fewer tests, so it is listed as not checked instead of compared.
+    """
     if text is None:
         return {}
     name = path.rsplit("/", 1)[-1]
@@ -464,7 +479,7 @@ def _selection(path: str, text: str | None) -> dict[str, str]:
                     if parser.has_option(section_name, key)
                 }
     except (tomllib.TOMLDecodeError, configparser.Error):
-        return {}
+        return None
     return {}
 
 
@@ -489,6 +504,9 @@ def facts(before: Mapping[str, str | None], after: Mapping[str, str | None]) -> 
 
     tests = {path: pair for path, pair in trees.items() if is_test_file(path)}
     new_test_names = {name for _, new in tests.values() if new is not None for name in _tests(new)}
+    # A test moved into another class, out of a class, or into a renamed one keeps its function
+    # name: it was moved, not removed. Moves are not reported.
+    new_test_names |= {_bare(name) for name in new_test_names}
 
     # Tests deleted or emptied, unless every test in the file still exists somewhere.
     for path, (old, new) in tests.items():
@@ -498,8 +516,8 @@ def facts(before: Mapping[str, str | None], after: Mapping[str, str | None]) -> 
         if not old_names:
             continue
         gone = old_names - set(_tests(new)) if new is not None else old_names
-        if gone and not gone <= new_test_names:
-            missing = sorted(gone - new_test_names)
+        missing = sorted(name for name in gone if name not in new_test_names and _bare(name) not in new_test_names)
+        if missing:
             what = "deleted" if new is None else "emptied" if not _tests(new) else "lost tests"
             out.append(
                 Fact(
@@ -544,8 +562,10 @@ def facts(before: Mapping[str, str | None], after: Mapping[str, str | None]) -> 
                     "observation",
                 )
             )
-        old_tests = _tests(old) if old else {}
-        unchecked = sorted(name for name, node in _tests(new).items() if _checks(node) == 0 and name not in old_tests)
+        old_tests = {_bare(name) for name in _tests(old)} if old else set()
+        unchecked = sorted(
+            name for name, node in _tests(new).items() if _checks(node) == 0 and _bare(name) not in old_tests
+        )
         if unchecked:
             out.append(
                 Fact(
@@ -619,6 +639,9 @@ def facts(before: Mapping[str, str | None], after: Mapping[str, str | None]) -> 
         if path.rsplit("/", 1)[-1] not in CONFIG_FILES:
             continue
         old_selection, new_selection = _selection(path, before.get(path)), _selection(path, after.get(path))
+        if old_selection is None or new_selection is None:
+            unreadable.append(path)
+            continue
         for key in sorted(set(old_selection) | set(new_selection)):
             if old_selection.get(key) != new_selection.get(key):
                 out.append(

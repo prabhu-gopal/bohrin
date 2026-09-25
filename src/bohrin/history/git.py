@@ -115,10 +115,19 @@ def default_base(root: Path) -> str:
     raise GitError("the repository has no commits yet")
 
 
-def files_at(root: Path, commit: str) -> list[str]:
-    """Every file path in ``commit``'s tree."""
-    output = _git(root, "ls-tree", "-r", "-z", "--name-only", "--full-tree", commit)
-    return [path.decode("utf-8", "surrogateescape") for path in output.split(b"\0") if path]
+def files_at(root: Path, commit: str) -> dict[str, int]:
+    """Every file in ``commit``'s tree, with its size in bytes, so a caller can refuse a huge one
+    before reading it. A submodule, which has no size, is left out: it is another repository."""
+    output = _git(root, "ls-tree", "-r", "-z", "-l", "--full-tree", commit)
+    found: dict[str, int] = {}
+    for entry in output.split(b"\0"):
+        if not entry:
+            continue
+        meta, _, path = entry.partition(b"\t")
+        size = meta.split()[-1]
+        if size.isdigit():
+            found[path.decode("utf-8", "surrogateescape")] = int(size)
+    return found
 
 
 def read_at(root: Path, commit: str, path: str) -> bytes:

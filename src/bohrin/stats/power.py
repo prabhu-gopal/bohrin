@@ -290,9 +290,12 @@ def analyse(rows: list[Row], source: str = "", min_difference: float | None = No
         shared = sorted(set(per_model[first]) & set(per_model[second]))
         differences = [per_model[first][task][0] - per_model[second][task][0] for task in shared]
         if not differences:
+            notes.append(f"{first} and {second} share no tasks, so they were not compared.")
             continue
         labels = [cluster_of.get(task, task) for task in shared] if clustered else None
         error = standard_error(differences, labels)
+        if math.isnan(error):
+            notes.append(f"{first} and {second} share only {len(shared)} task, too few to compare.")
         centre = mean(differences)
         paired = _finite(detectable_difference(error))
         if min_difference is not None and paired is not None and paired > min_difference:

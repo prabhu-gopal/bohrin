@@ -167,6 +167,34 @@ All notable changes to this project are documented here. The format follows
   empty nested function or class drew a grounded candidate from `drop_side_effect`, although it
   does no work; a nested function that does work still counts.
 
+- **A function that only evaluates a name or a number no longer counts as work.** `def f(x): x`
+  drew a grounded "emptied" candidate that behaves exactly like the reference.
+
+- **`bohrin verify` no longer reports a stricter test as weakened.** `assert a == 1 and b == 2`
+  was read as a truth check only (W3), so adding a condition to a test was reported as weakening
+  it. Checks are now read the way they pass: `and` has the kinds of all its parts, `or` is only as
+  strong as its weakest part, `not` checks what its operand checks, and `assertTrue(x == 5)` is
+  read by its argument. Weakenings it missed are now seen: `!= None` and `None is not x` are
+  existence checks, `mock.call_count == 1` is a mock-call check, and `snapshot.assert_match(...)`
+  is a snapshot. 24 new tests fail on the old reader.
+- **`bohrin verify` no longer reports moved tests as removed.** Renaming a `unittest` class, moving
+  a test method to another class or turning it into a function was reported as "tests removed";
+  a test is now matched by its function name when that is unique, so a test weakened while it
+  moved is still seen.
+- **`bohrin verify` no longer reports a broken pytest configuration as a selection change.** A
+  `pytest.ini`, `setup.cfg`, `tox.ini` or `pyproject.toml` that does not parse is listed as not
+  checked: pytest stops on it rather than running fewer tests.
+- **`bohrin verify` sees more loosened tolerances and swallowed checks.** Tolerances passed by
+  position (`pytest.approx(x, 0.5)`, `np.allclose(a, b, 0.5)`), NumPy's `isclose` (whose `rtol`
+  and `atol` differ from the standard library's), expected values written on the left
+  (`assert 5 == f(x)`), and checks inside `with suppress(AssertionError)` or `except*`.
+- **`bohrin verify` checks a committed file's size before reading it.** The 2 MB limit was
+  applied after the whole file was loaded, and counted characters rather than bytes; it is now
+  read from git's tree listing first. A file reached through a symlinked directory outside the
+  repository is never read.
+- **`bohrin power` says when two models could not be compared**, instead of leaving the
+  comparison out silently: when they share no tasks, or share too few for an interval.
+
 ### Removed
 
 - **The answer-level operators and rewritings.** The operators `empty_body`,
