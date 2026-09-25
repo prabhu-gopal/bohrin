@@ -30,6 +30,18 @@ All notable changes to this project are documented here. The format follows
   Each has a manifest (`bohrin/oracle@1`, `…/comment-free-oracle@1`, `…/reformatted-oracle@1`,
   `…/renamed-oracle@1`). A differential test runs every emitted control beside its original on a
   corpus built to break naive renaming, and demands identical results.
+- **The BCL-1 conformance suite, and `bohrin conformance check`.** A way to prove a
+  grader-checking tool is sound: 14 fixture graders in `conformance/bcl-1/`, a correct one and one
+  with exactly that defect for each of seven weaknesses (BGW-101, 104, 120, 123, 124, 126, 127),
+  written for the suite with no copied problems. A tool reports what it flagged on each in the new
+  `conformance-results/v1` format. `bohrin conformance check FILE` (listed by `bohrin help more`)
+  runs no grader, and gives the level only to a tool that flags every defect, with the right ID,
+  and flags no correct grader: one false accusation fails it. It also prints the tool's
+  true-positive rate, false-positive rate and their difference, as the OWASP Benchmark scores
+  security tools. BGW-102, 103 and 105 have no fixtures yet, and the check says the level is
+  claimed over the other seven. The tests hold every fixture to what it claims: each correct
+  grader accepts the reference and its certified rewritings, and each defect shows on a
+  demonstration its correct partner gets right.
 - **Two more hollow-program probes** for BGW-101, trivial implementation:
   `bohrin/constant-implementation@1` makes every function return a constant of its own return
   type (`0`, `""`, `[]`, `{}`, `False`, …), read from the annotation or from what the reference

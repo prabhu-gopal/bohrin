@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bohrin.com/schema/conformance-results/v1",
+  "title": "Bohrin conformance results",
+  "description": "What a checking tool reported for each fixture grader of a conformance suite: whether it ran, and which weakness classes it flagged. `bohrin conformance check` compares it with the suite's expected results.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "suite", "tool", "results"],
+  "properties": {
+    "$schema": {"const": "https://bohrin.com/schema/conformance-results/v1"},
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "version"],
+      "properties": {
+        "level": {"type": "string", "pattern": "^BCL-[1-4]$"},
+        "version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fixture", "status"],
+        "properties": {
+          "fixture": {"type": "string", "pattern": "^bcl-[1-4]/[a-z0-9]+(-[a-z0-9]+)*/(correct|defect)$"},
+          "status": {
+            "description": "ran: the tool checked the fixture and `flagged` lists what it found. error: it tried and could not. skipped: it did not try.",
+            "enum": ["ran", "error", "skipped"]
+          },
+          "flagged": {
+            "description": "The weakness classes the tool reported for this grader. Empty means it reported none.",
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^BGW-[1-9][0-9]*$"}
+          },
+          "message": {"type": "string", "minLength": 1}
+        },
+        "if": {"properties": {"status": {"const": "ran"}}},
+        "then": {"required": ["flagged"]},
+        "else": {"not": {"required": ["flagged"]}}
+      }
+    }
+  }
+}

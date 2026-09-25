@@ -23,6 +23,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import NoReturn
 
+from bohrin import conformance
 from bohrin.history import verify as history
 from bohrin.history.git import GitError
 from bohrin.report.sarif import to_sarif
@@ -98,7 +99,34 @@ def _parser() -> _Parser:
         help="also write the facts as SARIF 2.1.0 to FILE, for code-scanning annotations on a pull request",
     )
     check.add_argument("path", nargs="?", type=Path, default=Path("."), help="a path inside the repository")
+
+    more = verbs.add_parser("help", help="show the rarely used commands: bohrin help more")
+    more.add_argument("topic", nargs="?", choices=["more"], help="more: the rarely used commands")
+
+    conformance = verbs.add_parser(
+        "conformance",
+        help=argparse.SUPPRESS,
+        description=(
+            "Check a checking tool's results on the conformance suite's fixture graders, and print the level it "
+            "achieves. The tool must flag every grader with a defect, with that defect's ID, and no correct grader. "
+            "Runs no grader: it compares the results file with the suite's expected results."
+        ),
+    )
+    # argparse lists a subcommand even with help=SUPPRESS; rare commands are listed by `help more` only.
+    verbs._choices_actions = [a for a in verbs._choices_actions if a.dest != "conformance"]
+    actions = conformance.add_subparsers(dest="action", metavar="ACTION", required=True)
+    conformance_check = actions.add_parser("check", help="check a results file and print the level achieved")
+    conformance_check.add_argument("file", type=Path, help="the tool's results, a conformance-results/v1 JSON file")
+    conformance_check.add_argument("--json", action="store_true", help="print only the JSON report")
     return parser
+
+
+#: The rarely used commands, shown by ``bohrin help more``.
+MORE = """Rarely used commands:
+
+  bohrin conformance check FILE   check a checking tool's results on the conformance suite, and print
+                                  the level it achieves (BCL-1)
+"""
 
 
 def _power(args: argparse.Namespace) -> int:
@@ -153,6 +181,28 @@ def _verify(args: argparse.Namespace) -> int:
     return CLEAN
 
 
+def _conformance(args: argparse.Namespace) -> int:
+    path: Path = args.file
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        print(f"bohrin: cannot open {path}: {exc.strerror}. Check the path and try again.", file=sys.stderr)
+        return CANNOT_RUN
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        print(f"bohrin: {path} is not a JSON document. See 'Conformance' in docs/SPEC.md.", file=sys.stderr)
+        return CANNOT_RUN
+    try:
+        report = conformance.check(conformance.read_results(data))
+    except ValueError as exc:
+        print(f"bohrin: cannot check {path}: {exc}. See 'Conformance' in docs/SPEC.md.", file=sys.stderr)
+        return CANNOT_RUN
+    if args.json:
+        print(json.dumps(report.to_json(), indent=2))
+    else:
+        print(conformance.render(report, source=path.name))
+    return CLEAN if report.achieved else FINDINGS
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run ``bohrin`` with ``argv`` (default: the process's arguments) and return its exit code."""
     parser = _parser()
@@ -161,6 +211,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _power(args)
     if args.verb == "verify":
         return _verify(args)
+    if args.verb == "conformance":
+        return _conformance(args)
+    if args.verb == "help":
+        if args.topic == "more":
+            print(MORE, end="")
+            return CLEAN
+        parser.print_help()
+        return CLEAN
     parser.print_help()
     return USAGE if argv else CLEAN
 

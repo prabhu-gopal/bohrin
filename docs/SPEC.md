@@ -456,6 +456,43 @@ fact keeps its annotation when its counts change. The GitHub Action in this repo
 (`action.yml`) runs `bohrin verify` on every pull request and uploads the SARIF; it needs the
 checkout's full history (`fetch-depth: 0`) and `security-events: write`.
 
+## Conformance
+
+A conformance suite proves that a **grader-checking tool is sound**: it flags every grader with a
+defect and never flags a correct one. It follows test262 and the JSON Schema Test Suite (open
+cases as data, any runner) and the paired good and bad cases of NIST's Juliet suite.
+
+**Fixtures.** Each weakness of a level has a pair of graders in `conformance/<level>/`: one
+correct, one with exactly that defect. They are self-contained Python files, written for the
+suite, with the interface in `conformance/README.md`. Their expected results are in
+`src/bohrin/conformance/bcl-1.toml`. The tests hold each pair to what it claims:
+- every correct grader accepts the reference and every certified rewriting of it;
+- each grader with a defect shows it on a demonstration its correct partner gets right;
+- otherwise, it agrees with its partner.
+
+| Level | Shapes | Weaknesses | In the suite now |
+|---|---|---|---|
+| BCL-1 | program, io | 101–105, 120, 123, 124, 126, 127 | 101, 104, 120, 123, 124, 126, 127 (version 1) |
+| BCL-2 | workspace | BCL-1 and 108, 109, 112, 117 | not yet |
+| BCL-3 | container | BCL-2 and 110, 111, 113, 116, 138 | not yet |
+| BCL-4 | container, hardened | BCL-3 and 130–132, verified structurally | not yet |
+
+**Results.** A tool reports each fixture in the `https://bohrin.com/schema/conformance-results/v1`
+format: `ran` with the weakness classes it flagged, `error` or `skipped`. `bohrin conformance
+check FILE` (listed by `bohrin help more`) runs no grader; it compares the results with the
+expected ones. A tool **achieves the level** when, for every weakness with fixtures:
+- it flags the grader with the defect with that weakness (detected);
+- it flags nothing on the correct grader (clean);
+- it flags no other weakness on the grader with the defect (no misattribution).
+
+A fixture that errored, was skipped or is missing is neither detected nor clean. One false
+accusation fails the level however much was found. Beside the level, the check prints the
+true-positive rate over graders with a defect, the false-positive rate over correct graders, and
+their difference (Youden's index, the OWASP Benchmark's score) as a score from −100 to 100.
+Weaknesses of the level with no fixtures yet are named, and the level is claimed only over the
+others. Exit codes: 0 achieved, 1 not achieved, 2 the file cannot be checked (another level or
+version, an unknown or repeated fixture, or a record the schema refuses).
+
 ## Identifiers
 
 Every artefact has a permanent identifier, following conventions the security field already
