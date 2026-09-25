@@ -36,7 +36,7 @@ All notable changes to this project are documented here. The format follows
   restores a cache another run could have written (found by the zizmor workflow audit), and the
   release is created with GitHub's own CLI instead of a third-party action.
 - **Coverage-guided fuzzing of every reader of untrusted input** (`fuzz/fuzz_readers.py`, Atheris,
-  weekly), with the same check run on a corpus and 1,500 seeded mutations in every test run.
+  weekly, instrumented, installed pinned by hash), with the same check run on a corpus and 1,500 seeded mutations in every test run.
   **CodeQL** static analysis and **Dependabot** updates for the pinned actions and locked
   dependencies.
 - **The decisions file format**, `.bohrin/decisions.toml` (`bohrin.decisions`): what a repository

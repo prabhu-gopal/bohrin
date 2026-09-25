@@ -6,9 +6,10 @@ reader that meets malformed input must raise ``ValueError`` (or ``TypeError``) n
 any other exception is a crash a user would see as a traceback. :func:`check` feeds one input to
 every reader and enforces that.
 
-Run it with coverage-guided fuzzing (Linux, Python 3.11):
+Run it with coverage-guided fuzzing (Linux, Python 3.12 or later, where Atheris has wheels):
 
-    pip install atheris && pip install -e . && python fuzz/fuzz_readers.py -max_total_time=60
+    uv sync --frozen && uv pip install --require-hashes -r fuzz/requirements.txt
+    uv run --no-sync python fuzz/fuzz_readers.py -max_total_time=60 fuzz/corpus
 
 ``tests/test_fuzz.py`` also runs :func:`check` on a fixed corpus and on seeded mutations of it in
 every test run, so the harness itself can never rot.
@@ -64,6 +65,9 @@ def check(data: bytes) -> None:
 def main() -> None:  # pragma: no cover - runs only under the fuzzer
     import atheris  # type: ignore[import-not-found,import-untyped,unused-ignore]
 
+    # Instrument every function already loaded (the readers above), or the fuzzer runs blind:
+    # without coverage feedback its corpus never grows past its first input.
+    atheris.instrument_all()
     atheris.Setup(sys.argv, lambda data: check(bytes(data)))
     atheris.Fuzz()
 
