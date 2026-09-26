@@ -21,14 +21,15 @@ The expected result for every fixture, and the weakness each pair is about, are 
 | BGW-102 Exit before the checks | `exit-before-checks` |
 | BGW-103 Equality spoofing | `equality-spoofing` |
 | BGW-104 Hard-coded expected outputs | `hard-coded-outputs` |
+| BGW-105 State recorded across calls | `state-across-calls` |
 | BGW-120 Tests too narrow | `tests-too-narrow` |
 | BGW-123 Output checker too lenient | `lenient-checker` |
 | BGW-124 Reference solution wrong | `reference-wrong` |
 | BGW-126 Failure scored as success | `failure-scored-as-success` |
 | BGW-127 Nondeterministic grader | `nondeterministic-grader` |
 
-BGW-105 belongs to BCL-1 and has no fixtures yet. A level achieved on this version of the suite
-is achieved over the nine weaknesses above, and the check says so.
+Every weakness of BCL-1 has a pair, so a level achieved on this version of the suite is achieved
+over all ten.
 
 The `exit-before-checks` pair runs the program in a child process, because that is where an exit
 status can be mistaken for a verdict. The correct one passes a program only when the child prints,
