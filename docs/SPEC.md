@@ -519,7 +519,7 @@ suite, with the interface in `conformance/README.md`. Their expected results are
 
 | Level | Shapes | Weaknesses | In the suite now |
 |---|---|---|---|
-| BCL-1 | program, io | 101–105, 120, 123, 124, 126, 127 | 101–104, 120, 123, 124, 126, 127 (version 1) |
+| BCL-1 | program, io | 101–105, 120, 123, 124, 126, 127 | all ten (version 1) |
 | BCL-2 | workspace | BCL-1 and 108, 109, 112, 117 | not yet |
 | BCL-3 | container | BCL-2 and 110, 111, 113, 116, 138 | not yet |
 | BCL-4 | container, hardened | BCL-3 and 130–132, verified structurally | not yet |

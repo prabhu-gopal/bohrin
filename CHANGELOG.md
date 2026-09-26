@@ -79,16 +79,16 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
   The schema and the reader agree on every single-field breakage. The example record describes
   the example grader in this repository.
 - **The BCL-1 conformance suite, and `bohrin conformance check`.** A way to prove a
-  grader-checking tool is sound: 18 fixture graders in `conformance/bcl-1/`, a correct one and one
-  with exactly that defect for each of nine weaknesses (BGW-101, 102, 103, 104, 120, 123, 124, 126,
-  127),
+  grader-checking tool is sound: 20 fixture graders in `conformance/bcl-1/`, a correct one and one
+  with exactly that defect for each of the level's ten weaknesses (BGW-101 to 105, 120, 123, 124,
+  126, 127),
   written for the suite with no copied problems. A tool reports what it flagged on each in the new
   `conformance-results/v1` format. `bohrin conformance check FILE` (listed by `bohrin help more`)
   runs no grader, and gives the level only to a tool that flags every defect, with the right ID,
   and flags no correct grader: one false accusation fails it. It also prints the tool's
   true-positive rate, false-positive rate and their difference, as the OWASP Benchmark scores
-  security tools. BGW-105 has no fixtures yet, and the check says the level is claimed over the
-  other nine. The BGW-102 pair runs the program in a child process: the correct grader passes it
+  security tools. The BGW-105 pair's correct grader runs each case in a fresh process, so no
+  state carries between cases; its partner runs them all in one. The BGW-102 pair runs the program in a child process: the correct grader passes it
   only when the child prints, after the last check, a token the program never sees; the defective
   one reads exit status 0 as a pass. Each grader with a defect checks types and fails closed exactly as its
   partner does, so it has only its own defect: run against Bohrin's battery, no correct grader pays

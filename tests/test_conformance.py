@@ -140,6 +140,19 @@ _DEMONSTRATIONS = [
         0.0,
         1.0,
     ),
+    (
+        "state-across-calls",
+        "class S:\n"
+        "    def __init__(self):\n"
+        "        self.c = 0\n"
+        "    def __call__(self, items):\n"
+        "        ans = [0, 4, 10, 7, 2][self.c]\n"
+        "        self.c += 1\n"
+        "        return ans\n"
+        "solve = S()\n",
+        0.0,
+        1.0,
+    ),
 ]
 
 
@@ -270,7 +283,7 @@ def _check(document: dict[str, Any]) -> Any:
 def test_a_tool_that_flags_every_defect_and_nothing_else_achieves_the_level() -> None:
     report = _check(_results(_perfect))
     assert report.achieved and report.youden == 1.0
-    assert (report.true_positives, report.defective, report.false_positives, report.correct) == (9, 9, 0, 9)
+    assert (report.true_positives, report.defective, report.false_positives, report.correct) == (10, 10, 0, 10)
     assert "BCL-1 achieved" in render(report)
 
 
@@ -348,9 +361,8 @@ def test_results_that_cannot_be_checked_are_refused(change: Callable[[dict[str, 
 
 def test_the_level_is_claimed_only_over_the_weaknesses_with_fixtures_and_says_so() -> None:
     report = _check(_results(_perfect))
-    assert set(report.suite.pending) == {"BGW-105"}
-    assert f"checked over {len(SUITE.covered)} of its {len(SUITE.weaknesses)} weaknesses" in render(report)
-    assert report.to_json()["weaknesses_pending"] == ["BGW-105"]
+    assert set(report.suite.pending) == set()
+    assert report.to_json()["weaknesses_pending"] == []
 
 
 # --------------------------------------------------------------------------- the published format
@@ -447,4 +459,4 @@ def test_another_level_is_not_published_yet() -> None:
 
 def test_results_are_read_into_their_record() -> None:
     results = read_results(_results(_perfect))
-    assert isinstance(results, Results) and results.tool == "example" and len(results.results) == 18
+    assert isinstance(results, Results) and results.tool == "example" and len(results.results) == 20
