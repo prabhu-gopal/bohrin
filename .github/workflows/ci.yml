@@ -105,7 +105,7 @@ jobs:
           from bohrin.evidence import SCHEMA, finding_schema
           assert finding_schema()['\$id'] == SCHEMA, 'the finding schema did not ship'
           from bohrin.conformance import suite
-          assert len(suite().fixtures) == 18 and suite().level == 'BCL-1', 'the conformance suite index did not ship'
+          assert len(suite().fixtures) == 20 and suite().level == 'BCL-1', 'the conformance suite index did not ship'
           from bohrin.registry import REGISTRY_RECORD_SCHEMA, registry_record_schema
           assert registry_record_schema()['\$id'] == REGISTRY_RECORD_SCHEMA, 'the registry schema did not ship'
           import bohrin.api as api
