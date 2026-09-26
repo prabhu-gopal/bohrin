@@ -7,8 +7,8 @@ authors:
 repository-code: "https://github.com/prabhu-gopal/bohrin"
 url: "https://bohrin.com"
 license: Apache-2.0
-version: 0.3.0
-date-released: "2026-09-22"
+version: 0.4.0
+date-released: "2026-09-26"
 abstract: >-
   Bohrin tests the graders of reinforcement-learning environments: the verifiers, reward
   functions and test suites that decide whether a model's work counts. It constructs
