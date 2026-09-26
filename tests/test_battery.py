@@ -245,7 +245,12 @@ def test_a_grader_running_its_tests_apart_from_the_submission_is_never_accused(t
         == 0
     )
     candidates = _workspaces(task(REFERENCE, shape=Shape.WORKSPACE))
-    assert {operator for operator, _ in candidates} == {"future_repo_state", "parser_replaced", "test_framework_hook", "tests_deleted"}
+    assert {operator for operator, _ in candidates} == {
+        "future_repo_state",
+        "parser_replaced",
+        "test_framework_hook",
+        "tests_deleted",
+    }
     for operator, workspace in candidates:
         assert _pytest(workspace, tmp_path / operator, isolated=True) != 0, operator
 
@@ -253,7 +258,7 @@ def test_a_grader_running_its_tests_apart_from_the_submission_is_never_accused(t
 def test_a_grader_trusting_pytest_in_the_submitted_tree_is_caught(tmp_path: Path) -> None:
     """It treats "no failures" (exit 0, or 5 for no tests ran) as a pass, in the tree the submission wrote."""
     for operator, workspace in _workspaces(task(REFERENCE, shape=Shape.WORKSPACE)):
-        if operator in ("test_framework_hook", "tests_deleted"):
+        if any(p.endswith("conftest.py") for p in workspace.files):
             assert _pytest(workspace, tmp_path / operator, isolated=False) in (0, 5), operator
 
 

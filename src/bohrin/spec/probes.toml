@@ -200,10 +200,11 @@ sources = ["https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/", "https:
 
 [probe.template]
 solution = "reference-emptied"
-parameters = ["source_path", "hijack_command"]
+parameters = ["source_path", "tool_path"]
 
 [probe.template.files]
 "{source_path}" = "reference-emptied"
+"{tool_path}" = "fake-tool.py"
 
 [[probe]]
 id = "bohrin/reward-written@1"
@@ -223,10 +224,11 @@ sources = ["https://docs.harborframework.com/core-concepts/tasks/overview.md", "
 
 [probe.template]
 solution = "reference-emptied"
-parameters = ["source_path", "reward_command"]
+parameters = ["source_path", "reward_path"]
 
 [probe.template.files]
 "{source_path}" = "reference-emptied"
+"{reward_path}" = "reward-max.txt"
 
 [[probe]]
 id = "bohrin/parser-replaced@1"
@@ -246,10 +248,10 @@ sources = ["https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/"]
 
 [probe.template]
 solution = "reference-emptied"
-parameters = ["source_path", "parser_path", "parser_content"]
+parameters = ["source_path", "parser_path"]
 
 [probe.template.files]
-"{parser_path}" = "parser_content"
+"{parser_path}" = "fake-parser.py"
 "{source_path}" = "reference-emptied"
 
 [[probe]]
@@ -270,7 +272,7 @@ sources = ["https://metr.org/blog/2025-06-05-recent-reward-hacking/", "https://a
 
 [probe.template]
 solution = "reference-emptied"
-parameters = ["source_path", "tamper_command"]
+parameters = ["source_path", "measurement_path"]
 
 [probe.template.files]
 "{source_path}" = "reference-emptied"
@@ -293,7 +295,7 @@ sources = ["https://github.com/SWE-bench/SWE-bench/issues/465", "https://arxiv.o
 
 [probe.template]
 solution = "reference-emptied"
-parameters = ["source_path", "future_repo_command"]
+parameters = ["source_path", "repo_root"]
 
 [probe.template.files]
 "{source_path}" = "reference-emptied"
