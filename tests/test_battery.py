@@ -27,8 +27,10 @@ import pytest
 
 from _fixtures import LENIENT_CORRECT, REFERENCE, TRIVIAL_REFERENCE, behavioural_grader, task, text
 from bohrin.ir.task import Candidate, Ground, Provenance, Shape, Source, Task, Workspace
+from bohrin.mutate import discover
 from bohrin.mutate.base import MutationOperator
 from bohrin.mutate.battery import battery
+from bohrin.mutate.operators import MeasurementTampered
 
 
 class _Proposes(MutationOperator):
@@ -246,7 +248,6 @@ def test_a_grader_running_its_tests_apart_from_the_submission_is_never_accused(t
     )
     candidates = _workspaces(task(REFERENCE, shape=Shape.WORKSPACE))
     assert {operator for operator, _ in candidates} == {
-        "future_repo_state",
         "parser_replaced",
         "test_framework_hook",
         "tests_deleted",
@@ -260,6 +261,63 @@ def test_a_grader_trusting_pytest_in_the_submitted_tree_is_caught(tmp_path: Path
     for operator, workspace in _workspaces(task(REFERENCE, shape=Shape.WORKSPACE)):
         if any(p.endswith("conftest.py") for p in workspace.files):
             assert _pytest(workspace, tmp_path / operator, isolated=False) in (0, 5), operator
+
+
+#: Each container/workspace tamper probe, and the file whose content a weak grader trusts. The
+#: value is what a grader fooled by that file reads: a forged reward, a fake parser's or a fake
+#: tool's output. (measurement_tampered is a command, not a file, and is checked separately.)
+_TAMPER_FILES = {
+    "reward_written": ("{reward_path}", "1.0"),
+    "parser_replaced": ("{parser_path}", "passed"),
+    "hijacked_tool": ("{tool_path}", "success"),
+}
+
+
+@pytest.mark.parametrize(("operator", "expected"), sorted(_TAMPER_FILES.items()))
+def test_a_container_tamper_fools_a_grader_that_trusts_it_and_not_a_correct_one(
+    operator: str, expected: tuple[str, str], tmp_path: Path
+) -> None:
+    """The tamper does real work: a grader that trusts the tampered file pays, a correct one rejects.
+
+    The correct grader checks the solution (which is empty, so it fails) and never the tampered
+    file; the weak grader trusts the file the submission wrote. Both verdicts come from the same
+    submission, so this shows the tamper is what a weak grader pays for — not just that the empty
+    solution is wrong.
+    """
+    op = next(o for o in discover() if o.id == operator)
+    (candidate,) = op.apply(task(REFERENCE, shape=Shape.CONTAINER))
+    assert isinstance(candidate.payload, Workspace)
+    path_key, trusted = expected
+    content = candidate.payload.files[path_key]
+    assert content is not None
+
+    # A file that prints is run as the grader's tool/parser would run it; a data file is read.
+    if content.strip().startswith("print("):
+        written = tmp_path / "tampered.py"
+        written.write_text(content, encoding="utf-8")
+        run = subprocess.run([sys.executable, str(written)], capture_output=True, text=True, timeout=30, check=False)
+        seen = run.stdout
+    else:
+        seen = content
+
+    def weak_grader() -> bool:
+        return trusted in seen  # trusts the tampered file's output/content
+
+    def correct_grader() -> bool:
+        source = candidate.payload.files["{source_path}"]  # type: ignore[union-attr]
+        return source is not None and "return" in source and "pass" not in source  # the empty solution has no work
+
+    assert weak_grader(), operator
+    assert not correct_grader(), operator
+
+
+def test_the_measurement_tamper_targets_the_declared_path() -> None:
+    """It is a command, not a file: it rewrites the timer in the measurement path a weak grader reads."""
+    (candidate,) = MeasurementTampered().apply(task(REFERENCE, shape=Shape.CONTAINER))
+    assert isinstance(candidate.payload, Workspace)
+    (command,) = candidate.payload.commands
+    assert "{measurement_path}" in command and "time.time()" in command
+    assert "measurement_path" in candidate.payload.parameters
 
 
 def test_a_grader_that_only_checks_the_code_runs_is_still_caught() -> None:

@@ -132,6 +132,21 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
   Every body is replaced, special methods included, so no work of the reference survives. Run
   over the 1,675 compiling standard-library modules of Python 3.11 under 60 kB as references,
   every submission compiled and none compiled to its reference.
+- **Container and workspace tamper probes for four more weakness classes.** Each submits the
+  empty implementation beside one concrete, published tamper, with only environment paths as
+  parameters:
+  - `bohrin/hijacked-tool@1` (BGW-110): a fake tool at `{tool_path}` that prints the state the
+    verifier wants;
+  - `bohrin/reward-written@1` (BGW-111): a full reward written straight to `{reward_path}`;
+  - `bohrin/parser-replaced@1` (BGW-112): a fake result parser at `{parser_path}` that reports
+    success;
+  - `bohrin/measurement-tampered@1` (BGW-113): a command that rewrites the timer in
+    `{measurement_path}`.
+
+  The ground is the empty implementation's, so a correct grader always rejects; a grader that
+  trusts the tampered tool, reward, parser or timing pays, which the tests show both ways. A
+  manifest template now also lists a probe's **commands**, so the published template fully
+  describes a container probe, checked against the operator by the parity test.
 - **Correct-work acceptance, beside the Coverage Score, per grader shape**
   (`bohrin.scoring.scorecard`). A grader that rejects everything catches every cheat, so each
   shape now gets two numbers, never merged: the Coverage Score and the share of correct rewritings

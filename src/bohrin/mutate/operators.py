@@ -899,33 +899,10 @@ class MeasurementTampered(MutationOperator):
         )
 
 
-class FutureRepoState(MutationOperator):
-    """The real fix is taken from repository history the task should not have shipped
-    (BGW-117, future repository state)."""
-
-    id = "future_repo_state"
-    category = "answer_access"
-    rationale = "The answer is extracted from history, so only a verifier that ships a clean repository catches it."
-    requires_code = True
-    shapes = (Shape.WORKSPACE, Shape.CONTAINER)
-
-    def apply(self, task: Task) -> Iterator[Candidate]:
-        """The empty implementation, with a command that accesses the future repository state."""
-        yield from _tampered_workspace(
-            self.id,
-            task,
-            "the repository history is accessed to extract the answer",
-            files={},
-            parameters=("source_path", "repo_root"),
-            commands=("git -C {repo_root} log -p",),
-        )
-
-
 __all__ = [
     "ConstantImplementation",
     "DropSideEffect",
     "EqualitySpoofing",
-    "FutureRepoState",
     "HijackedTool",
     "MeasurementTampered",
     "ParserReplaced",

@@ -16,7 +16,7 @@ from importlib.resources import files
 from types import MappingProxyType
 from typing import Any
 
-from bohrin.ir.task import Ground, Shape, Workspace
+from bohrin.ir.task import _PLACEHOLDER, Ground, Shape, Workspace
 from bohrin.spec.ids import is_probe_id
 from bohrin.spec.weaknesses import WeaknessList, weakness_list
 
@@ -56,6 +56,8 @@ class Template:
     files: Mapping[str, str]
     #: What an instantiation must supply. Never filled in by this library.
     parameters: tuple[str, ...]
+    #: Commands run in the environment, verbatim. They may name ``parameters``.
+    commands: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,13 +123,21 @@ def _template(raw: Any, where: str) -> Template:
     raw_files = raw.get("files", {})
     if not isinstance(raw_files, dict) or not all(isinstance(v, str) for v in raw_files.values()):
         raise ValueError(f"{where}: template.files maps paths to template names")
+    commands = _strings(raw.get("commands", []), f"{where}.template.commands")
     try:
         # The same rules a submitted workspace is held to: relative paths inside the root, and
         # every parameter a path names is declared.
-        Workspace(dict.fromkeys(raw_files, ""), parameters=parameters)
+        Workspace(dict.fromkeys(raw_files, ""), commands=commands, parameters=parameters)
     except ValueError as exc:
         raise ValueError(f"{where}: {exc}") from exc
-    return Template(solution=solution, files=MappingProxyType(dict(raw_files)), parameters=parameters)
+    # A command may name a parameter too, and every parameter it names must be declared, so the
+    # published manifest fully describes what an instantiation has to supply.
+    undeclared = sorted({name for command in commands for name in _PLACEHOLDER.findall(command)} - set(parameters))
+    if undeclared:
+        raise ValueError(f"{where}: a command names undeclared parameters {undeclared}")
+    return Template(
+        solution=solution, files=MappingProxyType(dict(raw_files)), parameters=parameters, commands=commands
+    )
 
 
 def _probe(entry: Mapping[str, Any], weaknesses: WeaknessList) -> Probe:

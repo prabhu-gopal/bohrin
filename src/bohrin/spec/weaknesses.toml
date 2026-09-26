@@ -231,7 +231,7 @@ mechanism = "When the repository keeps history past the task's starting commit (
 shapes = ["workspace", "container"]
 grounds = ["structural"]
 evidence = ["reproduction"]
-provides = ["template"]
+provides = []
 fix = "Ship the repository as a single squashed commit at the starting state, with no other refs, remotes or reflog."
 sources = ["https://github.com/SWE-bench/SWE-bench/issues/465", "https://arxiv.org/abs/2604.11072", "https://poolside.ai/blog/through-the-looking-glass"]
 
