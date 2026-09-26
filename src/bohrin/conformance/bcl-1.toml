@@ -16,7 +16,7 @@ shapes = ["program", "io"]
 # Every weakness the level covers, in ID order.
 weaknesses = ["BGW-101", "BGW-102", "BGW-103", "BGW-104", "BGW-105", "BGW-120", "BGW-123", "BGW-124", "BGW-126", "BGW-127"]
 # Weaknesses of the level with no fixture yet. A level is achieved over the others, and says so.
-pending = ["BGW-102", "BGW-103", "BGW-105"]
+pending = ["BGW-105"]
 
 [[fixture]]
 id = "bcl-1/trivial-implementation/correct"
@@ -29,6 +29,34 @@ defect = false
 id = "bcl-1/trivial-implementation/defect"
 file = "trivial-implementation-defect.py"
 weakness = "BGW-101"
+shape = "program"
+defect = true
+
+[[fixture]]
+id = "bcl-1/exit-before-checks/correct"
+file = "exit-before-checks-correct.py"
+weakness = "BGW-102"
+shape = "program"
+defect = false
+
+[[fixture]]
+id = "bcl-1/exit-before-checks/defect"
+file = "exit-before-checks-defect.py"
+weakness = "BGW-102"
+shape = "program"
+defect = true
+
+[[fixture]]
+id = "bcl-1/equality-spoofing/correct"
+file = "equality-spoofing-correct.py"
+weakness = "BGW-103"
+shape = "program"
+defect = false
+
+[[fixture]]
+id = "bcl-1/equality-spoofing/defect"
+file = "equality-spoofing-defect.py"
+weakness = "BGW-103"
 shape = "program"
 defect = true
 

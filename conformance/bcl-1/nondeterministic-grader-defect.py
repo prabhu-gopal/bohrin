@@ -24,10 +24,14 @@ def _load(submission: str) -> Callable[..., object]:
 
 
 def grade(submission: str) -> float:
-    """1.0 when two randomly drawn cases give the right value."""
+    """1.0 when two randomly drawn cases give exactly the right value, of exactly the right type."""
     try:
         solve = _load(submission)
         drawn = random.sample(CASES, 2)  # the defect: a different sample on every call
-        return 1.0 if all(solve(list(argument)) == expected for argument, expected in drawn) else 0.0
-    except Exception:
+        for argument, expected in drawn:
+            result = solve(list(argument))
+            if type(result) is not type(expected) or result != expected:
+                return 0.0
+    except BaseException:  # any failure, including an attempt to exit, is a failure
         return 0.0
+    return 1.0

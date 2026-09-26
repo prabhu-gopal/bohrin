@@ -23,12 +23,15 @@ def _load(submission: str) -> Callable[..., object]:
 
 
 def grade(submission: str) -> float:
-    """1.0 unless the program returns a wrong value; an error counts as a pass."""
+    """1.0 unless the program returns a wrong value or type; an exception counts as a pass."""
     try:
         solve = _load(submission)
         for argument, expected in CASES:
-            if solve(list(argument)) != expected:
+            result = solve(list(argument))
+            if type(result) is not type(expected) or result != expected:
                 return 0.0
     except Exception:
         return 1.0  # the defect
+    except BaseException:  # an attempt to exit is still a failure: the defect is exceptions only
+        return 0.0
     return 1.0
