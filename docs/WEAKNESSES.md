@@ -176,7 +176,7 @@ Evidence kinds:
 |---|---|---|---|
 | [BGW-115](#bgw-115) | Solution in the task text | workspace, container | statistic |
 | [BGW-116](#bgw-116) | Reference or verifier readable at run time | container | template |
-| [BGW-117](#bgw-117) | Future repository state | workspace, container | template |
+| [BGW-117](#bgw-117) | Future repository state | workspace, container | definition |
 | [BGW-118](#bgw-118) | Solution fetched from the network | container | definition |
 
 ### BGW-115

@@ -55,6 +55,7 @@ def test_an_operator_emits_what_its_manifest_promises(operator: str) -> None:
         if isinstance(c.payload, Workspace):
             assert set(c.payload.files) == set(probe.template.files), "the manifest names every file written"
             assert c.payload.parameters == probe.template.parameters, "and every parameter to fill in"
+            assert c.payload.commands == probe.template.commands, "and every command run"
         else:
             assert isinstance(c.payload, Source)
             assert not probe.template.files and not probe.template.parameters, "a program needs no instantiation"
@@ -137,6 +138,15 @@ def test_a_manifest_breaking_one_rule_is_refused(breakage: str, old: str, new: s
     assert old in _GOOD, breakage
     with pytest.raises(ValueError):
         parse(_GOOD.replace(old, new, 1))
+
+
+def test_a_command_that_names_an_undeclared_parameter_is_refused() -> None:
+    """A command's parameters must be declared too, so the manifest fully describes the instantiation."""
+    with_command = _GOOD.replace(
+        'parameters = ["reward_path"]', 'parameters = ["reward_path"]\ncommands = ["run {tool_path}"]'
+    )
+    with pytest.raises(ValueError, match="undeclared parameters"):
+        parse(with_command)
 
 
 def test_a_negative_control_must_name_its_ground() -> None:
