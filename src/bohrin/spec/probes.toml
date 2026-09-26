@@ -11,6 +11,9 @@
 # * `ground` is the ground a negative control rests on; positive controls have none.
 # * `template.parameters` names what an instantiation must supply (a test root, a reward path).
 #   Nothing in this library fills them in.
+# * `attribution` says when a finding carries another of the probe's weaknesses than the first:
+#   the first rule whose `when_rejected` probe the same grader rejected on the same task decides.
+#   One submission can be paid for by graders with different defects, and the fix differs.
 # * `maturity` starts at `experimental`. A probe becomes `stable` only after a public sample with
 #   no confirmed false accusation and a 95% lower bound on precision of at least 95%.
 
@@ -63,7 +66,7 @@ parameters = []
 [[probe]]
 id = "bohrin/raise-not-implemented@1"
 operator = "raise_not_implemented"
-weakness = ["BGW-101"]
+weakness = ["BGW-101", "BGW-126"]
 title = "The reference with every function body replaced by raise NotImplementedError"
 shapes = ["program"]
 ground = "structural"
@@ -81,6 +84,11 @@ sources = ["https://arxiv.org/abs/2604.17596"]
 [probe.template]
 solution = "reference-raising"
 parameters = []
+
+[[probe.attribution]]
+weakness = "BGW-126"
+when_rejected = "bohrin/empty-implementation@1"
+reason = "The grader rejected the empty implementation of the same task, so it runs the code and checks what comes back; paying for a program that only raises is scoring a failure as success, and the fix is to fail closed, not to check more values."
 
 [[probe]]
 id = "bohrin/success-exit@1"

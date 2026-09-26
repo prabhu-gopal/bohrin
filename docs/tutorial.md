@@ -215,12 +215,12 @@ checks_it
 program: 1 task scored
   COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
   CORRECT-WORK ACCEPTANCE: 100 / 100   95% CI 34–100   2 of 2 accepted   relations: 2
-  not run: 13 applicable weakness classes: BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
+  not run: 12 applicable weakness classes: BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-127, BGW-128, BGW-137
 matches_reference
 program: 1 task scored
   COVERAGE SCORE: 100 / 100   95% CI 21–100   1 of 1 caught   categories: 1 of 5 (battery 2)
   CORRECT-WORK ACCEPTANCE: 0 / 100   95% CI 0–66   0 of 2 accepted   relations: 2
-  not run: 13 applicable weakness classes: BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-126, BGW-127, BGW-128, BGW-137
+  not run: 12 applicable weakness classes: BGW-104, BGW-105, BGW-106, BGW-107, BGW-119, BGW-121, BGW-122, BGW-123, BGW-125, BGW-127, BGW-128, BGW-137
 ```
 
 Both catch the empty body, but `matches_reference` rejects every correct rewriting: it checks the

@@ -12,8 +12,9 @@ import random
 from collections.abc import Callable
 from typing import Any
 
-#: Every case the grader checks: the argument, and the result a correct program returns.
-CASES = [([], 0), ([1, -2, 3], 4), ([0], 0), ([5, 5], 10), ([-1, -1], 0)]
+#: Every case the grader checks: the argument, and the result a correct program returns. Each
+#: expects a different value, so no constant can pass however the cases are drawn.
+CASES = [([], 0), ([1, -2, 3], 4), ([5, 5], 10), ([7], 7), ([-1, 2], 2)]
 
 
 def _load(submission: str) -> Callable[..., object]:

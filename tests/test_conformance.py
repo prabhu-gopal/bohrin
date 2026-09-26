@@ -35,7 +35,7 @@ from bohrin.conformance import (
 from bohrin.ir.task import Shape, Source
 from bohrin.mutate.battery import battery
 from bohrin.relations import positive_controls
-from bohrin.spec.probes import probe_for
+from bohrin.spec.probes import probe_for, weakness_of
 from bohrin.spec.weaknesses import weakness_list
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -183,19 +183,47 @@ def test_the_battery_accuses_no_correct_grader_in_the_suite(fixture: Fixture) ->
     assert [op for op, reward in _rewards(fixture.file).items() if reward == 1.0] == [], fixture.id
 
 
-@pytest.mark.parametrize(("operator", "weakness"), [("success_exit", "BGW-102"), ("equality_spoofing", "BGW-103")])
-def test_the_exit_and_spoofing_probes_land_on_their_own_defect_and_no_other(operator: str, weakness: str) -> None:
-    """Each defect grader has exactly one defect, so these probes are paid for by one fixture only."""
-    probe = probe_for(operator)
-    assert probe is not None and probe.weakness == (weakness,)
-    paying = [f.id for f in SUITE.fixtures if f.shape is Shape.PROGRAM and _rewards(f.file)[operator] == 1.0]
-    assert paying == [next(f.id for f in SUITE.fixtures if f.weakness == weakness and f.defect)]
+def _flags(fixture: Fixture) -> set[str]:
+    """What Bohrin's battery reports on a fixture: one weakness per submission it paid for, chosen by
+    the manifests' attribution rules from the fixture's own verdicts on the other submissions."""
+    rewards = _rewards(fixture.file)
+    rejected = {probe.id for op, reward in rewards.items() if reward == 0.0 and (probe := probe_for(op))}
+    flags = set()
+    for op, reward in rewards.items():
+        probe = probe_for(op)
+        if reward == 1.0 and probe is not None:
+            flags.add(weakness_of(probe, rejected))
+    return flags
+
+
+#: What the battery reports on each grader with a defect. The rest need what this library does not
+#: run: inputs the task does not show (BGW-104, BGW-120), a second reference (BGW-124), repeats
+#: (BGW-127), or output checking (BGW-123, an io grader).
+_BATTERY_FINDS = {"BGW-101", "BGW-102", "BGW-103", "BGW-126"}
+
+
+@pytest.mark.parametrize("fixture", [f for f in SUITE.fixtures if f.shape is Shape.PROGRAM], ids=lambda f: f.id)
+def test_the_battery_reports_each_fixture_with_its_own_weakness_or_not_at_all(fixture: Fixture) -> None:
+    """No correct grader flagged, and no grader with a defect flagged for another: the level's rules."""
+    expected = {fixture.weakness} if fixture.defect and fixture.weakness in _BATTERY_FINDS else set()
+    assert _flags(fixture) == expected, fixture.id
 
 
 def test_the_wrong_reference_fixture_pays_for_the_wrong_references_mistake() -> None:
     wrong = "def solve(items):\n    return sum(items)\n"
     correct, defective = _pair("reference-wrong")
     assert (correct(wrong), defective(wrong)) == (0.0, 1.0)
+
+
+def test_no_constant_can_pass_the_random_grader_by_luck() -> None:
+    """If two cases expected the same value, a constant would pass whenever both were drawn, and a tool
+    right to report that as a trivial implementation would be marked as misattributing."""
+    for kind in ("correct", "defect"):
+        namespace: dict[str, Any] = {"__name__": "fixture"}
+        name = f"nondeterministic-grader-{kind}.py"
+        exec(compile((FIXTURES / name).read_text(encoding="utf-8"), name, "exec"), namespace)
+        expected = [value for _, value in namespace["CASES"]]
+        assert len(set(expected)) == len(expected), name
 
 
 def test_the_nondeterministic_grader_disagrees_with_itself_and_its_partner_never_does() -> None:

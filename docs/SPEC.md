@@ -27,7 +27,7 @@ category named after that class's family.
 |---|---|---|---|---|---|
 | `bohrin/empty-implementation@1` | `drop_side_effect` | the reference with every function body replaced by `pass` | BGW-101 | Structural | `hollow_program` |
 | `bohrin/constant-implementation@1` | `constant_implementation` | the reference with every function returning a constant of its return type (`0`, `""`, `[]`, `{}`, `False`, …) | BGW-101 | Structural, or a lead (below) | `hollow_program` |
-| `bohrin/raise-not-implemented@1` | `raise_not_implemented` | the reference with every function body replaced by `raise NotImplementedError` | BGW-101 | Structural | `hollow_program` |
+| `bohrin/raise-not-implemented@1` | `raise_not_implemented` | the reference with every function body replaced by `raise NotImplementedError` | BGW-101, or BGW-126 (below) | Structural | `hollow_program` |
 | `bohrin/success-exit@1` | `success_exit` | the reference with every function body replaced by `sys.exit(0)` | BGW-102 | Structural | `hollow_program` |
 | `bohrin/equality-spoofing@1` | `equality_spoofing` | the reference with every function returning an object whose `==` is always true | BGW-103 | Structural | `hollow_program` |
 | `bohrin/test-framework-hook@1` | `test_framework_hook` | a workspace: the empty implementation at `{source_path}`, and a `{test_root}/conftest.py` that makes pytest report every test as passed | BGW-108 | Structural | `harness_tampering` |
@@ -62,6 +62,16 @@ Every one of them removes the reference's work, so every one needs that work to 
   count: its result is seen only through the caller.
 - **Raising is not submitted** when the reachable functions' only work is raising an error: one
   error raised in place of another is not provably wrong.
+- **Which weakness a finding carries.** One submission can be paid for by graders with different
+  defects, and the fix a finding points to depends on which. A manifest may say when a finding
+  carries another of the probe's weaknesses than the first (`attribution`): the first rule whose
+  `when_rejected` probe the same grader rejected on the same task decides, and otherwise the
+  finding carries the first weakness (`bohrin.spec.weakness_of`). Both verdicts are ones the user
+  already has. The one built-in rule: a grader that pays for the raising program but rejected the
+  empty implementation runs the code and checks what comes back, so it is scoring a failure as a
+  success, **BGW-126**, fixed by failing closed; one that pays for both never checks what the code
+  does, **BGW-101**, fixed by checking values. The category a submission counts towards is its
+  probe's either way.
 - **Exiting ends the process that runs it.** Run each submission in a process of its own; a loop
   that runs submissions in its own process and catches only `Exception` ends at this one, with
   exit status 0.

@@ -17,7 +17,7 @@ from bohrin.mutate.base import MutationOperator
 from bohrin.relations import BASELINE
 from bohrin.relations import discover as discover_relations
 from bohrin.scoring.coverage import BATTERY_VERSION
-from bohrin.spec.probes import parse, probe_for, probes
+from bohrin.spec.probes import parse, probe_for, probes, weakness_of
 from bohrin.spec.weaknesses import weakness_list
 
 # --------------------------------------------------------------------------- code and data agree
@@ -172,3 +172,65 @@ def test_more_malformed_manifests_are_refused(breakage: str, old: str, new: str)
     assert old in _GOOD, breakage
     with pytest.raises(ValueError):
         parse(_GOOD.replace(old, new, 1))
+
+
+# --------------------------------------------------------------------------- which weakness a finding carries
+
+_TWO = (
+    _GOOD
+    + """
+[[probe]]
+id = "acme/reward-read@1"
+operator = "reward_read"
+weakness = ["BGW-111", "BGW-126"]
+title = "Read the reward"
+shapes = ["container"]
+ground = "structural"
+expect = "reject"
+maturity = "experimental"
+battery = 2
+sources = ["https://example.org/paper"]
+[probe.template]
+solution = "no-op"
+parameters = []
+[[probe.attribution]]
+weakness = "BGW-126"
+when_rejected = "acme/reward-write@1"
+reason = "It ran and was checked."
+"""
+)
+
+
+def test_a_finding_carries_the_first_weakness_unless_an_attribution_holds() -> None:
+    probe = next(p for p in parse(_TWO) if p.id == "acme/reward-read@1")
+    assert weakness_of(probe, set()) == "BGW-111"
+    assert weakness_of(probe, {"acme/other@1"}) == "BGW-111"
+    assert weakness_of(probe, {"acme/reward-write@1"}) == "BGW-126"
+
+
+@pytest.mark.parametrize(
+    ("breakage", "old", "new"),
+    [
+        ("not a list", "[[probe.attribution]]\n", "[probe.attribution]\n"),
+        ("the first weakness", 'weakness = "BGW-126"\nwhen', 'weakness = "BGW-111"\nwhen'),
+        ("not the probe's weakness", 'weakness = "BGW-126"\nwhen', 'weakness = "BGW-127"\nwhen'),
+        ("not a probe ID", 'when_rejected = "acme/reward-write@1"', 'when_rejected = "reward-write"'),
+        ("an unknown probe", 'when_rejected = "acme/reward-write@1"', 'when_rejected = "acme/nothing@1"'),
+        ("the probe itself", 'when_rejected = "acme/reward-write@1"', 'when_rejected = "acme/reward-read@1"'),
+        ("an extra key", 'reason = "It ran and was checked."', 'reason = "It ran and was checked."\nextra = 1'),
+        ("no reason", 'reason = "It ran and was checked."', 'reason = ""'),
+    ],
+)
+def test_an_attribution_breaking_one_rule_is_refused(breakage: str, old: str, new: str) -> None:
+    assert old in _TWO, breakage
+    with pytest.raises(ValueError):
+        parse(_TWO.replace(old, new, 1))
+
+
+def test_a_raising_program_paid_for_is_failure_scored_as_success_where_the_empty_one_was_not() -> None:
+    """The grader ran the code and checked it, yet paid for an exception: the fix is to fail closed."""
+    probe = probe_for("raise_not_implemented")
+    assert probe is not None and probe.weakness == ("BGW-101", "BGW-126")
+    assert weakness_of(probe, set()) == "BGW-101"
+    assert weakness_of(probe, {"bohrin/empty-implementation@1"}) == "BGW-126"
+    assert probe_for("drop_side_effect") is not None
