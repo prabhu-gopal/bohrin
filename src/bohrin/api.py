@@ -66,7 +66,7 @@ from bohrin.scoring.coverage import BATTERY_VERSION, CATEGORIES, Attempt, Covera
 from bohrin.scoring.gap import GapScore, verification_gap
 from bohrin.scoring.interval import wilson_interval
 from bohrin.scoring.scorecard import Acceptance, ControlAttempt, Scorecard, scorecard
-from bohrin.spec import probe_for, probes, weakness_list
+from bohrin.spec import probe_for, probes, weakness_list, weakness_of
 
 __all__ = [
     "ADAPTERS",
@@ -146,5 +146,6 @@ __all__ = [
     "to_sarif",
     "verification_gap",
     "weakness_list",
+    "weakness_of",
     "wilson_interval",
 ]

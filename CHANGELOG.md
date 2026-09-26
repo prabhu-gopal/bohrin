@@ -92,7 +92,9 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
   only when the child prints, after the last check, a token the program never sees; the defective
   one reads exit status 0 as a pass. Each grader with a defect checks types and fails closed exactly as its
   partner does, so it has only its own defect: run against Bohrin's battery, no correct grader pays
-  for any submission, and the exit and spoofing submissions are paid for by their own fixture alone. The tests hold every fixture to what it claims: each correct
+  for any submission, and every submission it pays for is reported under the grader's own weakness
+  or not at all. The nondeterministic pair's cases each expect a different value, so no constant
+  can pass it by the luck of the draw. The tests hold every fixture to what it claims: each correct
   grader accepts the reference and its certified rewritings, and each defect shows on a
   demonstration its correct partner gets right.
 - **Two more hollow-program probes** for BGW-101, trivial implementation:
@@ -106,6 +108,14 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
   checking alone; raising is not submitted where the reachable functions' only work is raising.
   Run over the 823 standard-library modules of Python 3.11 as references, every submission
   parsed and none compiled to its reference.
+- **Which weakness a finding carries, as a published rule.** A probe manifest may now say when a
+  finding carries another of the probe's weaknesses than the first (`attribution`, applied by
+  `bohrin.spec.weakness_of`, also on the plugin seam), from the same grader's verdict on another
+  probe of the same task; no grader is called. The one built-in rule: a grader that pays for the
+  raising program but rejected the empty implementation is reported as BGW-126, failure scored as
+  success (fix: fail closed), not BGW-101 (fix: check values), because it evidently runs the code
+  and checks results. `bohrin/raise-not-implemented@1` names both classes, so a scorecard now
+  counts BGW-126 as tried when it runs.
 - **Probes for four more weakness classes**, each submitting only where the reference has
   reachable work (see Fixed, below):
   - `bohrin/success-exit@1` (BGW-102, exit before the checks): every function body replaced by

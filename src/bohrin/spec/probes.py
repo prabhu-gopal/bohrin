@@ -9,7 +9,7 @@ the weakness list.
 from __future__ import annotations
 
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from functools import cache
 from importlib.resources import files
@@ -59,6 +59,23 @@ class Template:
 
 
 @dataclass(frozen=True, slots=True)
+class Attribution:
+    """When a finding of a probe carries another of its weaknesses than the first.
+
+    One submission can be paid for by graders with different defects, and the fix a finding points
+    to depends on which. The grader's verdict on another probe of the same task tells them apart:
+    both verdicts are ones the user already has, so the rule needs no grader to be called.
+    """
+
+    #: The weakness the finding carries when the condition holds; one of the probe's weaknesses.
+    weakness: str
+    #: The ID of a probe whose submission, on the same task, the same grader rejected.
+    when_rejected: str
+    #: Why the condition points to this weakness, for a reader checking the finding.
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class Probe:
     """One probe's manifest."""
 
@@ -77,6 +94,8 @@ class Probe:
     #: Conditions under which the probe submits nothing, or submits only a lead.
     guards: tuple[str, ...]
     sources: tuple[str, ...]
+    #: Checked in order; a finding carries the first whose condition holds, else ``weakness[0]``.
+    attribution: tuple[Attribution, ...] = ()
 
 
 def _strings(value: Any, where: str) -> tuple[str, ...]:
@@ -164,7 +183,29 @@ def _probe(entry: Mapping[str, Any], weaknesses: WeaknessList) -> Probe:
         template=_template(entry.get("template"), where),
         guards=_strings(entry.get("guards", []), f"{where}.guards"),
         sources=sources,
+        attribution=_attributions(entry.get("attribution", []), weakness, where),
     )
+
+
+def _attributions(raw: Any, weakness: tuple[str, ...], where: str) -> tuple[Attribution, ...]:
+    if not isinstance(raw, list) or not all(isinstance(item, dict) for item in raw):
+        raise ValueError(f"{where}: attribution is a list of tables")
+    out = []
+    for item in raw:
+        if set(item) != {"weakness", "when_rejected", "reason"}:
+            raise ValueError(f"{where}: an attribution has exactly weakness, when_rejected and reason")
+        rule = Attribution(
+            weakness=_text(item, "weakness", f"{where}.attribution"),
+            when_rejected=_text(item, "when_rejected", f"{where}.attribution"),
+            reason=_text(item, "reason", f"{where}.attribution"),
+        )
+        # The first weakness is what the finding carries anyway; any other must be the probe's own.
+        if rule.weakness not in weakness[1:]:
+            raise ValueError(f"{where}: an attribution names one of the probe's weaknesses after the first")
+        if not is_probe_id(rule.when_rejected):
+            raise ValueError(f"{where}: when_rejected must be a probe ID")
+        out.append(rule)
+    return tuple(out)
 
 
 def parse(text: str, weaknesses: WeaknessList | None = None) -> tuple[Probe, ...]:
@@ -176,6 +217,11 @@ def parse(text: str, weaknesses: WeaknessList | None = None) -> tuple[Probe, ...
         repeated = sorted({v for v in values if values.count(v) > 1})
         if repeated:
             raise ValueError(f"duplicate probe {key}s: {repeated}")
+    known = {p.id for p in probes}
+    for probe in probes:
+        for rule in probe.attribution:
+            if rule.when_rejected not in known or rule.when_rejected == probe.id:
+                raise ValueError(f"{probe.id}: when_rejected must name another probe in the same manifests")
     return tuple(sorted(probes, key=lambda p: p.id))
 
 
@@ -190,4 +236,25 @@ def probe_for(operator: str) -> Probe | None:
     return next((p for p in probes() if p.operator == operator), None)
 
 
-__all__ = ["EXPECT", "MATURITIES", "SOLUTIONS", "Probe", "Template", "parse", "probe_for", "probes"]
+def weakness_of(probe: Probe, rejected: Collection[str]) -> str:
+    """The weakness a finding of ``probe`` carries.
+
+    ``rejected`` holds the IDs of the probes whose submissions the same grader rejected on the same
+    task. The first attribution whose probe is among them decides; otherwise the finding carries the
+    probe's first weakness. A verdict that was not measured is not a rejection.
+    """
+    return next((rule.weakness for rule in probe.attribution if rule.when_rejected in rejected), probe.weakness[0])
+
+
+__all__ = [
+    "EXPECT",
+    "MATURITIES",
+    "SOLUTIONS",
+    "Attribution",
+    "Probe",
+    "Template",
+    "parse",
+    "probe_for",
+    "probes",
+    "weakness_of",
+]
