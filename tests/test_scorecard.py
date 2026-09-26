@@ -260,7 +260,7 @@ def test_every_shape_names_the_weaknesses_it_did_not_measure() -> None:
     assert {"BGW-101", "BGW-120", "BGW-124"} <= set(program.measured)
     assert not set(program.measured) & set(program.not_run)
     assert "BGW-104" in program.not_run, "an applicable class nothing tried is named, not hidden"
-    assert "BGW-112" in workspace.not_run and "BGW-112" not in program.not_run, "only classes the shape can have"
+    assert "BGW-138" in workspace.not_run and "BGW-138" not in program.not_run, "only classes the shape can have"
     assert f"not run: {len(program.not_run)} applicable weakness classes: BGW-104" in str(card)
 
 

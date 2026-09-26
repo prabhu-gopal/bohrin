@@ -732,6 +732,29 @@ def _tampered(operator: str, task: Task, conftest: str, detail: str) -> Iterator
     yield Candidate(payload=workspace, provenance=Provenance(operator, "reference", detail), ground=Ground.STRUCTURAL)
 
 
+def _tampered_workspace(
+    operator: str,
+    task: Task,
+    detail: str,
+    files: dict[str, str],
+    parameters: tuple[str, ...],
+    commands: tuple[str, ...] = (),
+) -> Iterator[Candidate]:
+    """The empty implementation at ``{source_path}``, with custom files and commands."""
+    hollow = _hollow(task.reference or "", "pass\n")
+    if hollow is None:
+        return
+    workspace_files = dict(files)
+    if "source_path" in parameters:
+        workspace_files["{source_path}"] = hollow
+    workspace = Workspace(
+        files=workspace_files,
+        commands=commands,
+        parameters=parameters,
+    )
+    yield Candidate(payload=workspace, provenance=Provenance(operator, "reference", detail), ground=Ground.STRUCTURAL)
+
+
 class TestFrameworkHook(MutationOperator):
     """Patch pytest to report every test as passed (BGW-108, test-framework hook).
 
@@ -784,11 +807,132 @@ class TestsDeleted(MutationOperator):
         yield from _tampered(self.id, task, conftest, "pytest is told to run no tests")
 
 
+class HijackedTool(MutationOperator):
+    """A tool the verifier runs to read state is replaced by one that prints the state the verifier
+    wants (BGW-110, hijacked tool)."""
+
+    id = "hijacked_tool"
+    category = "harness_tampering"
+    rationale = (
+        "The verifier's own tool is replaced to report success, so only a verifier that runs from "
+        "trusted paths catches it."
+    )
+    requires_code = True
+    shapes = (Shape.CONTAINER,)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """The empty implementation, with a command that overwrites a verifier tool."""
+        yield from _tampered_workspace(
+            self.id,
+            task,
+            "a tool the verifier relies on is replaced by a dummy that reports success",
+            files={},
+            parameters=("source_path", "hijack_command"),
+            commands=("{hijack_command}",),
+        )
+
+
+class RewardWritten(MutationOperator):
+    """The reward is written directly to a file the agent can reach (BGW-111, direct write to the reward file)."""
+
+    id = "reward_written"
+    category = "harness_tampering"
+    rationale = "The reward is forged directly by the agent, so only a verifier that writes it securely catches it."
+    requires_code = True
+    shapes = (Shape.CONTAINER,)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """The empty implementation, with a command that writes the maximum reward."""
+        yield from _tampered_workspace(
+            self.id,
+            task,
+            "the reward file is overwritten with a success score",
+            files={},
+            parameters=("source_path", "reward_command"),
+            commands=("{reward_command}",),
+        )
+
+
+class ParserReplaced(MutationOperator):
+    """The script that turns test output into a verdict is replaced by one that reports success
+    (BGW-112, result parser replaced)."""
+
+    id = "parser_replaced"
+    category = "harness_tampering"
+    rationale = (
+        "The parser is replaced to always report success, so only a verifier that keeps its parser "
+        "outside the agent's environment catches it."
+    )
+    requires_code = True
+    shapes = (Shape.WORKSPACE, Shape.CONTAINER)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """The empty implementation, with the result parser replaced."""
+        yield from _tampered_workspace(
+            self.id,
+            task,
+            "the script parsing test results is replaced to report success",
+            files={"{parser_path}": "{parser_content}"},
+            parameters=("source_path", "parser_path", "parser_content"),
+        )
+
+
+class MeasurementTampered(MutationOperator):
+    """A performance grader's own measurement (timer/counter) is changed so a wrong or slow program
+    reports well (BGW-113, measurement tampering)."""
+
+    id = "measurement_tampered"
+    category = "harness_tampering"
+    rationale = (
+        "The measurement tool is compromised, so only a verifier that measures from outside the process catches it."
+    )
+    requires_code = True
+    shapes = (Shape.CONTAINER, Shape.HISTORY)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """The empty implementation, with a command that tampers with the measurement."""
+        yield from _tampered_workspace(
+            self.id,
+            task,
+            "the measurement mechanism is tampered with to report good performance",
+            files={},
+            parameters=("source_path", "tamper_command"),
+            commands=("{tamper_command}",),
+        )
+
+
+class FutureRepoState(MutationOperator):
+    """The real fix is taken from repository history the task should not have shipped
+    (BGW-117, future repository state)."""
+
+    id = "future_repo_state"
+    category = "answer_access"
+    rationale = "The answer is extracted from history, so only a verifier that ships a clean repository catches it."
+    requires_code = True
+    shapes = (Shape.WORKSPACE, Shape.CONTAINER)
+
+    def apply(self, task: Task) -> Iterator[Candidate]:
+        """The empty implementation, with a command that accesses the future repository state."""
+        yield from _tampered_workspace(
+            self.id,
+            task,
+            "the repository history is accessed to extract the answer",
+            files={},
+            parameters=("source_path", "future_repo_command"),
+            commands=("{future_repo_command}",),
+        )
+
+
 __all__ = [
     "ConstantImplementation",
     "DropSideEffect",
     "EqualitySpoofing",
+    "FutureRepoState",
+    "HijackedTool",
+    "MeasurementTampered",
+    "ParserReplaced",
     "RaiseNotImplemented",
+    "RewardWritten",
     "SuccessExit",
     "TestFrameworkHook",
     "TestsDeleted",
