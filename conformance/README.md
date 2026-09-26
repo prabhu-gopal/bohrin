@@ -18,6 +18,8 @@ The expected result for every fixture, and the weakness each pair is about, are 
 | Weakness | Pair |
 |---|---|
 | BGW-101 Trivial implementation | `trivial-implementation` |
+| BGW-102 Exit before the checks | `exit-before-checks` |
+| BGW-103 Equality spoofing | `equality-spoofing` |
 | BGW-104 Hard-coded expected outputs | `hard-coded-outputs` |
 | BGW-120 Tests too narrow | `tests-too-narrow` |
 | BGW-123 Output checker too lenient | `lenient-checker` |
@@ -25,8 +27,12 @@ The expected result for every fixture, and the weakness each pair is about, are 
 | BGW-126 Failure scored as success | `failure-scored-as-success` |
 | BGW-127 Nondeterministic grader | `nondeterministic-grader` |
 
-BGW-102, BGW-103 and BGW-105 belong to BCL-1 and have no fixtures yet. A level achieved on this
-version of the suite is achieved over the seven weaknesses above, and the check says so.
+BGW-105 belongs to BCL-1 and has no fixtures yet. A level achieved on this version of the suite
+is achieved over the nine weaknesses above, and the check says so.
+
+The `exit-before-checks` pair runs the program in a child process, because that is where an exit
+status can be mistaken for a verdict. The correct one passes a program only when the child prints,
+after the last check, a token handed to it on standard input before the program runs.
 
 ## The grader interface
 

@@ -24,6 +24,7 @@ from _parity import disagreements
 from bohrin.cli import CANNOT_RUN, CLEAN, FINDINGS, main
 from bohrin.conformance import (
     CONFORMANCE_RESULTS_SCHEMA,
+    Fixture,
     Results,
     check,
     conformance_results_schema,
@@ -31,8 +32,10 @@ from bohrin.conformance import (
     render,
     suite,
 )
-from bohrin.ir.task import Shape
+from bohrin.ir.task import Shape, Source
+from bohrin.mutate.battery import battery
 from bohrin.relations import positive_controls
+from bohrin.spec.probes import probe_for
 from bohrin.spec.weaknesses import weakness_list
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -127,6 +130,16 @@ _DEMONSTRATIONS = [
     ("lenient-checker", "1 2 3 4\n", 0.0, 1.0),
     ("reference-wrong", REFERENCE, 1.0, 0.0),
     ("failure-scored-as-success", "def solve(items):\n    raise NotImplementedError\n", 0.0, 1.0),
+    ("exit-before-checks", "def solve(items):\n    import sys\n    sys.exit(0)\n", 0.0, 1.0),
+    ("exit-before-checks", "import sys\nsys.exit(0)\n", 0.0, 1.0),
+    (
+        "equality-spoofing",
+        "class Anything:\n    def __eq__(self, other):\n        return True\n\n"
+        "    def __ne__(self, other):\n        return False\n\n\n"
+        "def solve(items):\n    return Anything()\n",
+        0.0,
+        1.0,
+    ),
 ]
 
 
@@ -144,6 +157,39 @@ def test_a_defective_grader_has_only_its_defect_and_accepts_the_reference(slug: 
     """Exactly one defect: on the correct solution, the defective grader agrees with its partner."""
     correct, defective = _pair(slug)
     assert correct(REFERENCE) == defective(REFERENCE) == 1.0
+
+
+def _rewards(name: str) -> dict[str, float | None]:
+    """What one fixture pays for each grounded submission of the battery; None where the grader died.
+
+    A defect grader catching only ``Exception`` dies on a submission that exits, as the suite's README
+    warns; a tool records that as an error, never as a pass.
+    """
+    grade = _grader(name)
+    out: dict[str, float | None] = {}
+    for candidate in battery(task(REFERENCE)).grounded:
+        assert isinstance(candidate.payload, Source)
+        try:
+            out[candidate.provenance.operator] = grade(candidate.payload.text)
+        except BaseException:
+            out[candidate.provenance.operator] = None
+    return out
+
+
+@pytest.mark.parametrize(
+    "fixture", [f for f in SUITE.fixtures if f.shape is Shape.PROGRAM and not f.defect], ids=lambda f: f.id
+)
+def test_the_battery_accuses_no_correct_grader_in_the_suite(fixture: Fixture) -> None:
+    assert [op for op, reward in _rewards(fixture.file).items() if reward == 1.0] == [], fixture.id
+
+
+@pytest.mark.parametrize(("operator", "weakness"), [("success_exit", "BGW-102"), ("equality_spoofing", "BGW-103")])
+def test_the_exit_and_spoofing_probes_land_on_their_own_defect_and_no_other(operator: str, weakness: str) -> None:
+    """Each defect grader has exactly one defect, so these probes are paid for by one fixture only."""
+    probe = probe_for(operator)
+    assert probe is not None and probe.weakness == (weakness,)
+    paying = [f.id for f in SUITE.fixtures if f.shape is Shape.PROGRAM and _rewards(f.file)[operator] == 1.0]
+    assert paying == [next(f.id for f in SUITE.fixtures if f.weakness == weakness and f.defect)]
 
 
 def test_the_wrong_reference_fixture_pays_for_the_wrong_references_mistake() -> None:
@@ -196,7 +242,7 @@ def _check(document: dict[str, Any]) -> Any:
 def test_a_tool_that_flags_every_defect_and_nothing_else_achieves_the_level() -> None:
     report = _check(_results(_perfect))
     assert report.achieved and report.youden == 1.0
-    assert (report.true_positives, report.defective, report.false_positives, report.correct) == (7, 7, 0, 7)
+    assert (report.true_positives, report.defective, report.false_positives, report.correct) == (9, 9, 0, 9)
     assert "BCL-1 achieved" in render(report)
 
 
@@ -274,9 +320,9 @@ def test_results_that_cannot_be_checked_are_refused(change: Callable[[dict[str, 
 
 def test_the_level_is_claimed_only_over_the_weaknesses_with_fixtures_and_says_so() -> None:
     report = _check(_results(_perfect))
-    assert set(report.suite.pending) == {"BGW-102", "BGW-103", "BGW-105"}
+    assert set(report.suite.pending) == {"BGW-105"}
     assert f"checked over {len(SUITE.covered)} of its {len(SUITE.weaknesses)} weaknesses" in render(report)
-    assert report.to_json()["weaknesses_pending"] == ["BGW-102", "BGW-103", "BGW-105"]
+    assert report.to_json()["weaknesses_pending"] == ["BGW-105"]
 
 
 # --------------------------------------------------------------------------- the published format
@@ -373,4 +419,4 @@ def test_another_level_is_not_published_yet() -> None:
 
 def test_results_are_read_into_their_record() -> None:
     results = read_results(_results(_perfect))
-    assert isinstance(results, Results) and results.tool == "example" and len(results.results) == 14
+    assert isinstance(results, Results) and results.tool == "example" and len(results.results) == 18
