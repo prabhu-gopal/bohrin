@@ -8,6 +8,14 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The scorecard says how many scored tasks had nothing tried.** A line such as `program: 73 tasks
+  scored` beside a Coverage Score over 32 tasks read as though all 73 were checked; on the other 41
+  the battery had nothing to submit (their references do no reachable work), which the output never
+  said. Each shape now prints `…; nothing tried on 41 of them` when that count is not zero, and
+  `ShapeScore.untried` carries it. Found running the released package against real coding graders.
+
 ## [0.4.0] — 2026-09-26
 
 ### Added
