@@ -126,10 +126,16 @@ class ShapeScore:
     measured: tuple[str, ...]
     #: Weakness classes that apply to the shape and that nothing in this run measured.
     not_run: tuple[str, ...]
+    #: Scored tasks on which no grounded submission had a result: the Coverage Score says nothing
+    #: about them, which a count of "tasks scored" alone would hide.
+    untried: int = 0
 
     def __str__(self) -> str:
         name = self.shape.value if self.shape is not None else "overall"
-        lines = [f"{name}: {self.tasks} task{'' if self.tasks == 1 else 's'} scored", f"  {self.coverage}"]
+        head = f"{name}: {self.tasks} task{'' if self.tasks == 1 else 's'} scored"
+        if self.untried:
+            head += f"; nothing tried on {self.untried} of them"
+        lines = [head, f"  {self.coverage}"]
         lines.append(f"  {self.acceptance}")
         if self.not_run:
             count = len(self.not_run)
@@ -267,6 +273,9 @@ def _shape_score(
 ) -> ShapeScore:
     coverage = coverage_score(attempts, ops)
     acceptance = correct_work_acceptance(controls)
+    # A task counts as tried when some grounded submission on it has a result; a lead, or an attempt
+    # that could not run, tries nothing.
+    tried = {a.task_id for a in attempts if a.candidate.known_wrong and a.accepted is not None}
     measured = _measured_weaknesses(attempts, controls)
     applicable = {
         w.id
@@ -280,6 +289,7 @@ def _shape_score(
         acceptance=acceptance,
         measured=_by_number(measured),
         not_run=_by_number(applicable - measured),
+        untried=tasks - len(tried),
     )
 
 

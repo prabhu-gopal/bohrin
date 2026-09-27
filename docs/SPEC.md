@@ -216,7 +216,10 @@ silently:
 **Per shape, then overall.** Tasks are scored per grader shape, then all together. Each shape
 names the weakness classes that apply to it (active classes of a scoring category that list the
 shape) and that nothing in the run measured. A class is measured when a probe whose manifest names
-it produced a counted result.
+it produced a counted result. Each shape also says how many of its scored tasks had **nothing
+tried**: no grounded submission with a result (the battery had nothing to submit, or every attempt
+could not run). The Coverage Score says nothing about those tasks, and a bare count of tasks scored
+would hide that.
 
 **Verification Gap** — how often a grader paid for work that was wrong or disagreed with itself.
 0–100, lower is better, printed with the checks it covered. Checks that could not run are left

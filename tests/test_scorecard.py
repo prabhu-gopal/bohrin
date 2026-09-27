@@ -155,6 +155,38 @@ def test_nothing_measured_is_not_perfect() -> None:
     assert correct_work_acceptance([]).interval_95 is None
 
 
+#: A reference whose output comes from module-level code: there is no reachable work to remove, so
+#: the battery submits nothing, and the task is scored with nothing tried on it.
+SCRIPT = "print(sum([2, 3]))\n"
+
+
+def test_scored_tasks_with_nothing_tried_are_counted_and_said() -> None:
+    """ "2 tasks scored" beside a score over one task would read as if both were checked."""
+    tasks = [task(REFERENCE, task_id="works"), task(SCRIPT, task_id="script")]
+    attempts, controls = _run(tasks, lambda t: _correct(t) if t.id == "works" else (lambda sub: sub == SCRIPT))
+    assert not [a for a in attempts if a.task_id == "script"], "the battery submits nothing for the script"
+
+    card = scorecard(tasks, attempts, controls)
+    (program,) = card.shapes
+    assert (program.tasks, program.untried, program.coverage.measured) == (2, 1, 1)
+    assert str(program).startswith("program: 2 tasks scored; nothing tried on 1 of them\n")
+
+
+def test_a_task_whose_only_grounded_attempt_could_not_run_is_untried() -> None:
+    tasks = _tasks(Shape.PROGRAM)
+    attempts, controls = _run(tasks, lambda _t: lambda _submission: None)
+    card = scorecard(tasks, attempts, controls)
+
+    assert card.overall.untried == card.overall.tasks == len(tasks)
+
+
+def test_when_every_task_was_tried_the_line_says_nothing_more() -> None:
+    tasks = _tasks(Shape.PROGRAM)
+    card = scorecard(tasks, *_run(tasks, _correct))
+
+    assert card.overall.untried == 0 and "nothing tried" not in str(card)
+
+
 # --------------------------------------------------------------------------- exclusions
 
 
