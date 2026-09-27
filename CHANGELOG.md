@@ -8,6 +8,8 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-09-27
+
 ### Fixed
 
 - **The scorecard says how many scored tasks had nothing tried.** A line such as `program: 73 tasks
@@ -405,6 +407,7 @@ The first release: check the grader of an RL coding environment before you train
 - **Seventeen certified rewritings of a correct answer** (`bohrin.relations`), and public entry
   points (`bohrin.mutators`, `bohrin.relations`) for third-party operators and rewritings.
 
-[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/prabhu-gopal/bohrin/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/prabhu-gopal/bohrin/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/prabhu-gopal/bohrin/releases/tag/v0.3.0
