@@ -145,6 +145,13 @@ class RenamedLocals(Relation):
         "local variables, and no renamed function reads its own local names at run time"
     )
 
+    #: Both sides are compared after Python's own unparser has laid them out, so that only the names
+    #: differ. Comparing the rewriting against the original's own layout would fail wherever the
+    #: compiler stores a source position as a constant — from Python 3.13 a class body keeps its own
+    #: first line number — which says nothing about what the program does. Re-laying out the original
+    #: changes nothing either: that it has the same syntax tree is checked here, and is the whole of
+    #: what certifies :class:`Reformatted`.
+
     def render(self, answer: str) -> str | None:
         """The program with locals renamed, or ``None`` when nothing can be renamed and certified."""
         try:
@@ -176,7 +183,10 @@ class RenamedLocals(Relation):
         if not renamed:
             return None
         rewritten = ast.unparse(tree) + "\n"
-        return rewritten if same_bytecode_except_local_names(answer, rewritten) else None
+        laid_out = ast.unparse(ast.parse(answer)) + "\n"  # parsed without error above, so it parses again
+        if not same_syntax(answer, laid_out):
+            return None
+        return rewritten if same_bytecode_except_local_names(laid_out, rewritten) else None
 
 
 __all__ = ["CommentFree", "Reformatted", "RenamedLocals"]
