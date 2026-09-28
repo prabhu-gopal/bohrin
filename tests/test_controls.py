@@ -116,6 +116,28 @@ def test_an_f_string_name_specifier_keeps_its_output_when_renamed() -> None:
     assert _outcome(rewritten, inputs) == _outcome(source, inputs)
 
 
+def test_a_program_with_a_class_is_renamed_on_every_python() -> None:
+    """From Python 3.13 a class body stores its own first line number as a constant. Comparing the rewriting
+    against the original's own layout then failed on any program with a class, and the rewriting was never
+    sent: on 3.13, real references lost this check entirely. Both sides are now compared laid out alike."""
+    body, inputs = CORPUS["class with methods"]
+    # A comment and blank lines above the class, as in real code: laying the program out again moves the
+    # class up, which is what changed its stored line number and broke the comparison.
+    source = "# accumulate doubled values\n\n\n" + body
+    rewritten = RenamedLocals().render(source)
+    assert rewritten is not None, "refused: the certificate compared layouts, not programs"
+    assert "doubled" not in rewritten
+    assert _outcome(rewritten, inputs) == _outcome(source, inputs)
+
+
+def test_nothing_is_renamed_when_laying_out_the_original_changes_its_syntax(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The layout used for the comparison must itself be the same program: checked, never assumed."""
+    import bohrin.relations.builtin as builtin
+
+    monkeypatch.setattr(builtin, "same_syntax", lambda _left, _right: False)
+    assert RenamedLocals().render(REFERENCE) is None
+
+
 def test_parameters_and_function_names_are_kept() -> None:
     rewritten = RenamedLocals().render(REFERENCE)
     assert rewritten is not None and "def solve(items):" in rewritten and "total" not in rewritten

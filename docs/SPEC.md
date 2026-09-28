@@ -109,7 +109,7 @@ by machine, to do the same thing. A rewriting that cannot be proved is not submi
 | `bohrin/oracle@1` | `oracle` | the reference, unchanged: the baseline | identity | BGW-124 |
 | `bohrin/comment-free-oracle@1` | `comment_free` | the reference with its comments removed | the same syntax tree | BGW-120 |
 | `bohrin/reformatted-oracle@1` | `reformatted` | the reference re-laid out by Python's own unparser | the same syntax tree | BGW-120 |
-| `bohrin/renamed-oracle@1` | `renamed_locals` | the reference with local variables renamed; never parameters or function names | the same bytecode, up to the names of locals | BGW-120 |
+| `bohrin/renamed-oracle@1` | `renamed_locals` | the reference with local variables renamed; never parameters or function names | the same bytecode, up to the names of locals, with both laid out by Python's unparser (the laid-out original checked to have the same syntax tree) | BGW-120 |
 
 - **If the grader rejects the baseline**, the task is a baseline failure: excluded from every
   rate, never scored.

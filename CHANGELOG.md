@@ -8,6 +8,16 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The renamed-locals correct-work check works on Python 3.13, and more often everywhere.** It proves a
+  rewriting does the same thing by comparing bytecode up to local names, but compared the rewriting (laid out
+  by Python's unparser) against the original's own layout. From Python 3.13 a class body stores its first line
+  number as a constant, so any program with a class failed that comparison and the check was never sent.
+  Both sides are now laid out alike, and the laid-out original is checked to have the same syntax tree. Over
+  the standard library the check now applies to 424 of 657 modules on 3.13 (64 before) and 476 of 711 on 3.12
+  (389 before); no rewriting fails to compile. Found running the released package against real graders.
+
 ## [0.4.1] — 2026-09-27
 
 ### Fixed
