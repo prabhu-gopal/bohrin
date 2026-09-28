@@ -8,6 +8,8 @@ advisory), as [SECURITY.md](SECURITY.md) describes.
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-09-29
+
 ### Fixed
 
 - **The renamed-locals correct-work check works on Python 3.13, and more often everywhere.** It proves a
@@ -417,7 +419,8 @@ The first release: check the grader of an RL coding environment before you train
 - **Seventeen certified rewritings of a correct answer** (`bohrin.relations`), and public entry
   points (`bohrin.mutators`, `bohrin.relations`) for third-party operators and rewritings.
 
-[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/prabhu-gopal/bohrin/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/prabhu-gopal/bohrin/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/prabhu-gopal/bohrin/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/prabhu-gopal/bohrin/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/prabhu-gopal/bohrin/releases/tag/v0.3.0
